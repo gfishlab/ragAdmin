@@ -1,0 +1,35 @@
+package com.ragadmin.server.model.controller;
+
+import com.ragadmin.server.common.model.ApiResponse;
+import com.ragadmin.server.model.dto.CreateModelProviderRequest;
+import com.ragadmin.server.model.dto.ModelProviderResponse;
+import com.ragadmin.server.model.service.ModelProviderService;
+import jakarta.validation.Valid;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/admin/model-providers")
+public class ModelProviderController {
+
+    private final ModelProviderService modelProviderService;
+
+    public ModelProviderController(ModelProviderService modelProviderService) {
+        this.modelProviderService = modelProviderService;
+    }
+
+    @GetMapping
+    public ApiResponse<List<ModelProviderResponse>> list() {
+        return ApiResponse.success(modelProviderService.list());
+    }
+
+    @PostMapping
+    public ApiResponse<ModelProviderResponse> create(@Valid @RequestBody CreateModelProviderRequest request) {
+        return ApiResponse.success(modelProviderService.create(request));
+    }
+}
