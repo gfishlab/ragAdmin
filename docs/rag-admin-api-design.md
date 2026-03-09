@@ -368,6 +368,10 @@
 }
 ```
 
+### 6.3.2 激活文档版本
+
+- `PUT /api/admin/documents/{documentId}/versions/{versionId}/activate`
+
 ### 6.4 更新文档启停状态
 
 - `PUT /api/admin/documents/{documentId}/status`

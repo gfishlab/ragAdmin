@@ -4,6 +4,7 @@ import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.dto.ActivateDocumentVersionResponse;
 import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.CreateDocumentVersionRequest;
@@ -49,6 +50,14 @@ public class DocumentController {
     ) {
         AuthenticatedUser authenticatedUser = (AuthenticatedUser) httpServletRequest.getAttribute(AuthService.REQUEST_ATTRIBUTE);
         return ApiResponse.success(documentService.createDocumentVersion(documentId, request, authenticatedUser.getUserId()));
+    }
+
+    @PutMapping("/documents/{documentId}/versions/{versionId}/activate")
+    public ApiResponse<ActivateDocumentVersionResponse> activateVersion(
+            @PathVariable Long documentId,
+            @PathVariable Long versionId
+    ) {
+        return ApiResponse.success(documentService.activateVersion(documentId, versionId));
     }
 
     @PostMapping("/documents/{documentId}/parse")

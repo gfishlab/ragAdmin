@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.dto.ActivateDocumentVersionResponse;
 import com.ragadmin.server.document.dto.ChunkResponse;
 import com.ragadmin.server.document.dto.CreateDocumentRequest;
 import com.ragadmin.server.document.dto.CreateDocumentVersionRequest;
@@ -106,6 +107,30 @@ public class DocumentService {
         document.setContentHash(request.getContentHash());
         documentMapper.updateById(document);
         return toResponse(document);
+    }
+
+    @Transactional
+    public ActivateDocumentVersionResponse activateVersion(Long documentId, Long versionId) {
+        DocumentEntity document = requireDocument(documentId);
+        DocumentVersionEntity version = documentVersionMapper.selectById(versionId);
+        if (version == null || !version.getDocumentId().equals(documentId)) {
+            throw new BusinessException("DOCUMENT_VERSION_NOT_FOUND", "文档版本不存在", HttpStatus.NOT_FOUND);
+        }
+
+        // 激活历史版本时，主文档的存储信息和 currentVersion 必须同步回滚到目标版本。
+        document.setStorageBucket(version.getStorageBucket());
+        document.setStorageObjectKey(version.getStorageObjectKey());
+        document.setCurrentVersion(version.getVersionNo());
+        document.setContentHash(version.getContentHash());
+        document.setParseStatus(version.getParseStatus());
+        documentMapper.updateById(document);
+
+        return new ActivateDocumentVersionResponse(
+                document.getId(),
+                version.getId(),
+                document.getCurrentVersion(),
+                document.getParseStatus()
+        );
     }
 
     public void updateDocumentStatus(Long documentId, Boolean enabled) {
