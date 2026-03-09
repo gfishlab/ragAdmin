@@ -11,6 +11,9 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
+import com.ragadmin.server.document.support.ChunkVectorizationService;
+import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
+import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -31,6 +34,8 @@ public class DocumentParseProcessor {
     private final ChunkMapper chunkMapper;
     private final DocumentContentExtractor documentContentExtractor;
     private final TaskStepRecordMapper taskStepRecordMapper;
+    private final KnowledgeBaseService knowledgeBaseService;
+    private final ChunkVectorizationService chunkVectorizationService;
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
@@ -38,7 +43,9 @@ public class DocumentParseProcessor {
             DocumentVersionMapper documentVersionMapper,
             ChunkMapper chunkMapper,
             DocumentContentExtractor documentContentExtractor,
-            TaskStepRecordMapper taskStepRecordMapper
+            TaskStepRecordMapper taskStepRecordMapper,
+            KnowledgeBaseService knowledgeBaseService,
+            ChunkVectorizationService chunkVectorizationService
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
         this.documentMapper = documentMapper;
@@ -46,6 +53,8 @@ public class DocumentParseProcessor {
         this.chunkMapper = chunkMapper;
         this.documentContentExtractor = documentContentExtractor;
         this.taskStepRecordMapper = taskStepRecordMapper;
+        this.knowledgeBaseService = knowledgeBaseService;
+        this.chunkVectorizationService = chunkVectorizationService;
     }
 
     public void processWaitingTasks() {
@@ -61,13 +70,20 @@ public class DocumentParseProcessor {
     public void processSingleTask(Long taskId) {
         try {
             ProcessingContext context = markRunning(taskId);
+            KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(context.document().getKbId());
+
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
             ParsedContent parsedContent = parseContent(context.document(), context.version());
             completeStep(extractStep);
 
             TaskStepRecordEntity chunkStep = startStep(context.task().getId(), "PERSIST_CHUNKS", "切片入库");
-            persistChunks(context, parsedContent.chunks());
+            List<ChunkEntity> chunks = persistChunks(context, parsedContent.chunks());
             completeStep(chunkStep);
+
+            TaskStepRecordEntity embeddingStep = startStep(context.task().getId(), "GENERATE_EMBEDDING", "生成向量");
+            chunkVectorizationService.vectorize(knowledgeBase, chunks);
+            completeStep(embeddingStep);
+
             markSuccess(context);
             log.info("文档解析任务执行成功，taskId={}, documentId={}, chunkCount={}",
                     context.task().getId(), context.document().getId(), parsedContent.chunks().size());
@@ -125,11 +141,16 @@ public class DocumentParseProcessor {
     }
 
     @Transactional
-    protected void persistChunks(ProcessingContext context, List<String> chunks) {
+    protected List<ChunkEntity> persistChunks(ProcessingContext context, List<String> chunks) {
+        List<ChunkEntity> existingChunks = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
+                .eq(ChunkEntity::getDocumentVersionId, context.version().getId())
+                .orderByAsc(ChunkEntity::getChunkNo));
+        chunkVectorizationService.deleteRefsByChunkIds(existingChunks.stream().map(ChunkEntity::getId).toList());
         chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
                 .eq(ChunkEntity::getDocumentVersionId, context.version().getId()));
 
         int chunkNo = 1;
+        List<ChunkEntity> persistedChunks = new ArrayList<>();
         for (String chunkText : chunks) {
             ChunkEntity entity = new ChunkEntity();
             entity.setKbId(context.document().getKbId());
@@ -142,7 +163,9 @@ public class DocumentParseProcessor {
             entity.setMetadataJson(null);
             entity.setEnabled(Boolean.TRUE);
             chunkMapper.insert(entity);
+            persistedChunks.add(entity);
         }
+        return persistedChunks;
     }
 
     @Transactional

@@ -43,6 +43,7 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
         ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
         ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);
         ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
+        ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
 
         log.info("已完成默认模型提供方与模型定义初始化");
     }

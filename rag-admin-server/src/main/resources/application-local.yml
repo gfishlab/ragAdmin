@@ -15,6 +15,10 @@ spring:
       enabled: true
 
 rag:
+  ai:
+    ollama:
+      base-url: http://127.0.0.1:11434
+      timeout-seconds: 30
   storage:
     minio:
       endpoint: 192.168.0.11
@@ -24,3 +28,8 @@ rag:
       secret-key: zh123456
       bucket-name: hrsys
       public-url: http://192.168.0.11:9000
+  vector:
+    milvus:
+      base-url: http://127.0.0.1:19530
+      token: root:Milvus
+      enabled: true
