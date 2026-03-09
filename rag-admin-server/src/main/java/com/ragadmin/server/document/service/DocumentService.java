@@ -211,7 +211,6 @@ public class DocumentService {
     @Transactional
     public DocumentParseTaskEntity submitParseTask(Long documentId, int retryCount) {
         DocumentEntity document = requireDocument(documentId);
-
         DocumentVersionEntity version = documentVersionMapper.selectOne(new LambdaQueryWrapper<DocumentVersionEntity>()
                 .eq(DocumentVersionEntity::getDocumentId, documentId)
                 .eq(DocumentVersionEntity::getVersionNo, document.getCurrentVersion())
@@ -220,8 +219,22 @@ public class DocumentService {
             throw new BusinessException("DOCUMENT_VERSION_NOT_FOUND", "文档版本不存在", HttpStatus.NOT_FOUND);
         }
 
+        return submitParseTask(document, version, retryCount);
+    }
+
+    @Transactional
+    public DocumentParseTaskEntity submitParseTask(Long documentId, Long versionId, int retryCount) {
+        DocumentEntity document = requireDocument(documentId);
+        DocumentVersionEntity version = documentVersionMapper.selectById(versionId);
+        if (version == null || !version.getDocumentId().equals(documentId)) {
+            throw new BusinessException("DOCUMENT_VERSION_NOT_FOUND", "文档版本不存在", HttpStatus.NOT_FOUND);
+        }
+        return submitParseTask(document, version, retryCount);
+    }
+
+    private DocumentParseTaskEntity submitParseTask(DocumentEntity document, DocumentVersionEntity version, int retryCount) {
         DocumentParseTaskEntity existingTask = documentParseTaskMapper.selectOne(new LambdaQueryWrapper<DocumentParseTaskEntity>()
-                .eq(DocumentParseTaskEntity::getDocumentId, documentId)
+                .eq(DocumentParseTaskEntity::getDocumentId, document.getId())
                 .eq(DocumentParseTaskEntity::getDocumentVersionId, version.getId())
                 .in(DocumentParseTaskEntity::getTaskStatus, "WAITING", "RUNNING")
                 .last("LIMIT 1"));
@@ -231,7 +244,7 @@ public class DocumentService {
 
         DocumentParseTaskEntity task = new DocumentParseTaskEntity();
         task.setKbId(document.getKbId());
-        task.setDocumentId(documentId);
+        task.setDocumentId(document.getId());
         task.setDocumentVersionId(version.getId());
         task.setTaskStatus("WAITING");
         task.setRetryCount(retryCount);

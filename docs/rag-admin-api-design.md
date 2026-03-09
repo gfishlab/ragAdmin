@@ -423,6 +423,11 @@
 
 - `POST /api/admin/tasks/{taskId}/retry`
 
+说明：
+
+- 仅 `FAILED` 或 `CANCELED` 状态允许重试
+- 重试必须沿用原任务对应的 `documentVersionId`
+
 ### 6.10 内部任务回调
 
 - `POST /api/internal/tasks/{taskId}/complete`

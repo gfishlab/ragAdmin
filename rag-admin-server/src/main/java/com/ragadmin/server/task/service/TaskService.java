@@ -87,10 +87,14 @@ public class TaskService {
 
     public TaskDetailResponse retry(Long taskId) {
         DocumentParseTaskEntity task = requireTask(taskId);
-        if ("WAITING".equals(task.getTaskStatus()) || "RUNNING".equals(task.getTaskStatus())) {
-            throw new BusinessException("TASK_RETRY_NOT_ALLOWED", "任务进行中，不能重复重试", HttpStatus.BAD_REQUEST);
+        if (!"FAILED".equals(task.getTaskStatus()) && !"CANCELED".equals(task.getTaskStatus())) {
+            throw new BusinessException("TASK_RETRY_NOT_ALLOWED", "仅失败或已取消的任务允许重试", HttpStatus.BAD_REQUEST);
         }
-        DocumentParseTaskEntity retriedTask = documentService.submitParseTask(task.getDocumentId(), task.getRetryCount() + 1);
+        DocumentParseTaskEntity retriedTask = documentService.submitParseTask(
+                task.getDocumentId(),
+                task.getDocumentVersionId(),
+                task.getRetryCount() + 1
+        );
         recordRetry(retriedTask, "手动重试", "SUBMITTED");
         DocumentEntity document = documentMapper.selectById(retriedTask.getDocumentId());
         return toDetail(retriedTask, document, listSteps(retriedTask.getId()), listRetryRecords(retriedTask.getId()));

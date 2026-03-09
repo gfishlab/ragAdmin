@@ -67,7 +67,7 @@
 | `DOCUMENT_VERSION_NOT_FOUND` | 文档版本不存在 | 解析任务、版本切换、内部回调找不到目标版本 |
 | `TASK_NOT_FOUND` | 任务不存在 | 查询任务详情、内部回调时找不到任务 |
 | `TASK_TYPE_UNSUPPORTED` | 任务类型暂不支持 | 任务列表筛选传入不支持的类型 |
-| `TASK_RETRY_NOT_ALLOWED` | 当前任务不允许重试 | 任务仍在运行时重复重试 |
+| `TASK_RETRY_NOT_ALLOWED` | 当前任务不允许重试 | 对成功任务重试，或对非失败/已取消任务重复重试 |
 | `TASK_STATUS_INVALID` | 内部回调任务状态不合法 | 内部回调传入非 `SUCCESS` / `FAILED` |
 | `PARSE_STATUS_INVALID` | 内部回调解析状态不合法 | 内部回调传入非法解析状态 |
 
