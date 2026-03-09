@@ -7,13 +7,14 @@ import com.ragadmin.server.auth.dto.LoginRequest;
 import com.ragadmin.server.auth.dto.LoginResponse;
 import com.ragadmin.server.auth.dto.RefreshTokenResponse;
 import com.ragadmin.server.auth.entity.SysUserEntity;
+import com.ragadmin.server.auth.mapper.AuthUserStructMapper;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.model.AuthClaims;
 import com.ragadmin.server.auth.model.AuthTokenType;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -23,30 +24,32 @@ import org.springframework.util.StringUtils;
 import java.time.Duration;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 @Service
 public class AuthService {
 
     public static final String REQUEST_ATTRIBUTE = "AUTHENTICATED_USER";
 
-    @Autowired
+    @Resource
     private SysUserMapper sysUserMapper;
 
-    @Autowired
+    @Resource
     private SysRoleMapper sysRoleMapper;
 
-    @Autowired
+    @Resource
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
+    @Resource
     private TokenService tokenService;
 
-    @Autowired
+    @Resource
     private StringRedisTemplate stringRedisTemplate;
 
-    @Autowired
+    @Resource
     private AuthProperties authProperties;
+
+    @Resource
+    private AuthUserStructMapper authUserStructMapper;
 
     public LoginResponse login(LoginRequest request) {
         SysUserEntity user = findByLoginId(request.getLoginId());
@@ -62,39 +65,37 @@ public class AuthService {
         String refreshToken = tokenService.generateRefreshToken(user.getId(), user.getUsername(), sessionId);
         persistSession(user.getId(), sessionId, refreshToken);
 
-        return new LoginResponse(
-                accessToken,
-                refreshToken,
-                authProperties.getAccessTokenTtlSeconds(),
-                authProperties.getRefreshTokenTtlSeconds(),
-                buildCurrentUser(user)
-        );
+        return new LoginResponse()
+                .setAccessToken(accessToken)
+                .setRefreshToken(refreshToken)
+                .setExpiresIn(authProperties.getAccessTokenTtlSeconds())
+                .setRefreshExpiresIn(authProperties.getRefreshTokenTtlSeconds())
+                .setUser(buildCurrentUser(user));
     }
 
     public RefreshTokenResponse refresh(String refreshToken) {
         AuthClaims claims = parseToken(refreshToken, AuthTokenType.REFRESH);
-        assertSessionAlive(claims.sessionId());
-        String storedRefreshToken = stringRedisTemplate.opsForValue().get(buildRefreshKey(claims.sessionId()));
+        assertSessionAlive(claims.getSessionId());
+        String storedRefreshToken = stringRedisTemplate.opsForValue().get(buildRefreshKey(claims.getSessionId()));
         if (!StringUtils.hasText(storedRefreshToken) || !storedRefreshToken.equals(refreshToken)) {
             throw unauthorized("Refresh Token 无效或已失效");
         }
 
-        SysUserEntity user = loadEnabledUser(claims.userId());
-        String newAccessToken = tokenService.generateAccessToken(user.getId(), user.getUsername(), claims.sessionId());
-        String newRefreshToken = tokenService.generateRefreshToken(user.getId(), user.getUsername(), claims.sessionId());
-        persistSession(user.getId(), claims.sessionId(), newRefreshToken);
-        return new RefreshTokenResponse(
-                newAccessToken,
-                newRefreshToken,
-                authProperties.getAccessTokenTtlSeconds(),
-                authProperties.getRefreshTokenTtlSeconds()
-        );
+        SysUserEntity user = loadEnabledUser(claims.getUserId());
+        String newAccessToken = tokenService.generateAccessToken(user.getId(), user.getUsername(), claims.getSessionId());
+        String newRefreshToken = tokenService.generateRefreshToken(user.getId(), user.getUsername(), claims.getSessionId());
+        persistSession(user.getId(), claims.getSessionId(), newRefreshToken);
+        return new RefreshTokenResponse()
+                .setAccessToken(newAccessToken)
+                .setRefreshToken(newRefreshToken)
+                .setExpiresIn(authProperties.getAccessTokenTtlSeconds())
+                .setRefreshExpiresIn(authProperties.getRefreshTokenTtlSeconds());
     }
 
     public void logout(AuthenticatedUser authenticatedUser) {
         stringRedisTemplate.delete(List.of(
-                buildSessionKey(authenticatedUser.sessionId()),
-                buildRefreshKey(authenticatedUser.sessionId())
+                buildSessionKey(authenticatedUser.getSessionId()),
+                buildRefreshKey(authenticatedUser.getSessionId())
         ));
     }
 
@@ -104,8 +105,11 @@ public class AuthService {
 
     public AuthenticatedUser authenticateAccessToken(String accessToken) {
         AuthClaims claims = parseToken(accessToken, AuthTokenType.ACCESS);
-        assertSessionAlive(claims.sessionId());
-        return new AuthenticatedUser(claims.userId(), claims.username(), claims.sessionId());
+        assertSessionAlive(claims.getSessionId());
+        return new AuthenticatedUser()
+                .setUserId(claims.getUserId())
+                .setUsername(claims.getUsername())
+                .setSessionId(claims.getSessionId());
     }
 
     private SysUserEntity findByLoginId(String loginId) {
@@ -125,19 +129,13 @@ public class AuthService {
     }
 
     private CurrentUserResponse buildCurrentUser(SysUserEntity user) {
-        return new CurrentUserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getDisplayName(),
-                user.getMobile(),
-                sysRoleMapper.selectRoleCodesByUserId(user.getId())
-        );
+        return authUserStructMapper.toCurrentUserResponse(user, sysRoleMapper.selectRoleCodesByUserId(user.getId()));
     }
 
     private AuthClaims parseToken(String token, AuthTokenType expectedType) {
         try {
             AuthClaims claims = tokenService.parse(token);
-            if (claims.tokenType() != expectedType) {
+            if (claims.getTokenType() != expectedType) {
                 throw unauthorized("Token 类型非法");
             }
             return claims;

@@ -7,8 +7,8 @@ import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.service.UserAdminService;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
+import jakarta.annotation.Resource;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/users")
 public class UserController {
 
-    @Autowired
+    @Resource
     private UserAdminService userAdminService;
 
     @GetMapping

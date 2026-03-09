@@ -25,8 +25,11 @@
     <properties>
         <java.version>21</java.version>
         <jjwt.version>0.12.6</jjwt.version>
+        <lombok.version>1.18.36</lombok.version>
+        <mapstruct.version>1.6.3</mapstruct.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <minio.version>8.5.17</minio.version>
+        <spring-boot.version>3.3.5</spring-boot.version>
         <tika.version>2.9.2</tika.version>
     </properties>
 </project>

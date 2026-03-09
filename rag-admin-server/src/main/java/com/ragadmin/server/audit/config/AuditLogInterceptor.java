@@ -34,8 +34,8 @@ public class AuditLogInterceptor implements HandlerInterceptor {
         AuditLogEntity entity = new AuditLogEntity();
         AuthenticatedUser user = (AuthenticatedUser) request.getAttribute(AuthService.REQUEST_ATTRIBUTE);
         if (user != null) {
-            entity.setOperatorUserId(user.userId());
-            entity.setOperatorUsername(user.username());
+            entity.setOperatorUserId(user.getUserId());
+            entity.setOperatorUsername(user.getUsername());
         }
         entity.setActionType(request.getMethod());
         entity.setBizType(resolveBizType(request.getRequestURI()));

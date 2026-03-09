@@ -8,12 +8,13 @@ import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.entity.SysRoleEntity;
 import com.ragadmin.server.auth.entity.SysUserEntity;
 import com.ragadmin.server.auth.entity.SysUserRoleEntity;
+import com.ragadmin.server.auth.mapper.AuthUserStructMapper;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.mapper.SysUserRoleMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
-import org.springframework.beans.factory.annotation.Autowired;
+import jakarta.annotation.Resource;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -29,17 +30,20 @@ import java.util.stream.Collectors;
 @Service
 public class UserAdminService {
 
-    @Autowired
+    @Resource
     private SysUserMapper sysUserMapper;
 
-    @Autowired
+    @Resource
     private SysRoleMapper sysRoleMapper;
 
-    @Autowired
+    @Resource
     private SysUserRoleMapper sysUserRoleMapper;
 
-    @Autowired
+    @Resource
     private PasswordEncoder passwordEncoder;
+
+    @Resource
+    private AuthUserStructMapper authUserStructMapper;
 
     public PageResponse<UserListItemResponse> list(String keyword, String status, long pageNo, long pageSize) {
         Page<SysUserEntity> page = sysUserMapper.selectPage(
@@ -178,14 +182,6 @@ public class UserAdminService {
     }
 
     private UserListItemResponse toResponse(SysUserEntity user, List<String> roles) {
-        return new UserListItemResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getDisplayName(),
-                user.getEmail(),
-                user.getMobile(),
-                user.getStatus(),
-                roles
-        );
+        return authUserStructMapper.toUserListItemResponse(user, roles);
     }
 }

@@ -36,7 +36,7 @@ public class DocumentController {
             HttpServletRequest httpServletRequest
     ) {
         AuthenticatedUser authenticatedUser = (AuthenticatedUser) httpServletRequest.getAttribute(AuthService.REQUEST_ATTRIBUTE);
-        return ApiResponse.success(documentService.createDocument(kbId, request, authenticatedUser.userId()));
+        return ApiResponse.success(documentService.createDocument(kbId, request, authenticatedUser.getUserId()));
     }
 
     @PostMapping("/documents/{documentId}/parse")

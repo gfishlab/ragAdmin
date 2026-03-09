@@ -8,6 +8,7 @@ import com.ragadmin.server.auth.entity.SysUserRoleEntity;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.mapper.SysUserRoleMapper;
+import jakarta.annotation.Resource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
@@ -20,25 +21,16 @@ public class AuthBootstrapInitializer implements ApplicationRunner {
 
     private static final Logger log = LoggerFactory.getLogger(AuthBootstrapInitializer.class);
 
-    private final AuthProperties authProperties;
-    private final SysUserMapper sysUserMapper;
-    private final SysRoleMapper sysRoleMapper;
-    private final SysUserRoleMapper sysUserRoleMapper;
-    private final PasswordEncoder passwordEncoder;
-
-    public AuthBootstrapInitializer(
-            AuthProperties authProperties,
-            SysUserMapper sysUserMapper,
-            SysRoleMapper sysRoleMapper,
-            SysUserRoleMapper sysUserRoleMapper,
-            PasswordEncoder passwordEncoder
-    ) {
-        this.authProperties = authProperties;
-        this.sysUserMapper = sysUserMapper;
-        this.sysRoleMapper = sysRoleMapper;
-        this.sysUserRoleMapper = sysUserRoleMapper;
-        this.passwordEncoder = passwordEncoder;
-    }
+    @Resource
+    private AuthProperties authProperties;
+    @Resource
+    private SysUserMapper sysUserMapper;
+    @Resource
+    private SysRoleMapper sysRoleMapper;
+    @Resource
+    private SysUserRoleMapper sysUserRoleMapper;
+    @Resource
+    private PasswordEncoder passwordEncoder;
 
     @Override
     public void run(ApplicationArguments args) {

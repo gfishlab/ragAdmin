@@ -1,9 +1,14 @@
 package com.ragadmin.server.auth.dto;
 
-public record RefreshTokenResponse(
-        String accessToken,
-        String refreshToken,
-        long expiresIn,
-        long refreshExpiresIn
-) {
+import lombok.Data;
+import lombok.experimental.Accessors;
+
+@Data
+@Accessors(chain = true)
+public class RefreshTokenResponse {
+
+    private String accessToken;
+    private String refreshToken;
+    private long expiresIn;
+    private long refreshExpiresIn;
 }

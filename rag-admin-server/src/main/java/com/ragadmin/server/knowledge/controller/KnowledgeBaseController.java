@@ -43,7 +43,7 @@ public class KnowledgeBaseController {
             HttpServletRequest httpServletRequest
     ) {
         AuthenticatedUser authenticatedUser = (AuthenticatedUser) httpServletRequest.getAttribute(AuthService.REQUEST_ATTRIBUTE);
-        return ApiResponse.success(knowledgeBaseService.create(request, authenticatedUser.userId()));
+        return ApiResponse.success(knowledgeBaseService.create(request, authenticatedUser.getUserId()));
     }
 
     @GetMapping("/{kbId}")

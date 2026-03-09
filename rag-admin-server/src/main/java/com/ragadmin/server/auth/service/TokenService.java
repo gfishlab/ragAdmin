@@ -3,10 +3,11 @@ package com.ragadmin.server.auth.service;
 import com.ragadmin.server.auth.config.AuthProperties;
 import com.ragadmin.server.auth.model.AuthClaims;
 import com.ragadmin.server.auth.model.AuthTokenType;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.Resource;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import javax.crypto.SecretKey;
@@ -17,12 +18,12 @@ import java.util.Date;
 @Service
 public class TokenService {
 
-    @Autowired
+    @Resource
     private AuthProperties authProperties;
 
     private SecretKey secretKey;
 
-    @Autowired
+    @PostConstruct
     public void init() {
         this.secretKey = Keys.hmacShaKeyFor(authProperties.getJwtSecret().getBytes(StandardCharsets.UTF_8));
     }
@@ -41,12 +42,11 @@ public class TokenService {
                 .build()
                 .parseSignedClaims(token)
                 .getPayload();
-        return new AuthClaims(
-                claims.get("uid", Long.class),
-                claims.getSubject(),
-                claims.get("sid", String.class),
-                AuthTokenType.valueOf(claims.get("typ", String.class))
-        );
+        return new AuthClaims()
+                .setUserId(claims.get("uid", Long.class))
+                .setUsername(claims.getSubject())
+                .setSessionId(claims.get("sid", String.class))
+                .setTokenType(AuthTokenType.valueOf(claims.get("typ", String.class)));
     }
 
     private String generateToken(Long userId, String username, String sessionId, AuthTokenType tokenType, long ttlSeconds) {

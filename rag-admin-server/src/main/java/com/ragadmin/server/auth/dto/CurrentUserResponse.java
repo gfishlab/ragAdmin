@@ -1,12 +1,17 @@
 package com.ragadmin.server.auth.dto;
 
+import lombok.Data;
+import lombok.experimental.Accessors;
+
 import java.util.List;
 
-public record CurrentUserResponse(
-        Long id,
-        String username,
-        String displayName,
-        String mobile,
-        List<String> roles
-) {
+@Data
+@Accessors(chain = true)
+public class CurrentUserResponse {
+
+    private Long id;
+    private String username;
+    private String displayName;
+    private String mobile;
+    private List<String> roles;
 }

@@ -2,6 +2,7 @@ package com.ragadmin.server.auth.service;
 
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.common.exception.BusinessException;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.http.HttpHeaders;
@@ -13,6 +14,9 @@ import org.springframework.web.servlet.HandlerInterceptor;
 @Component
 public class AuthInterceptor implements HandlerInterceptor {
 
+    @Resource
+    private AuthService authService;
+
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) {
         String authorization = request.getHeader(HttpHeaders.AUTHORIZATION);
@@ -23,11 +27,5 @@ public class AuthInterceptor implements HandlerInterceptor {
         AuthenticatedUser authenticatedUser = authService.authenticateAccessToken(accessToken);
         request.setAttribute(AuthService.REQUEST_ATTRIBUTE, authenticatedUser);
         return true;
-    }
-
-    private final AuthService authService;
-
-    public AuthInterceptor(AuthService authService) {
-        this.authService = authService;
     }
 }

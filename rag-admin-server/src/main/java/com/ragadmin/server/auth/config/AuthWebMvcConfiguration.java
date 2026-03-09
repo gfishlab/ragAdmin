@@ -1,6 +1,7 @@
 package com.ragadmin.server.auth.config;
 
 import com.ragadmin.server.auth.service.AuthInterceptor;
+import jakarta.annotation.Resource;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
@@ -8,11 +9,8 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class AuthWebMvcConfiguration implements WebMvcConfigurer {
 
-    private final AuthInterceptor authInterceptor;
-
-    public AuthWebMvcConfiguration(AuthInterceptor authInterceptor) {
-        this.authInterceptor = authInterceptor;
-    }
+    @Resource
+    private AuthInterceptor authInterceptor;
 
     @Override
     public void addInterceptors(InterceptorRegistry registry) {

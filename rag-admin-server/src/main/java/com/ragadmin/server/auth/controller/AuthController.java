@@ -8,9 +8,9 @@ import com.ragadmin.server.auth.dto.RefreshTokenResponse;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.common.model.ApiResponse;
+import jakarta.annotation.Resource;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/admin/auth")
 public class AuthController {
 
-    @Autowired
+    @Resource
     private AuthService authService;
 
     @PostMapping("/login")
@@ -43,7 +43,7 @@ public class AuthController {
     @GetMapping("/me")
     public ApiResponse<CurrentUserResponse> me(HttpServletRequest request) {
         AuthenticatedUser authenticatedUser = currentUser(request);
-        return ApiResponse.success(authService.getCurrentUser(authenticatedUser.userId()));
+        return ApiResponse.success(authService.getCurrentUser(authenticatedUser.getUserId()));
     }
 
     private AuthenticatedUser currentUser(HttpServletRequest request) {

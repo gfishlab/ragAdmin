@@ -79,7 +79,7 @@ public class ChatService {
         knowledgeBaseService.requireById(request.getKbId());
         ChatSessionEntity session = new ChatSessionEntity();
         session.setKbId(request.getKbId());
-        session.setUserId(user.userId());
+        session.setUserId(user.getUserId());
         session.setSessionName(request.getSessionName());
         session.setStatus("ENABLED");
         chatSessionMapper.insert(session);
@@ -89,14 +89,14 @@ public class ChatService {
     public PageResponse<ChatSessionResponse> listSessions(Long kbId, AuthenticatedUser user, long pageNo, long pageSize) {
         Page<ChatSessionEntity> page = chatSessionMapper.selectPage(Page.of(pageNo, pageSize),
                 new LambdaQueryWrapper<ChatSessionEntity>()
-                        .eq(ChatSessionEntity::getUserId, user.userId())
+                        .eq(ChatSessionEntity::getUserId, user.getUserId())
                         .eq(kbId != null, ChatSessionEntity::getKbId, kbId)
                         .orderByDesc(ChatSessionEntity::getId));
         return new PageResponse<>(page.getRecords().stream().map(this::toSessionResponse).toList(), pageNo, pageSize, page.getTotal());
     }
 
     public List<ChatMessageResponse> listMessages(Long sessionId, AuthenticatedUser user) {
-        ChatSessionEntity session = requireSession(sessionId, user.userId());
+        ChatSessionEntity session = requireSession(sessionId, user.getUserId());
         List<ChatMessageEntity> messages = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, session.getId())
                 .orderByAsc(ChatMessageEntity::getId));
@@ -133,7 +133,7 @@ public class ChatService {
 
     @Transactional
     public ChatResponse chat(Long sessionId, ChatRequest request, AuthenticatedUser user) {
-        ChatSessionEntity session = requireSession(sessionId, user.userId());
+        ChatSessionEntity session = requireSession(sessionId, user.getUserId());
         if (!session.getKbId().equals(request.getKbId())) {
             throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
         }
@@ -155,7 +155,7 @@ public class ChatService {
 
         ChatMessageEntity message = new ChatMessageEntity();
         message.setSessionId(session.getId());
-        message.setUserId(user.userId());
+        message.setUserId(user.getUserId());
         message.setMessageType("RAG");
         message.setQuestionText(request.getQuestion());
         message.setAnswerText(completion.content());
@@ -201,19 +201,19 @@ public class ChatService {
         if (message == null) {
             throw new BusinessException("CHAT_MESSAGE_NOT_FOUND", "消息不存在", HttpStatus.NOT_FOUND);
         }
-        ChatSessionEntity session = requireSession(message.getSessionId(), user.userId());
+        ChatSessionEntity session = requireSession(message.getSessionId(), user.getUserId());
         if (session == null) {
             throw new BusinessException("CHAT_SESSION_NOT_FOUND", "会话不存在", HttpStatus.NOT_FOUND);
         }
 
         ChatFeedbackEntity entity = chatFeedbackMapper.selectOne(new LambdaQueryWrapper<ChatFeedbackEntity>()
                 .eq(ChatFeedbackEntity::getMessageId, messageId)
-                .eq(ChatFeedbackEntity::getUserId, user.userId())
+                .eq(ChatFeedbackEntity::getUserId, user.getUserId())
                 .last("LIMIT 1"));
         if (entity == null) {
             entity = new ChatFeedbackEntity();
             entity.setMessageId(messageId);
-            entity.setUserId(user.userId());
+            entity.setUserId(user.getUserId());
             entity.setFeedbackType(feedbackType);
             entity.setCommentText(comment);
             chatFeedbackMapper.insert(entity);
