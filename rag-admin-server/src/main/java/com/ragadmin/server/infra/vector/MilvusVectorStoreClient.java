@@ -69,6 +69,36 @@ public class MilvusVectorStoreClient {
                 .toList());
     }
 
+    public List<SearchResult> search(String collectionName, List<Float> vector, int limit) {
+        if (!milvusProperties.isEnabled()) {
+            return List.of();
+        }
+        try {
+            SearchResponse response = restClient.post()
+                    .uri("/v2/vectordb/entities/search")
+                    .body(Map.of(
+                            "collectionName", collectionName,
+                            "data", List.of(vector),
+                            "annsField", "vector",
+                            "limit", limit,
+                            "outputFields", List.of("id")
+                    ))
+                    .retrieve()
+                    .body(SearchResponse.class);
+            if (response == null || response.data() == null) {
+                return List.of();
+            }
+            return response.data().stream()
+                    .map(item -> new SearchResult(
+                            String.valueOf(item.get("id")),
+                            parseScore(item)
+                    ))
+                    .toList();
+        } catch (Exception ex) {
+            throw new BusinessException("MILVUS_SEARCH_FAILED", "Milvus 检索失败", HttpStatus.BAD_GATEWAY);
+        }
+    }
+
     private void upsertRaw(String collectionName, List<Map<String, Object>> data) {
         if (!milvusProperties.isEnabled()) {
             return;
@@ -85,5 +115,19 @@ public class MilvusVectorStoreClient {
         } catch (Exception ex) {
             throw new BusinessException("MILVUS_INSERT_FAILED", "Milvus 向量写入失败", HttpStatus.BAD_GATEWAY);
         }
+    }
+
+    private double parseScore(Map<String, Object> item) {
+        Object score = item.getOrDefault("distance", item.get("score"));
+        if (score instanceof Number number) {
+            return number.doubleValue();
+        }
+        return 0D;
+    }
+
+    public record SearchResult(String vectorId, double score) {
+    }
+
+    private record SearchResponse(List<Map<String, Object>> data) {
     }
 }

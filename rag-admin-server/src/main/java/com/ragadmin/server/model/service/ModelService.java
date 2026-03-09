@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
+import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
@@ -164,6 +165,20 @@ public class ModelService {
         );
     }
 
+    public ChatModelDescriptor requireChatModelDescriptor(Long modelId) {
+        AiModelEntity model = requireModelWithCapability(modelId, "TEXT_GENERATION");
+        AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
+        if (provider == null) {
+            throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
+        }
+        return new ChatModelDescriptor(
+                model.getId(),
+                model.getModelCode(),
+                provider.getProviderCode(),
+                provider.getProviderName()
+        );
+    }
+
     private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {
         return new ModelResponse(
                 entity.getId(),
@@ -178,5 +193,13 @@ public class ModelService {
                 entity.getTemperatureDefault(),
                 entity.getStatus()
         );
+    }
+
+    public record ChatModelDescriptor(
+            Long modelId,
+            String modelCode,
+            String providerCode,
+            String providerName
+    ) {
     }
 }
