@@ -3,10 +3,12 @@ package com.ragadmin.server.model.controller;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.model.dto.CreateModelRequest;
+import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.service.ModelService;
 import jakarta.validation.Valid;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,5 +39,10 @@ public class ModelController {
     @PostMapping
     public ApiResponse<ModelResponse> create(@Valid @RequestBody CreateModelRequest request) {
         return ApiResponse.success(modelService.create(request));
+    }
+
+    @PostMapping("/{modelId}/health-check")
+    public ApiResponse<ModelHealthCheckResponse> healthCheck(@PathVariable Long modelId) {
+        return ApiResponse.success(modelService.healthCheck(modelId));
     }
 }

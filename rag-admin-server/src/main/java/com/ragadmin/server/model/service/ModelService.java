@@ -5,7 +5,11 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
+import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.model.dto.ModelCapabilityHealthResponse;
+import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
@@ -32,17 +36,23 @@ public class ModelService {
     private final AiProviderMapper aiProviderMapper;
     private final AiModelCapabilityMapper aiModelCapabilityMapper;
     private final ModelProviderService modelProviderService;
+    private final ChatClientRegistry chatClientRegistry;
+    private final EmbeddingClientRegistry embeddingClientRegistry;
 
     public ModelService(
             AiModelMapper aiModelMapper,
             AiProviderMapper aiProviderMapper,
             AiModelCapabilityMapper aiModelCapabilityMapper,
-            ModelProviderService modelProviderService
+            ModelProviderService modelProviderService,
+            ChatClientRegistry chatClientRegistry,
+            EmbeddingClientRegistry embeddingClientRegistry
     ) {
         this.aiModelMapper = aiModelMapper;
         this.aiProviderMapper = aiProviderMapper;
         this.aiModelCapabilityMapper = aiModelCapabilityMapper;
         this.modelProviderService = modelProviderService;
+        this.chatClientRegistry = chatClientRegistry;
+        this.embeddingClientRegistry = embeddingClientRegistry;
     }
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
@@ -177,6 +187,69 @@ public class ModelService {
                 provider.getProviderCode(),
                 provider.getProviderName()
         );
+    }
+
+    public ModelHealthCheckResponse healthCheck(Long modelId) {
+        AiModelEntity model = requireModel(modelId);
+        AiProviderEntity provider = requireProvider(model.getProviderId());
+        List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
+                .stream()
+                .map(AiModelCapabilityEntity::getCapabilityType)
+                .distinct()
+                .toList();
+        if (capabilityTypes.isEmpty()) {
+            throw new BusinessException("MODEL_CAPABILITY_EMPTY", "模型未配置能力类型", HttpStatus.BAD_REQUEST);
+        }
+
+        // 探活按能力逐项执行，返回结果里保留每一项状态，便于联调时直接定位失败点。
+        List<ModelCapabilityHealthResponse> checks = capabilityTypes.stream()
+                .map(capabilityType -> checkCapability(provider, model, capabilityType))
+                .toList();
+        boolean success = checks.stream().allMatch(item -> "UP".equals(item.status()));
+        String message = success ? "模型探活成功" : "模型探活失败，请检查 capabilityChecks";
+        return new ModelHealthCheckResponse(
+                model.getId(),
+                model.getModelCode(),
+                provider.getProviderCode(),
+                success ? "UP" : "DOWN",
+                message,
+                checks
+        );
+    }
+
+    private ModelCapabilityHealthResponse checkCapability(AiProviderEntity provider, AiModelEntity model, String capabilityType) {
+        try {
+            if ("TEXT_GENERATION".equals(capabilityType)) {
+                ChatModelClient client = chatClientRegistry.getClient(provider.getProviderCode());
+                client.chat(model.getModelCode(), List.of(new ChatModelClient.ChatMessage("user", "ping")));
+                return new ModelCapabilityHealthResponse(capabilityType, "UP", "聊天能力可用");
+            }
+            if ("EMBEDDING".equals(capabilityType)) {
+                embeddingClientRegistry.getClient(provider.getProviderCode())
+                        .embed(model.getModelCode(), List.of("health check"));
+                return new ModelCapabilityHealthResponse(capabilityType, "UP", "向量能力可用");
+            }
+            return new ModelCapabilityHealthResponse(capabilityType, "DOWN", "当前未实现该能力探活");
+        } catch (Exception ex) {
+            String message = ex.getMessage() == null || ex.getMessage().isBlank() ? "探活失败" : ex.getMessage();
+            return new ModelCapabilityHealthResponse(capabilityType, "DOWN", message);
+        }
+    }
+
+    private AiModelEntity requireModel(Long modelId) {
+        AiModelEntity model = aiModelMapper.selectById(modelId);
+        if (model == null) {
+            throw new BusinessException("MODEL_NOT_FOUND", "模型不存在", HttpStatus.NOT_FOUND);
+        }
+        return model;
+    }
+
+    private AiProviderEntity requireProvider(Long providerId) {
+        AiProviderEntity provider = aiProviderMapper.selectById(providerId);
+        if (provider == null) {
+            throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
+        }
+        return provider;
     }
 
     private ModelResponse toResponse(AiModelEntity entity, AiProviderEntity provider, List<String> capabilityTypes) {
