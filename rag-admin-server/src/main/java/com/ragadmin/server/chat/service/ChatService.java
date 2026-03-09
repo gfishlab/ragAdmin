@@ -11,9 +11,11 @@ import com.ragadmin.server.chat.dto.ChatSessionResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
 import com.ragadmin.server.chat.dto.CreateChatSessionRequest;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
+import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
+import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.common.exception.BusinessException;
@@ -45,6 +47,7 @@ public class ChatService {
     private final ChatSessionMapper chatSessionMapper;
     private final ChatMessageMapper chatMessageMapper;
     private final ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+    private final ChatFeedbackMapper chatFeedbackMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final RetrievalService retrievalService;
     private final ModelService modelService;
@@ -56,6 +59,7 @@ public class ChatService {
             ChatSessionMapper chatSessionMapper,
             ChatMessageMapper chatMessageMapper,
             ChatAnswerReferenceMapper chatAnswerReferenceMapper,
+            ChatFeedbackMapper chatFeedbackMapper,
             KnowledgeBaseService knowledgeBaseService,
             RetrievalService retrievalService,
             ModelService modelService,
@@ -66,6 +70,7 @@ public class ChatService {
         this.chatSessionMapper = chatSessionMapper;
         this.chatMessageMapper = chatMessageMapper;
         this.chatAnswerReferenceMapper = chatAnswerReferenceMapper;
+        this.chatFeedbackMapper = chatFeedbackMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.retrievalService = retrievalService;
         this.modelService = modelService;
@@ -192,6 +197,35 @@ public class ChatService {
                 references,
                 new ChatUsageResponse(completion.promptTokens(), completion.completionTokens())
         );
+    }
+
+    @Transactional
+    public void submitFeedback(Long messageId, String feedbackType, String comment, AuthenticatedUser user) {
+        ChatMessageEntity message = chatMessageMapper.selectById(messageId);
+        if (message == null) {
+            throw new BusinessException("CHAT_MESSAGE_NOT_FOUND", "消息不存在", HttpStatus.NOT_FOUND);
+        }
+        ChatSessionEntity session = requireSession(message.getSessionId(), user.userId());
+        if (session == null) {
+            throw new BusinessException("CHAT_SESSION_NOT_FOUND", "会话不存在", HttpStatus.NOT_FOUND);
+        }
+
+        ChatFeedbackEntity entity = chatFeedbackMapper.selectOne(new LambdaQueryWrapper<ChatFeedbackEntity>()
+                .eq(ChatFeedbackEntity::getMessageId, messageId)
+                .eq(ChatFeedbackEntity::getUserId, user.userId())
+                .last("LIMIT 1"));
+        if (entity == null) {
+            entity = new ChatFeedbackEntity();
+            entity.setMessageId(messageId);
+            entity.setUserId(user.userId());
+            entity.setFeedbackType(feedbackType);
+            entity.setCommentText(comment);
+            chatFeedbackMapper.insert(entity);
+            return;
+        }
+        entity.setFeedbackType(feedbackType);
+        entity.setCommentText(comment);
+        chatFeedbackMapper.updateById(entity);
     }
 
     private ChatSessionEntity requireSession(Long sessionId, Long userId) {

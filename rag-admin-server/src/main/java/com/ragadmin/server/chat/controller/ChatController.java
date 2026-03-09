@@ -3,6 +3,7 @@ package com.ragadmin.server.chat.controller;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
+import com.ragadmin.server.chat.dto.ChatFeedbackRequest;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatSessionResponse;
@@ -65,6 +66,16 @@ public class ChatController {
             HttpServletRequest httpServletRequest
     ) {
         return ApiResponse.success(chatService.chat(sessionId, request, currentUser(httpServletRequest)));
+    }
+
+    @PostMapping("/messages/{messageId}/feedback")
+    public ApiResponse<Void> feedback(
+            @PathVariable Long messageId,
+            @Valid @RequestBody ChatFeedbackRequest request,
+            HttpServletRequest httpServletRequest
+    ) {
+        chatService.submitFeedback(messageId, request.getFeedbackType(), request.getComment(), currentUser(httpServletRequest));
+        return ApiResponse.success(null);
     }
 
     private AuthenticatedUser currentUser(HttpServletRequest request) {
