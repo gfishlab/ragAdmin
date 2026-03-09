@@ -22,6 +22,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 @Service
 public class DocumentService {
@@ -93,6 +94,35 @@ public class DocumentService {
         );
         return new PageResponse<>(
                 page.getRecords().stream().map(this::toChunkResponse).toList(),
+                pageNo,
+                pageSize,
+                page.getTotal()
+        );
+    }
+
+    public PageResponse<DocumentResponse> listKnowledgeBaseDocuments(
+            Long kbId,
+            String keyword,
+            String parseStatus,
+            Boolean enabled,
+            long pageNo,
+            long pageSize
+    ) {
+        KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
+        Page<DocumentEntity> page = documentMapper.selectPage(
+                Page.of(pageNo, pageSize),
+                new LambdaQueryWrapper<DocumentEntity>()
+                        .eq(DocumentEntity::getKbId, knowledgeBase.getId())
+                        .eq(StringUtils.hasText(parseStatus), DocumentEntity::getParseStatus, parseStatus)
+                        .eq(enabled != null, DocumentEntity::getEnabled, enabled)
+                        .and(StringUtils.hasText(keyword), wrapper -> wrapper
+                                .like(DocumentEntity::getDocName, keyword)
+                                .or()
+                                .like(DocumentEntity::getDocType, keyword))
+                        .orderByDesc(DocumentEntity::getId)
+        );
+        return new PageResponse<>(
+                page.getRecords().stream().map(this::toResponse).toList(),
                 pageNo,
                 pageSize,
                 page.getTotal()

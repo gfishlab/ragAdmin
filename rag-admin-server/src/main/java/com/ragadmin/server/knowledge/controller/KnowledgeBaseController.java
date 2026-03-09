@@ -4,6 +4,8 @@ import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.dto.DocumentResponse;
+import com.ragadmin.server.document.service.DocumentService;
 import com.ragadmin.server.knowledge.dto.CreateKnowledgeBaseRequest;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.dto.UpdateKnowledgeBaseStatusRequest;
@@ -23,6 +25,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/knowledge-bases")
 public class KnowledgeBaseController {
+
+    @Autowired
+    private DocumentService documentService;
 
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
@@ -49,6 +54,18 @@ public class KnowledgeBaseController {
     @GetMapping("/{kbId}")
     public ApiResponse<KnowledgeBaseResponse> detail(@PathVariable Long kbId) {
         return ApiResponse.success(knowledgeBaseService.getDetail(kbId));
+    }
+
+    @GetMapping("/{kbId}/documents")
+    public ApiResponse<PageResponse<DocumentResponse>> documents(
+            @PathVariable Long kbId,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String parseStatus,
+            @RequestParam(required = false) Boolean enabled,
+            @RequestParam(defaultValue = "1") long pageNo,
+            @RequestParam(defaultValue = "20") long pageSize
+    ) {
+        return ApiResponse.success(documentService.listKnowledgeBaseDocuments(kbId, keyword, parseStatus, enabled, pageNo, pageSize));
     }
 
     @PutMapping("/{kbId}/status")
