@@ -1,11 +1,3 @@
--- RAG 知识库管理系统 PostgreSQL 建表草案 V1
--- 说明：
--- 1. 本草案面向首期内部平台
--- 2. 默认数据库为 PostgreSQL 16
--- 3. 数据库结构变更统一通过 Flyway 管理
--- 4. 向量本体不落 PostgreSQL，首期仅保存 Milvus 引用信息
--- 5. embedding 维度暂按 1024 设计，如后续切换模型需同步调整
-
 CREATE TABLE IF NOT EXISTS sys_user (
     id              BIGSERIAL PRIMARY KEY,
     username        VARCHAR(64) NOT NULL,
@@ -39,22 +31,6 @@ CREATE TABLE IF NOT EXISTS sys_user_role (
     UNIQUE (user_id, role_id),
     CONSTRAINT fk_sys_user_role_user FOREIGN KEY (user_id) REFERENCES sys_user (id),
     CONSTRAINT fk_sys_user_role_role FOREIGN KEY (role_id) REFERENCES sys_role (id)
-);
-
-CREATE TABLE IF NOT EXISTS sys_menu (
-    id                  BIGSERIAL PRIMARY KEY,
-    parent_id           BIGINT NOT NULL DEFAULT 0,
-    menu_type           VARCHAR(16) NOT NULL,
-    menu_code           VARCHAR(100) NOT NULL,
-    menu_name           VARCHAR(100) NOT NULL,
-    path                VARCHAR(255),
-    component           VARCHAR(255),
-    permission_code     VARCHAR(100),
-    sort_no             INTEGER NOT NULL DEFAULT 0,
-    status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
-    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (menu_code)
 );
 
 CREATE TABLE IF NOT EXISTS sys_audit_log (
@@ -130,19 +106,6 @@ CREATE TABLE IF NOT EXISTS ai_model_route (
 );
 
 CREATE INDEX IF NOT EXISTS idx_ai_model_route_scope ON ai_model_route (route_scope, scope_ref_id);
-
-CREATE TABLE IF NOT EXISTS ai_prompt_template (
-    id                  BIGSERIAL PRIMARY KEY,
-    template_code       VARCHAR(100) NOT NULL,
-    template_name       VARCHAR(100) NOT NULL,
-    capability_type     VARCHAR(64) NOT NULL,
-    prompt_content      TEXT NOT NULL,
-    version_no          INTEGER NOT NULL DEFAULT 1,
-    status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
-    created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (template_code, version_no)
-);
 
 CREATE TABLE IF NOT EXISTS kb_knowledge_base (
     id                  BIGSERIAL PRIMARY KEY,

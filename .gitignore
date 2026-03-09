@@ -1,2 +1,4 @@
 .claude/
 .idea/
+rag-admin-server/.env.local
+rag-admin-server/target/

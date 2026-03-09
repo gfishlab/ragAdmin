@@ -23,14 +23,14 @@
 本计划用于落地 `ragAdmin` 的首批可运行后端版本，交付范围是：
 
 - 后端单体应用
-- 本地 `docker-compose` 中间件环境
+- 本地 `docker-compose` + 内网依赖混合环境
 - API 可验收主链路
 
 首批不包含正式前端页面交付。
 
 ### 1.1 首批必须交付
 
-- 本地 `docker-compose` 环境与启动说明
+- 本地环境与内网依赖接入说明
 - Spring Boot 单体项目骨架
 - Flyway 初始迁移脚本
 - 登录、刷新、登出、当前用户
@@ -65,8 +65,9 @@
 - 后端：`JDK 21 + Spring Boot 3`
 - 单体单进程形态
 - 应用运行在宿主机
-- 中间件全部通过 `docker-compose` 容器化运行
-- 应用通过 `localhost` 访问中间件
+- PostgreSQL、Milvus、Ollama 优先通过 `docker-compose` 容器化运行
+- Redis、MinIO 当前阶段允许连接内网现有服务
+- 应用连接地址统一通过环境变量覆盖，禁止把敏感配置写死进仓库
 - 数据库：`PostgreSQL 16`
 - 缓存与会话：`Redis`
 - 对象存储：`MinIO`
@@ -93,8 +94,16 @@
 ### 3.1 开发模式
 
 - 后端应用在本机运行
-- PostgreSQL、Redis、MinIO、Milvus、Ollama 通过容器运行
-- 所有连接均走 `localhost`
+- PostgreSQL、Milvus、Ollama 优先通过容器运行
+- Redis、MinIO 当前阶段走内网服务器
+- 所有连接通过环境变量配置，不强制写死 `localhost`
+
+### 3.1.1 当前已确认的内网依赖
+
+- Redis：`192.168.0.11:6379`
+- MinIO API：`http://192.168.0.11:9000`
+- MinIO Bucket：`hrsys`
+- Redis 和 MinIO 账号密钥只允许保存在本地环境变量或未纳管的本地配置中
 
 ### 3.2 固定端口
 
@@ -111,18 +120,21 @@
 ### 3.3 `docker-compose` 必含服务
 
 - `postgres`
-- `redis`
-- `minio`
 - `milvus`
 - `etcd`
 - Milvus 所需显式依赖服务
 - `ollama`
 
+说明：
+
+- 如果后续内网 Redis、MinIO 不可复用，再补本地容器编排
+- 当前阶段 `docker-compose` 不强制拉起 Redis、MinIO
+
 ### 3.4 本地连接约定
 
 - `jdbc:postgresql://localhost:5432/rag_admin`
-- `redis://localhost:6379`
-- `http://localhost:9000`
+- `redis://$REDIS_HOST:$REDIS_PORT`
+- `http://$MINIO_ENDPOINT:$MINIO_PORT`
 - `localhost:19530`
 - `http://localhost:11434`
 
@@ -545,7 +557,7 @@ rag-admin/
 - 配置本地环境
 - 接入 Flyway
 - 配置 Logback
-- 拉起 PostgreSQL、Redis、MinIO、Milvus、Ollama
+- 拉起 PostgreSQL、Milvus、Ollama，并接入内网 Redis、MinIO
 
 ### 阶段 2：认证与基础治理
 
@@ -602,9 +614,9 @@ rag-admin/
 
 ### 13.1 环境验收
 
-- `docker-compose up` 后全部服务可用
+- `docker-compose up` 后 PostgreSQL、Milvus、Ollama 可用
 - 应用启动后健康检查通过
-- 本机应用可通过 `localhost` 访问全部中间件
+- 本机应用可通过环境变量连通 PostgreSQL、Redis、MinIO、Milvus、Ollama
 
 ### 13.2 认证验收
 
@@ -647,7 +659,7 @@ rag-admin/
 - 后端单体单进程
 - 应用宿主机运行，中间件容器运行
 - 端口固定
-- Redis 首批必接
+- Redis 首批必接，当前阶段走 `192.168.0.11`
 - Milvus 首批必接
 - Ollama 首批必接
 - 定时任务使用 `@Scheduled`
