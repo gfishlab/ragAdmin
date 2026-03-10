@@ -13,6 +13,20 @@ import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
 import com.ragadmin.server.chat.service.ChatService;
 import com.ragadmin.server.common.exception.GlobalExceptionHandler;
+import com.ragadmin.server.document.controller.DocumentController;
+import com.ragadmin.server.document.controller.FileController;
+import com.ragadmin.server.document.dto.DocumentResponse;
+import com.ragadmin.server.document.dto.UploadUrlResponse;
+import com.ragadmin.server.document.service.DocumentService;
+import com.ragadmin.server.document.service.FileUploadService;
+import com.ragadmin.server.knowledge.controller.KnowledgeBaseController;
+import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
+import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.system.controller.SystemHealthController;
+import com.ragadmin.server.system.dto.DependencyHealthResponse;
+import com.ragadmin.server.system.dto.HealthCheckResponse;
+import com.ragadmin.server.system.service.SystemHealthService;
 import com.ragadmin.server.task.controller.TaskController;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskRetryRecordResponse;
@@ -54,6 +68,18 @@ class AdminApiWebMvcTest {
     @Mock
     private ChatService chatService;
 
+    @Mock
+    private KnowledgeBaseService knowledgeBaseService;
+
+    @Mock
+    private DocumentService documentService;
+
+    @Mock
+    private FileUploadService fileUploadService;
+
+    @Mock
+    private SystemHealthService systemHealthService;
+
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -69,6 +95,19 @@ class AdminApiWebMvcTest {
         ChatController chatController = new ChatController();
         ReflectionTestUtils.setField(chatController, "chatService", chatService);
 
+        KnowledgeBaseController knowledgeBaseController = new KnowledgeBaseController();
+        ReflectionTestUtils.setField(knowledgeBaseController, "knowledgeBaseService", knowledgeBaseService);
+        ReflectionTestUtils.setField(knowledgeBaseController, "documentService", documentService);
+
+        DocumentController documentController = new DocumentController();
+        ReflectionTestUtils.setField(documentController, "documentService", documentService);
+
+        FileController fileController = new FileController();
+        ReflectionTestUtils.setField(fileController, "fileUploadService", fileUploadService);
+
+        SystemHealthController systemHealthController = new SystemHealthController();
+        ReflectionTestUtils.setField(systemHealthController, "systemHealthService", systemHealthService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -78,7 +117,14 @@ class AdminApiWebMvcTest {
                 .setControllerAdvice(exceptionHandler)
                 .build();
 
-        protectedMockMvc = MockMvcBuilders.standaloneSetup(taskController, chatController)
+        protectedMockMvc = MockMvcBuilders.standaloneSetup(
+                        taskController,
+                        chatController,
+                        knowledgeBaseController,
+                        documentController,
+                        fileController,
+                        systemHealthController
+                )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
                 .build();
@@ -201,6 +247,157 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.messageId").value(101))
                 .andExpect(jsonPath("$.data.answer").value("这是知识库回答"))
                 .andExpect(jsonPath("$.data.usage.promptTokens").value(120));
+    }
+
+    @Test
+    void shouldCreateKnowledgeBaseWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(knowledgeBaseService.create(any(), eq(1L))).thenReturn(new KnowledgeBaseResponse(
+                21L,
+                "demo-kb",
+                "演示知识库",
+                "用于测试",
+                2L,
+                "nomic-embed-text",
+                1L,
+                "qwen2.5:7b",
+                5,
+                false,
+                "ENABLED"
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/knowledge-bases")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "kbCode": "demo-kb",
+                                  "kbName": "演示知识库",
+                                  "description": "用于测试",
+                                  "embeddingModelId": 2,
+                                  "chatModelId": 1,
+                                  "retrieveTopK": 5,
+                                  "rerankEnabled": false,
+                                  "status": "ENABLED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.id").value(21))
+                .andExpect(jsonPath("$.data.kbCode").value("demo-kb"));
+    }
+
+    @Test
+    void shouldCreateUploadUrlWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(fileUploadService.createUploadUrl(any())).thenReturn(new UploadUrlResponse(
+                "hrsys",
+                "kb_document/20260310/demo/sample.md",
+                "http://minio/upload"
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/files/upload-url")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "fileName": "sample.md",
+                                  "contentType": "text/markdown",
+                                  "bizType": "KB_DOCUMENT"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.bucket").value("hrsys"))
+                .andExpect(jsonPath("$.data.objectKey").value("kb_document/20260310/demo/sample.md"));
+    }
+
+    @Test
+    void shouldCreateDocumentWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(documentService.createDocument(eq(21L), any(), eq(1L))).thenReturn(new DocumentResponse(
+                31L,
+                21L,
+                "sample.md",
+                "MARKDOWN",
+                "hrsys",
+                "kb_document/20260310/demo/sample.md",
+                1,
+                "PENDING",
+                true,
+                128L,
+                "hash-1"
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/knowledge-bases/21/documents")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "docName": "sample.md",
+                                  "docType": "MARKDOWN",
+                                  "storageBucket": "hrsys",
+                                  "storageObjectKey": "kb_document/20260310/demo/sample.md",
+                                  "fileSize": 128,
+                                  "contentHash": "hash-1"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.id").value(31))
+                .andExpect(jsonPath("$.data.parseStatus").value("PENDING"));
+    }
+
+    @Test
+    void shouldReturnKnowledgeBaseDocumentsWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(documentService.listKnowledgeBaseDocuments(21L, null, null, null, 1L, 20L))
+                .thenReturn(new PageResponse<>(
+                        List.of(new DocumentResponse(
+                                31L,
+                                21L,
+                                "sample.md",
+                                "MARKDOWN",
+                                "hrsys",
+                                "kb_document/20260310/demo/sample.md",
+                                1,
+                                "SUCCESS",
+                                true,
+                                128L,
+                                "hash-1"
+                        )),
+                        1,
+                        20,
+                        1
+                ));
+
+        protectedMockMvc.perform(get("/api/admin/knowledge-bases/21/documents")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.list[0].docName").value("sample.md"))
+                .andExpect(jsonPath("$.data.total").value(1));
+    }
+
+    @Test
+    void shouldReturnSystemHealthWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(systemHealthService.check()).thenReturn(new HealthCheckResponse(
+                "UP",
+                new DependencyHealthResponse("UP", "PostgreSQL 正常"),
+                new DependencyHealthResponse("UP", "Redis 正常"),
+                new DependencyHealthResponse("UP", "MinIO 正常"),
+                new DependencyHealthResponse("UP", "Ollama 正常"),
+                new DependencyHealthResponse("UP", "Milvus 正常")
+        ));
+
+        protectedMockMvc.perform(get("/api/admin/system/health")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.status").value("UP"))
+                .andExpect(jsonPath("$.data.postgres.status").value("UP"))
+                .andExpect(jsonPath("$.data.milvus.status").value("UP"));
     }
 
     private AuthenticatedUser authenticatedUser() {
