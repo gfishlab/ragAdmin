@@ -109,7 +109,7 @@
 
 - 后端：`9212`
 - 前端预留：`5173`
-- PostgreSQL：`5432`
+- PostgreSQL：`15432`
 - Redis：`6379`
 - MinIO API：`9000`
 - MinIO Console：`9001`
@@ -132,7 +132,7 @@
 
 ### 3.4 本地连接约定
 
-- `jdbc:postgresql://localhost:5432/rag_admin`
+- `jdbc:postgresql://localhost:15432/rag_admin`
 - `redis://$REDIS_HOST:$REDIS_PORT`
 - `http://$MINIO_ENDPOINT:$MINIO_PORT`
 - `localhost:19530`

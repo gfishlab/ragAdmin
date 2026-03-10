@@ -51,7 +51,7 @@
 
 当前 `application-local.yml` 中使用以下依赖：
 
-- PostgreSQL：`127.0.0.1:5432`
+- PostgreSQL：`127.0.0.1:15432`
 - Redis：`127.0.0.1:6379`
 - MinIO：`127.0.0.1:9000`
 - Ollama：`127.0.0.1:11434`

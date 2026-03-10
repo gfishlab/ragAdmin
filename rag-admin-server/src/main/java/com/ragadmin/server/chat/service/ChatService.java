@@ -175,10 +175,13 @@ public class ChatService {
             chatAnswerReferenceMapper.insert(ref);
         }
 
-        Map<Long, String> documentNameResolver = documentMapper.selectBatchIds(retrievalResult.chunks().stream()
-                        .map(item -> item.chunk().getDocumentId())
-                        .distinct()
-                        .toList())
+        List<Long> documentIds = retrievalResult.chunks().stream()
+                .map(item -> item.chunk().getDocumentId())
+                .distinct()
+                .toList();
+        Map<Long, String> documentNameResolver = documentIds.isEmpty()
+                ? Map.of()
+                : documentMapper.selectBatchIds(documentIds)
                 .stream()
                 .collect(Collectors.toMap(DocumentEntity::getId, DocumentEntity::getDocName));
 

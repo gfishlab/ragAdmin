@@ -36,6 +36,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -203,6 +204,62 @@ class ChatServiceTest {
         assertEquals(1, response.references().size());
         assertEquals(120, response.usage().promptTokens());
         assertEquals(30, response.usage().completionTokens());
+    }
+
+    @Test
+    void shouldAllowChatWithoutRetrievedReferences() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(32L);
+        session.setKbId(402L);
+        session.setUserId(100L);
+
+        ChatRequest request = new ChatRequest();
+        request.setKbId(402L);
+        request.setQuestion("没有命中时应该怎么回答");
+
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(402L);
+        knowledgeBase.setChatModelId(502L);
+
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(
+                List.of(),
+                ""
+        );
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                802L,
+                "qwen2.5:7b",
+                "OLLAMA",
+                "Ollama"
+        );
+
+        ChatModelClient chatClient = new ChatModelClient() {
+            @Override
+            public boolean supports(String providerCode) {
+                return true;
+            }
+
+            @Override
+            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
+                return new ChatCompletionResult("当前无法从知识库确认答案。", 64, 18);
+            }
+        };
+
+        when(chatSessionMapper.selectById(32L)).thenReturn(session);
+        when(knowledgeBaseService.requireById(402L)).thenReturn(knowledgeBase);
+        when(retrievalService.retrieve(knowledgeBase, "没有命中时应该怎么回答")).thenReturn(retrievalResult);
+        when(modelService.requireChatModelDescriptor(502L)).thenReturn(modelDescriptor);
+        when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
+        when(retrievalService.toReferenceResponses(eq(List.of()), any())).thenReturn(List.of());
+
+        ChatResponse response = chatService.chat(32L, request, user(100L));
+
+        verify(documentMapper, never()).selectBatchIds(any());
+        verify(chatAnswerReferenceMapper, never()).insert(isA(ChatAnswerReferenceEntity.class));
+        assertEquals("当前无法从知识库确认答案。", response.answer());
+        assertEquals(0, response.references().size());
+        assertEquals(64, response.usage().promptTokens());
+        assertEquals(18, response.usage().completionTokens());
     }
 
     @Test

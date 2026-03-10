@@ -1,6 +1,6 @@
 spring:
   datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/rag_admin
+    url: jdbc:postgresql://127.0.0.1:15432/rag_admin?sslmode=disable
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -20,7 +20,7 @@ rag:
   ai:
     ollama:
       base-url: http://127.0.0.1:11434
-      timeout-seconds: 30
+      timeout-seconds: 180
   storage:
     minio:
       endpoint: 127.0.0.1
