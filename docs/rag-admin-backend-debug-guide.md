@@ -156,7 +156,7 @@ mvn -q -pl rag-admin-server spring-boot:run
 
 默认启动端口：
 
-- `8080`
+- `9212`
 
 ### 4.3 首先验证健康检查
 

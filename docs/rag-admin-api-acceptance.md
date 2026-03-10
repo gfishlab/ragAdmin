@@ -50,7 +50,7 @@ mvn -q -pl rag-admin-server -am test
 先执行以下变量定义：
 
 ```powershell
-$BaseUrl = "http://127.0.0.1:8080"
+$BaseUrl = "http://127.0.0.1:9212"
 $LoginId = "admin"
 $Password = "Admin@123456"
 $SampleFile = "F:\codes\ragAdmin\docs\sample.md"

@@ -102,7 +102,7 @@ mvn -q -pl rag-admin-server spring-boot:run
 
 默认启动端口：
 
-- `8080`
+- `9212`
 
 默认 profile 为 `local`，对应本机 localhost + Docker 容器环境。
 
