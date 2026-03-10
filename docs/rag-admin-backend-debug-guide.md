@@ -89,6 +89,39 @@
 
 ## 4. 本地启动
 
+### 4.0 先拉起本地中间件
+
+仓库已提供基础编排文件：
+
+- `docker/compose/docker-compose.yml`
+- `docker/compose/.env.example`
+
+建议先复制环境文件：
+
+```bash
+cp docker/compose/.env.example docker/compose/.env
+```
+
+然后启动首期必需的本地容器：
+
+```bash
+docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.yml up -d
+```
+
+当前编排会启动：
+
+- `postgres`
+- `etcd`
+- `minio`
+- `milvus`
+- `ollama`
+
+说明：
+
+- 当前后端仍可继续复用内网 Redis
+- 当前后端如继续使用内网 MinIO，请保持 `application-local.yml` 或环境变量配置一致
+- 如要改为使用本地 MinIO，请同步覆盖 `MINIO_ENDPOINT`、`MINIO_PORT`、`MINIO_ACCESS_KEY`、`MINIO_SECRET_KEY`、`MINIO_BUCKET_NAME`
+
 ### 4.1 编译
 
 ```bash

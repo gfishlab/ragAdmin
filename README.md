@@ -26,6 +26,8 @@
 ```text
 ragAdmin/
   docs/
+  docker/
+    compose/
   rag-admin-server/
   AGENTS.md
   pom.xml
@@ -101,6 +103,13 @@ mvn -q -pl rag-admin-server spring-boot:run
 默认启动端口：
 
 - `8080`
+
+如需本地拉起 PostgreSQL、Milvus、Ollama 以及 Milvus 依赖，可先准备：
+
+```bash
+cp docker/compose/.env.example docker/compose/.env
+docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.yml up -d
+```
 
 更完整的依赖准备、接口验收顺序和常见排查方式，直接看联调文档。
 
