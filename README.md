@@ -104,6 +104,19 @@ mvn -q -pl rag-admin-server spring-boot:run
 
 - `8080`
 
+默认 profile 为 `local`，对应本机 localhost + Docker 容器环境。
+
+如果你需要继续使用内网共享开发环境，可显式切换：
+
+```bash
+mvn -q -pl rag-admin-server spring-boot:run -Dspring-boot.run.profiles=dev
+```
+
+配置语义：
+
+- `application-local.yml`：本机 Docker 容器环境
+- `application-dev.yml`：内网共享开发环境示例
+
 如需本地拉起 PostgreSQL、Milvus、Ollama 以及 Milvus 依赖，可先准备：
 
 ```bash

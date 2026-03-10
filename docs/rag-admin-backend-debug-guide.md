@@ -47,11 +47,13 @@
 
 ### 3.1 已固定的本地配置
 
+当前默认本地开发配置在 `application-local.yml`，指向本机 Docker 容器环境；如需继续使用内网共享环境，可切换到 `application-dev.yml`。
+
 当前 `application-local.yml` 中使用以下依赖：
 
 - PostgreSQL：`127.0.0.1:5432`
-- Redis：`192.168.0.11:6379`
-- MinIO：`192.168.0.11:9000`
+- Redis：`127.0.0.1:6379`
+- MinIO：`127.0.0.1:9000`
 - Ollama：`127.0.0.1:11434`
 - Milvus：`127.0.0.1:19530`
 
@@ -124,8 +126,8 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 
 说明：
 
-- 当前 `application-local.yml` 已改为默认优先使用本地容器地址
-- 如果仍要复用内网 Redis、MinIO 或其他服务，请自行覆盖环境变量
+- 当前 `application-local.yml` 默认用于本地容器环境
+- 如果仍要复用内网 Redis、MinIO 或其他服务，建议切换到 `dev` profile，或自行覆盖环境变量
 - 常用覆盖项包括：
   - `REDIS_HOST`
   - `REDIS_PORT`
@@ -288,7 +290,7 @@ GET /api/admin/system/health
 
 - Ollama 是否启动
 - 模型是否已拉取
-- `application-local.yml` 中 `rag.ai.ollama.base-url` 是否正确
+- `application-local.yml` 或 `application-dev.yml` 中 `rag.ai.ollama.base-url` 是否正确
 
 ### 7.3 文档解析失败
 
