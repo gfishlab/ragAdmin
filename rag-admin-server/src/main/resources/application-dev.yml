@@ -1,4 +1,7 @@
 spring:
+  config:
+    # dev 环境复用本地未跟踪的敏感配置，避免将密钥提交到仓库。
+    import: optional:classpath:application-local-secret.yml
   datasource:
     url: jdbc:postgresql://127.0.0.1:5432/rag_admin?sslmode=disable
     username: postgres
@@ -18,7 +21,15 @@ rag:
   internal:
     callback-token: rag-admin-internal-callback-token
   ai:
+    default-provider: BAILIAN
+    bailian:
+      enabled: true
+      base-url: https://dashscope.aliyuncs.com
+      chat-model: qwen-max
+      embedding-model: text-embedding-v3
+      timeout-seconds: 60
     ollama:
+      enabled: false
       base-url: http://127.0.0.1:11434
       timeout-seconds: 180
   storage:

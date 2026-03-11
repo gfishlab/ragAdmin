@@ -1,4 +1,5 @@
 .claude/
 .idea/
 rag-admin-server/.env.local
+rag-admin-server/src/main/resources/application-local-secret.yml
 rag-admin-server/target/

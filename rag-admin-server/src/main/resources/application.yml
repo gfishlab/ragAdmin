@@ -44,7 +44,17 @@ rag:
   internal:
     callback-token: ${RAG_INTERNAL_CALLBACK_TOKEN:rag-admin-internal-callback-token}
   ai:
+    # 默认主通道预留为百炼，Ollama 仅作为本地替代方案保留。
+    default-provider: ${RAG_AI_DEFAULT_PROVIDER:BAILIAN}
+    bailian:
+      enabled: ${BAILIAN_ENABLED:true}
+      base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com}
+      api-key:
+      chat-model: ${BAILIAN_CHAT_MODEL:qwen-max}
+      embedding-model: ${BAILIAN_EMBEDDING_MODEL:text-embedding-v3}
+      timeout-seconds: ${BAILIAN_TIMEOUT_SECONDS:60}
     ollama:
+      enabled: ${OLLAMA_ENABLED:false}
       base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
       timeout-seconds: 30
   storage:
