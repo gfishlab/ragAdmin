@@ -18,6 +18,13 @@ spring:
       enabled: true
 
 rag:
+  auth:
+    jwt-secret: rag-admin-local-secret-key-change-me
+    bootstrap:
+      admin-username: admin
+      admin-display-name: 系统管理员
+      admin-mobile: 13800000000
+      admin-password: Admin@123456
   internal:
     callback-token: rag-admin-internal-callback-token
   ai:

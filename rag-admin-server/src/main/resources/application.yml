@@ -33,41 +33,24 @@ logging:
 
 rag:
   auth:
-    jwt-secret: ${RAG_JWT_SECRET:rag-admin-dev-secret-key-change-me-2026}
     access-token-ttl-seconds: 7200
     refresh-token-ttl-seconds: 604800
-    bootstrap:
-      admin-username: ${BOOTSTRAP_ADMIN_USERNAME:admin}
-      admin-display-name: ${BOOTSTRAP_ADMIN_DISPLAY_NAME:系统管理员}
-      admin-mobile: ${BOOTSTRAP_ADMIN_MOBILE:13800000000}
-      admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:Admin@123456}
-  internal:
-    callback-token: ${RAG_INTERNAL_CALLBACK_TOKEN:rag-admin-internal-callback-token}
   ai:
-    # 默认主通道预留为百炼，Ollama 仅作为本地替代方案保留。
-    default-provider: ${RAG_AI_DEFAULT_PROVIDER:BAILIAN}
+    # 主配置仅保留跨环境共享基线，具体地址和敏感值放到 profile 或本地私有文件。
+    default-provider: BAILIAN
     bailian:
-      enabled: ${BAILIAN_ENABLED:true}
-      base-url: ${BAILIAN_BASE_URL:https://dashscope.aliyuncs.com}
+      enabled: true
       api-key:
-      chat-model: ${BAILIAN_CHAT_MODEL:qwen-max}
-      embedding-model: ${BAILIAN_EMBEDDING_MODEL:text-embedding-v3}
-      timeout-seconds: ${BAILIAN_TIMEOUT_SECONDS:60}
+      chat-model: qwen-max
+      embedding-model: text-embedding-v3
+      timeout-seconds: 60
     ollama:
-      enabled: ${OLLAMA_ENABLED:false}
-      base-url: ${OLLAMA_BASE_URL:http://127.0.0.1:11434}
+      enabled: false
       timeout-seconds: 30
   storage:
     minio:
-      endpoint:
       port: 9000
       use-ssl: false
-      access-key:
-      secret-key:
-      bucket-name:
-      public-url:
   vector:
     milvus:
-      base-url: ${MILVUS_BASE_URL:http://127.0.0.1:19530}
-      token: ${MILVUS_TOKEN:root:Milvus}
-      enabled: ${MILVUS_ENABLED:true}
+      enabled: true
