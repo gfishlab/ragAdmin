@@ -261,6 +261,12 @@
 
 - `POST /api/admin/knowledge-bases`
 
+说明：
+
+- `chatModelId` 与 `embeddingModelId` 必须来自后台模型管理中已入库的模型数据
+- 管理台模型下拉数据源应来自 `GET /api/admin/models` 或等价后台接口，不直接读取配置文件
+- 若知识库未显式绑定模型，后端可按“后台系统默认模型 > 配置文件平台兜底默认模型”做兜底解析
+
 请求体：
 
 ```json
