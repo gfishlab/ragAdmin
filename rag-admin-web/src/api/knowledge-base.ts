@@ -1,5 +1,6 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
+  CreateDocumentVersionRequest,
   CreateKnowledgeBaseDocumentRequest,
   DocumentChunk,
   DocumentDetail,
@@ -131,6 +132,17 @@ export async function activateDocumentVersion(documentId: number, versionId: num
     `/admin/documents/${documentId}/versions/${versionId}/activate`,
   )
   unwrapResponse(response.data)
+}
+
+export async function createDocumentVersion(
+  documentId: number,
+  payload: CreateDocumentVersionRequest,
+): Promise<number | null> {
+  const response = await http.post<ApiResponse<number | null>>(
+    `/admin/documents/${documentId}/versions`,
+    payload,
+  )
+  return unwrapResponse(response.data)
 }
 
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {

@@ -4,12 +4,20 @@ import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-
 import { useRoute, useRouter } from 'vue-router'
 import {
   activateDocumentVersion,
+  createDocumentVersion,
   getDocumentDetail,
+  getKnowledgeBaseDocumentUploadUrl,
   listDocumentChunks,
   listDocumentVersions,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
-import type { DocumentChunk, DocumentDetail, DocumentVersion } from '@/types/knowledge-base'
+import type {
+  CreateDocumentVersionRequest,
+  DocumentChunk,
+  DocumentDetail,
+  DocumentVersion,
+  UploadUrlResponse,
+} from '@/types/knowledge-base'
 
 const route = useRoute()
 const router = useRouter()
@@ -22,6 +30,11 @@ const versionLoading = ref(false)
 const versionError = ref('')
 const versions = ref<DocumentVersion[]>([])
 const activatingVersionIds = ref<number[]>([])
+const versionDialogVisible = ref(false)
+const versionFile = ref<File | null>(null)
+const versionSubmitting = ref(false)
+const versionUploadStage = ref<'idle' | 'getting-url' | 'uploading' | 'registering'>('idle')
+const versionUploadError = ref('')
 const versionPagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -69,12 +82,28 @@ function formatTime(value: string | null | undefined): string {
   return date.toLocaleString('zh-CN', { hour12: false })
 }
 
+function resetVersionUploadState(): void {
+  versionFile.value = null
+  versionSubmitting.value = false
+  versionUploadStage.value = 'idle'
+  versionUploadError.value = ''
+}
+
 function canActivateVersion(version: DocumentVersion): boolean {
   return !version.active
 }
 
 function isActivatingVersion(versionId: number): boolean {
   return activatingVersionIds.value.includes(versionId)
+}
+
+function handleSelectVersionFile(uploadFile: { raw?: File }): void {
+  versionFile.value = uploadFile.raw ?? null
+  versionUploadError.value = ''
+}
+
+function handleRemoveVersionFile(): void {
+  versionFile.value = null
 }
 
 function chunkPreview(chunk: DocumentChunk): string {
@@ -100,6 +129,20 @@ function toggleChunk(chunkId: number): void {
     return
   }
   expandedChunkIds.value = [...expandedChunkIds.value, chunkId]
+}
+
+async function uploadToObjectStorage(upload: UploadUrlResponse, file: File): Promise<void> {
+  const response = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  })
+
+  if (!response.ok) {
+    throw new Error(`文件上传失败，状态码 ${response.status}`)
+  }
 }
 
 async function loadDetail(): Promise<void> {
@@ -178,6 +221,16 @@ async function handleRetryVersions(): Promise<void> {
   await loadVersions()
 }
 
+function handleOpenVersionDialog(): void {
+  resetVersionUploadState()
+  versionDialogVisible.value = true
+}
+
+function handleCloseVersionDialog(): void {
+  versionDialogVisible.value = false
+  resetVersionUploadState()
+}
+
 async function handleActivateVersion(version: DocumentVersion): Promise<void> {
   if (!canActivateVersion(version) || isActivatingVersion(version.versionId)) {
     return
@@ -208,6 +261,59 @@ async function handleActivateVersion(version: DocumentVersion): Promise<void> {
     activatingVersionIds.value = activatingVersionIds.value.filter((id) => id !== version.versionId)
     await loadDetail()
     await loadVersions()
+  }
+}
+
+async function handleCreateVersion(): Promise<void> {
+  if (!versionFile.value) {
+    versionUploadError.value = '请先选择版本文件'
+    return
+  }
+
+  versionSubmitting.value = true
+  versionUploadError.value = ''
+
+  try {
+    versionUploadStage.value = 'getting-url'
+    const file = versionFile.value
+    const upload = await getKnowledgeBaseDocumentUploadUrl({
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      bizType: 'KB_DOCUMENT',
+    })
+
+    versionUploadStage.value = 'uploading'
+    await uploadToObjectStorage(upload, file)
+
+    versionUploadStage.value = 'registering'
+    const payload: CreateDocumentVersionRequest = {
+      storageBucket: upload.bucket,
+      storageObjectKey: upload.objectKey,
+      contentHash: null,
+    }
+    await createDocumentVersion(documentId.value, payload)
+
+    ElMessage.success('文档新版本已创建')
+    versionDialogVisible.value = false
+    resetVersionUploadState()
+    versionPagination.pageNo = 1
+    await loadDetail()
+    await loadVersions()
+  } catch (error) {
+    if (versionUploadStage.value === 'getting-url') {
+      versionUploadError.value = `获取上传凭证失败：${resolveErrorMessage(error)}`
+    } else if (versionUploadStage.value === 'uploading') {
+      versionUploadError.value = `文件上传失败：${resolveErrorMessage(error)}`
+    } else if (versionUploadStage.value === 'registering') {
+      versionUploadError.value = `新版本登记失败：${resolveErrorMessage(error)}`
+    } else {
+      versionUploadError.value = resolveErrorMessage(error)
+    }
+  } finally {
+    versionSubmitting.value = false
+    if (versionDialogVisible.value) {
+      versionUploadStage.value = 'idle'
+    }
   }
 }
 
@@ -338,7 +444,10 @@ onMounted(async () => {
             <h2>版本列表</h2>
             <p>当前仅提供只读浏览，不包含激活版本与新增版本操作。</p>
           </div>
-          <el-button :loading="versionLoading" @click="handleRetryVersions">刷新版本列表</el-button>
+          <div class="version-actions">
+            <el-button :loading="versionLoading" @click="handleRetryVersions">刷新版本列表</el-button>
+            <el-button type="primary" @click="handleOpenVersionDialog">新增版本</el-button>
+          </div>
         </div>
 
         <section v-if="versionError" class="version-error">
@@ -472,6 +581,67 @@ onMounted(async () => {
         </template>
       </section>
     </template>
+
+    <el-dialog
+      v-model="versionDialogVisible"
+      title="新增版本"
+      width="560px"
+      destroy-on-close
+      @close="handleCloseVersionDialog"
+    >
+      <section class="upload-dialog">
+        <p class="upload-hint">
+          当前目标文档：
+          <strong>{{ detail?.docName }}</strong>
+        </p>
+
+        <el-upload
+          class="upload-box"
+          drag
+          :auto-upload="false"
+          :limit="1"
+          :show-file-list="true"
+          :on-change="handleSelectVersionFile"
+          :on-remove="handleRemoveVersionFile"
+        >
+          <el-icon class="el-icon--upload"><i class="el-icon-upload" /></el-icon>
+          <div class="el-upload__text">将新版本文件拖到此处，或 <em>点击选择</em></div>
+          <template #tip>
+            <div class="el-upload__tip">
+              当前仅创建新版本记录，不会自动切换为生效版本。
+            </div>
+          </template>
+        </el-upload>
+
+        <div class="upload-meta soft-panel" v-if="versionFile">
+          <article class="upload-meta-item">
+            <span>文件名</span>
+            <strong>{{ versionFile.name }}</strong>
+          </article>
+          <article class="upload-meta-item">
+            <span>文件大小</span>
+            <strong>{{ (versionFile.size / 1024 / 1024).toFixed(2) }} MB</strong>
+          </article>
+        </div>
+
+        <el-alert
+          v-if="versionUploadError"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="versionUploadError"
+        />
+      </section>
+
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button :disabled="versionSubmitting" @click="handleCloseVersionDialog">取消</el-button>
+          <el-button type="primary" :loading="versionSubmitting" @click="handleCreateVersion">
+            开始上传
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -509,6 +679,11 @@ onMounted(async () => {
 }
 
 .head-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.version-actions {
   display: flex;
   gap: 12px;
 }
@@ -602,6 +777,55 @@ onMounted(async () => {
   word-break: break-word;
 }
 
+.upload-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.upload-hint {
+  margin: 0;
+  color: #6d5948;
+}
+
+.upload-box {
+  width: 100%;
+}
+
+.upload-meta {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.upload-meta-item {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.upload-meta-item span {
+  display: block;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.upload-meta-item strong {
+  display: block;
+  margin-top: 10px;
+  color: #2f241d;
+  word-break: break-word;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 .table-footer {
   display: flex;
   justify-content: flex-end;
@@ -629,9 +853,14 @@ onMounted(async () => {
     width: 100%;
   }
 
+  .version-actions,
   .overview-grid,
   .detail-matrix,
   .storage-panel {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-meta {
     grid-template-columns: 1fr;
   }
 }
@@ -646,6 +875,8 @@ onMounted(async () => {
   }
 
   .head-actions,
+  .version-actions,
+  .dialog-actions,
   .error-actions {
     flex-direction: column;
   }

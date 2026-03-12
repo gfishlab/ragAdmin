@@ -83,6 +83,12 @@ export interface DocumentVersion {
   createdAt: string
 }
 
+export interface CreateDocumentVersionRequest {
+  storageBucket: string
+  storageObjectKey: string
+  contentHash?: string | null
+}
+
 export interface DocumentChunk {
   chunkId: number
   chunkNo?: number | null
