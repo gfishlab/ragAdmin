@@ -41,3 +41,22 @@ export interface KnowledgeBaseDocument {
   enabled: boolean
   createdAt: string
 }
+
+export interface UploadUrlRequest {
+  fileName: string
+  contentType: string
+  bizType: 'KB_DOCUMENT'
+}
+
+export interface UploadUrlResponse {
+  bucket: string
+  objectKey: string
+  uploadUrl: string
+}
+
+export interface CreateKnowledgeBaseDocumentRequest {
+  docName: string
+  docType: string
+  storageBucket: string
+  storageObjectKey: string
+}

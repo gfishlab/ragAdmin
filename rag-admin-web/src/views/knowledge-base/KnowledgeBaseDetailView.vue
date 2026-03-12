@@ -1,13 +1,20 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElButton, ElEmpty, ElSkeleton } from 'element-plus'
+import { ElButton, ElEmpty, ElMessage, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import {
+  createKnowledgeBaseDocument,
   getKnowledgeBaseDetail,
+  getKnowledgeBaseDocumentUploadUrl,
   listKnowledgeBaseDocuments,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
-import type { KnowledgeBase, KnowledgeBaseDocument } from '@/types/knowledge-base'
+import type {
+  CreateKnowledgeBaseDocumentRequest,
+  KnowledgeBase,
+  KnowledgeBaseDocument,
+  UploadUrlResponse,
+} from '@/types/knowledge-base'
 
 const route = useRoute()
 const router = useRouter()
@@ -24,9 +31,32 @@ const documentPagination = reactive({
   pageSize: 10,
   total: 0,
 })
+const uploadDialogVisible = ref(false)
+const selectedFile = ref<File | null>(null)
+const uploadSubmitting = ref(false)
+const uploadStage = ref<'idle' | 'getting-url' | 'uploading' | 'registering'>('idle')
+const uploadError = ref('')
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
+const uploadDocType = computed(() => inferDocType(selectedFile.value?.name ?? ''))
+
+function inferDocType(fileName: string): string {
+  const extension = fileName.split('.').pop()?.toLowerCase() ?? ''
+  if (extension === 'pdf') {
+    return 'PDF'
+  }
+  if (extension === 'doc' || extension === 'docx') {
+    return 'DOC'
+  }
+  if (extension === 'md' || extension === 'markdown') {
+    return 'MARKDOWN'
+  }
+  if (extension === 'txt') {
+    return 'TEXT'
+  }
+  return 'UNKNOWN'
+}
 
 function modelLabel(name: string | null): string {
   return name || '平台默认模型'
@@ -70,6 +100,89 @@ function formatTime(value: string): string {
   return date.toLocaleString('zh-CN', {
     hour12: false,
   })
+}
+
+function resetUploadState(): void {
+  selectedFile.value = null
+  uploadSubmitting.value = false
+  uploadStage.value = 'idle'
+  uploadError.value = ''
+}
+
+function handleSelectFile(uploadFile: { raw?: File }): void {
+  selectedFile.value = uploadFile.raw ?? null
+  uploadError.value = ''
+}
+
+function handleRemoveFile(): void {
+  selectedFile.value = null
+}
+
+async function uploadToObjectStorage(upload: UploadUrlResponse, file: File): Promise<void> {
+  const response = await fetch(upload.uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': file.type || 'application/octet-stream',
+    },
+    body: file,
+  })
+
+  if (!response.ok) {
+    throw new Error(`文件上传失败，状态码 ${response.status}`)
+  }
+}
+
+async function handleUpload(): Promise<void> {
+  if (!selectedFile.value) {
+    uploadError.value = '请先选择待上传文件'
+    return
+  }
+
+  uploadSubmitting.value = true
+  uploadError.value = ''
+
+  try {
+    uploadStage.value = 'getting-url'
+    const file = selectedFile.value
+    const upload = await getKnowledgeBaseDocumentUploadUrl({
+      fileName: file.name,
+      contentType: file.type || 'application/octet-stream',
+      bizType: 'KB_DOCUMENT',
+    })
+
+    uploadStage.value = 'uploading'
+    await uploadToObjectStorage(upload, file)
+
+    uploadStage.value = 'registering'
+    const payload: CreateKnowledgeBaseDocumentRequest = {
+      docName: file.name,
+      docType: uploadDocType.value,
+      storageBucket: upload.bucket,
+      storageObjectKey: upload.objectKey,
+    }
+    await createKnowledgeBaseDocument(knowledgeBaseId.value, payload)
+
+    ElMessage.success('文档已接入当前知识库')
+    uploadDialogVisible.value = false
+    resetUploadState()
+    documentPagination.pageNo = 1
+    await loadDocuments()
+  } catch (error) {
+    if (uploadStage.value === 'getting-url') {
+      uploadError.value = `获取上传凭证失败：${resolveErrorMessage(error)}`
+    } else if (uploadStage.value === 'uploading') {
+      uploadError.value = `文件上传失败：${resolveErrorMessage(error)}`
+    } else if (uploadStage.value === 'registering') {
+      uploadError.value = `文件已上传，但文档登记失败：${resolveErrorMessage(error)}`
+    } else {
+      uploadError.value = resolveErrorMessage(error)
+    }
+  } finally {
+    uploadSubmitting.value = false
+    if (uploadDialogVisible.value) {
+      uploadStage.value = 'idle'
+    }
+  }
 }
 
 async function loadDetail(): Promise<void> {
@@ -117,6 +230,16 @@ async function handleRetryDetail(): Promise<void> {
 
 async function handleRetryDocuments(): Promise<void> {
   await loadDocuments()
+}
+
+function handleOpenUploadDialog(): void {
+  resetUploadState()
+  uploadDialogVisible.value = true
+}
+
+function handleCloseUploadDialog(): void {
+  uploadDialogVisible.value = false
+  resetUploadState()
 }
 
 async function handleBack(): Promise<void> {
@@ -227,9 +350,12 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>知识库文档</h2>
-            <p>该区域只负责浏览链路，后续再补上传、解析触发和详情查看。</p>
+            <p>当前已接入单文件上传入口，后续再补解析触发、详情查看和版本管理。</p>
           </div>
-          <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
+          <div class="document-actions">
+            <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
+            <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
+          </div>
         </div>
 
         <section v-if="documentError" class="document-error">
@@ -278,6 +404,71 @@ onMounted(async () => {
         </template>
       </section>
     </template>
+
+    <el-dialog
+      v-model="uploadDialogVisible"
+      title="上传文档"
+      width="560px"
+      destroy-on-close
+      @close="handleCloseUploadDialog"
+    >
+      <section class="upload-dialog">
+        <p class="upload-hint">
+          当前上传目标知识库：
+          <strong>{{ knowledgeBase?.kbName }}</strong>
+        </p>
+
+        <el-upload
+          class="upload-box"
+          drag
+          :auto-upload="false"
+          :limit="1"
+          :show-file-list="true"
+          :on-change="handleSelectFile"
+          :on-remove="handleRemoveFile"
+        >
+          <el-icon class="el-icon--upload"><i class="el-icon-upload" /></el-icon>
+          <div class="el-upload__text">将文件拖到此处，或 <em>点击选择</em></div>
+          <template #tip>
+            <div class="el-upload__tip">
+              首版支持单文件上传，文档类型将按文件扩展名自动推断。
+            </div>
+          </template>
+        </el-upload>
+
+        <div class="upload-meta soft-panel" v-if="selectedFile">
+          <article class="upload-meta-item">
+            <span>文件名</span>
+            <strong>{{ selectedFile.name }}</strong>
+          </article>
+          <article class="upload-meta-item">
+            <span>文件大小</span>
+            <strong>{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</strong>
+          </article>
+          <article class="upload-meta-item">
+            <span>文档类型</span>
+            <strong>{{ uploadDocType }}</strong>
+          </article>
+        </div>
+
+        <el-alert
+          v-if="uploadError"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="uploadError"
+        />
+      </section>
+
+      <template #footer>
+        <div class="dialog-actions">
+          <el-button :disabled="uploadSubmitting" @click="handleCloseUploadDialog">取消</el-button>
+          <el-button type="primary" :loading="uploadSubmitting" @click="handleUpload">
+            开始上传
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </section>
 </template>
 
@@ -311,6 +502,11 @@ onMounted(async () => {
 }
 
 .head-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.document-actions {
   display: flex;
   gap: 12px;
 }
@@ -398,6 +594,55 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.upload-dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.upload-hint {
+  margin: 0;
+  color: #6d5948;
+}
+
+.upload-box {
+  width: 100%;
+}
+
+.upload-meta {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.upload-meta-item {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.upload-meta-item span {
+  display: block;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.upload-meta-item strong {
+  display: block;
+  margin-top: 10px;
+  color: #2f241d;
+  word-break: break-word;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
 @media (max-width: 960px) {
   .detail-head,
   .section-head {
@@ -408,8 +653,13 @@ onMounted(async () => {
     width: 100%;
   }
 
+  .document-actions,
   .overview-grid,
   .detail-matrix {
+    grid-template-columns: 1fr;
+  }
+
+  .upload-meta {
     grid-template-columns: 1fr;
   }
 }
@@ -423,6 +673,8 @@ onMounted(async () => {
   }
 
   .head-actions,
+  .document-actions,
+  .dialog-actions,
   .error-actions {
     flex-direction: column;
   }

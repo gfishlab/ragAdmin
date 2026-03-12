@@ -1,9 +1,12 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
+  CreateKnowledgeBaseDocumentRequest,
   KnowledgeBase,
   KnowledgeBaseDocument,
   KnowledgeBaseUpsertRequest,
   ModelDefinition,
+  UploadUrlRequest,
+  UploadUrlResponse,
 } from '@/types/knowledge-base'
 import { http, unwrapResponse } from './http'
 
@@ -66,6 +69,21 @@ export async function listKnowledgeBaseDocuments(
       params: query,
     },
   )
+  return unwrapResponse(response.data)
+}
+
+export async function getKnowledgeBaseDocumentUploadUrl(
+  payload: UploadUrlRequest,
+): Promise<UploadUrlResponse> {
+  const response = await http.post<ApiResponse<UploadUrlResponse>>('/admin/files/upload-url', payload)
+  return unwrapResponse(response.data)
+}
+
+export async function createKnowledgeBaseDocument(
+  id: number,
+  payload: CreateKnowledgeBaseDocumentRequest,
+): Promise<number | null> {
+  const response = await http.post<ApiResponse<number | null>>(`/admin/knowledge-bases/${id}/documents`, payload)
   return unwrapResponse(response.data)
 }
 
