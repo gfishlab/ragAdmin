@@ -278,6 +278,10 @@ async function handleEdit(): Promise<void> {
   await router.push(`/knowledge-bases/${knowledgeBaseId.value}/edit`)
 }
 
+async function handleDocumentDetail(documentId: number): Promise<void> {
+  await router.push(`/documents/${documentId}`)
+}
+
 async function handleCurrentChange(pageNo: number): Promise<void> {
   documentPagination.pageNo = pageNo
   await loadDocuments()
@@ -415,8 +419,9 @@ onMounted(async () => {
                 {{ formatTime(row.createdAt) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="140" fixed="right">
+            <el-table-column label="操作" width="200" fixed="right">
               <template #default="{ row }">
+                <el-button link @click="handleDocumentDetail(row.documentId)">详情</el-button>
                 <el-button
                   link
                   type="primary"

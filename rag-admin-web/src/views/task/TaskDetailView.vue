@@ -64,6 +64,13 @@ async function handleBack(): Promise<void> {
   await router.push('/tasks')
 }
 
+async function handleLinkedDocumentDetail(): Promise<void> {
+  if (!linkedDocumentId.value) {
+    return
+  }
+  await router.push(`/documents/${linkedDocumentId.value}`)
+}
+
 onMounted(async () => {
   await loadDetail()
 })
@@ -179,6 +186,10 @@ onMounted(async () => {
               }}
             </strong>
           </article>
+        </div>
+
+        <div class="linkage-actions" v-if="linkedDocumentId">
+          <el-button type="primary" @click="handleLinkedDocumentDetail">查看关联文档</el-button>
         </div>
       </section>
 
@@ -316,6 +327,12 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.linkage-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
 @media (max-width: 960px) {
   .detail-head,
   .section-head {
@@ -344,6 +361,10 @@ onMounted(async () => {
   .head-actions,
   .error-actions {
     flex-direction: column;
+  }
+
+  .linkage-actions {
+    justify-content: stretch;
   }
 }
 </style>

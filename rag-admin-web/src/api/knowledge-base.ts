@@ -1,6 +1,8 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
   CreateKnowledgeBaseDocumentRequest,
+  DocumentDetail,
+  DocumentVersion,
   KnowledgeBase,
   KnowledgeBaseDocument,
   KnowledgeBaseUpsertRequest,
@@ -90,6 +92,24 @@ export async function createKnowledgeBaseDocument(
 export async function triggerDocumentParse(documentId: number): Promise<void> {
   const response = await http.post<ApiResponse<null>>(`/admin/documents/${documentId}/parse`)
   unwrapResponse(response.data)
+}
+
+export async function getDocumentDetail(documentId: number): Promise<DocumentDetail> {
+  const response = await http.get<ApiResponse<DocumentDetail>>(`/admin/documents/${documentId}`)
+  return unwrapResponse(response.data)
+}
+
+export async function listDocumentVersions(
+  documentId: number,
+  query: { pageNo: number; pageSize: number },
+): Promise<PageResponse<DocumentVersion>> {
+  const response = await http.get<ApiResponse<PageResponse<DocumentVersion>>>(
+    `/admin/documents/${documentId}/versions`,
+    {
+      params: query,
+    },
+  )
+  return unwrapResponse(response.data)
 }
 
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {

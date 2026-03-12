@@ -60,3 +60,25 @@ export interface CreateKnowledgeBaseDocumentRequest {
   storageBucket: string
   storageObjectKey: string
 }
+
+export interface DocumentDetail {
+  documentId: number
+  kbId: number | null
+  kbName?: string | null
+  docName: string
+  docType: string
+  parseStatus: string
+  enabled: boolean
+  storageBucket?: string | null
+  storageObjectKey?: string | null
+  createdAt: string
+  updatedAt?: string | null
+}
+
+export interface DocumentVersion {
+  versionId: number
+  storageObjectKey: string
+  contentHash?: string | null
+  active?: boolean
+  createdAt: string
+}

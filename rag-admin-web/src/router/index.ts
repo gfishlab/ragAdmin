@@ -66,6 +66,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'documents/:id',
+          name: 'document-detail',
+          component: () => import('@/views/document/DocumentDetailView.vue'),
+          meta: {
+            title: '文档详情',
+          },
+        },
+        {
           path: 'tasks',
           name: 'tasks',
           component: () => import('@/views/task/TaskMonitorView.vue'),
