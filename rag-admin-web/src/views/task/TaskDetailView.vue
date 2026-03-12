@@ -20,6 +20,52 @@ const linkedDocumentId = computed(() => {
   }
   return detail.value.taskType === 'DOCUMENT_PARSE' ? detail.value.bizId : null
 })
+const timelineSteps = computed(() => {
+  if (!detail.value) {
+    return []
+  }
+
+  const status = detail.value.taskStatus
+  const steps = [
+    {
+      code: 'WAITING',
+      label: '等待中',
+      reached: true,
+      current: status === 'WAITING',
+      time: formatTime(detail.value.createdAt),
+    },
+    {
+      code: 'RUNNING',
+      label: '运行中',
+      reached: ['RUNNING', 'SUCCESS', 'FAILED', 'CANCELED'].includes(status),
+      current: status === 'RUNNING',
+      time: ['RUNNING', 'SUCCESS', 'FAILED', 'CANCELED'].includes(status) ? '时间未知' : '待发生',
+    },
+    {
+      code: 'SUCCESS',
+      label: '成功',
+      reached: status === 'SUCCESS',
+      current: status === 'SUCCESS',
+      time: status === 'SUCCESS' ? formatTime(detail.value.updatedAt) : '待发生',
+    },
+    {
+      code: 'FAILED',
+      label: '失败',
+      reached: status === 'FAILED',
+      current: status === 'FAILED',
+      time: status === 'FAILED' ? formatTime(detail.value.updatedAt) : '待发生',
+    },
+    {
+      code: 'CANCELED',
+      label: '已取消',
+      reached: status === 'CANCELED',
+      current: status === 'CANCELED',
+      time: status === 'CANCELED' ? formatTime(detail.value.updatedAt) : '待发生',
+    },
+  ]
+
+  return steps
+})
 
 function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
   if (status === 'WAITING' || status === 'RUNNING') {
@@ -193,6 +239,33 @@ onMounted(async () => {
         </div>
       </section>
 
+      <section class="timeline-panel soft-panel">
+        <div class="section-head">
+          <div>
+            <h2>状态流转</h2>
+            <p>时间线基于当前任务状态保守推导，中间节点无精确时间时显示占位信息。</p>
+          </div>
+        </div>
+
+        <div class="timeline-list">
+          <article
+            v-for="step in timelineSteps"
+            :key="step.code"
+            class="timeline-item"
+            :class="{
+              'is-reached': step.reached,
+              'is-current': step.current,
+            }"
+          >
+            <div class="timeline-marker" />
+            <div class="timeline-content">
+              <strong>{{ step.label }}</strong>
+              <p>{{ step.time }}</p>
+            </div>
+          </article>
+        </div>
+      </section>
+
       <section class="error-panel soft-panel">
         <div class="section-head">
           <div>
@@ -217,6 +290,7 @@ onMounted(async () => {
 .detail-error,
 .detail-panel,
 .linkage-panel,
+.timeline-panel,
 .error-panel {
   padding: 24px;
 }
@@ -333,6 +407,66 @@ onMounted(async () => {
   margin-top: 18px;
 }
 
+.timeline-list {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.timeline-item {
+  position: relative;
+  padding: 18px;
+  border-radius: 18px;
+  border: 1px solid rgba(113, 82, 45, 0.12);
+  background: rgba(255, 250, 242, 0.58);
+}
+
+.timeline-item::after {
+  content: "";
+  position: absolute;
+  top: 30px;
+  right: -18px;
+  width: 20px;
+  height: 2px;
+  background: rgba(113, 82, 45, 0.14);
+}
+
+.timeline-item:last-child::after {
+  display: none;
+}
+
+.timeline-item.is-reached {
+  border-color: rgba(198, 107, 34, 0.28);
+  background: rgba(255, 247, 235, 0.9);
+}
+
+.timeline-item.is-current {
+  box-shadow: 0 18px 30px rgba(141, 69, 16, 0.12);
+}
+
+.timeline-marker {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: rgba(113, 82, 45, 0.18);
+}
+
+.timeline-item.is-reached .timeline-marker {
+  background: #c66b22;
+}
+
+.timeline-content strong {
+  display: block;
+  margin-top: 14px;
+  font-size: 18px;
+}
+
+.timeline-content p {
+  margin: 8px 0 0;
+  color: #6d5948;
+  font-size: 13px;
+}
+
 @media (max-width: 960px) {
   .detail-head,
   .section-head {
@@ -344,7 +478,8 @@ onMounted(async () => {
   }
 
   .overview-grid,
-  .detail-matrix {
+  .detail-matrix,
+  .timeline-list {
     grid-template-columns: 1fr;
   }
 }
@@ -354,6 +489,7 @@ onMounted(async () => {
   .detail-error,
   .detail-panel,
   .linkage-panel,
+  .timeline-panel,
   .error-panel {
     padding: 20px;
   }
