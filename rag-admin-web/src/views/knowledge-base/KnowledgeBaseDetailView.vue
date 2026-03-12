@@ -27,6 +27,11 @@ const knowledgeBase = ref<KnowledgeBase | null>(null)
 const documentLoading = ref(false)
 const documentError = ref('')
 const documents = ref<KnowledgeBaseDocument[]>([])
+const documentFilters = reactive({
+  keyword: '',
+  parseStatus: '',
+  enabled: '',
+})
 const documentPagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -231,6 +236,12 @@ async function loadDocuments(): Promise<void> {
   documentError.value = ''
   try {
     const response = await listKnowledgeBaseDocuments(knowledgeBaseId.value, {
+      keyword: documentFilters.keyword.trim() || undefined,
+      parseStatus: documentFilters.parseStatus || undefined,
+      enabled:
+        documentFilters.enabled === ''
+          ? undefined
+          : documentFilters.enabled === 'true',
       pageNo: documentPagination.pageNo,
       pageSize: documentPagination.pageSize,
     })
@@ -257,6 +268,19 @@ async function handleRetryDetail(): Promise<void> {
 }
 
 async function handleRetryDocuments(): Promise<void> {
+  await loadDocuments()
+}
+
+async function handleSearchDocuments(): Promise<void> {
+  documentPagination.pageNo = 1
+  await loadDocuments()
+}
+
+async function handleResetDocuments(): Promise<void> {
+  documentFilters.keyword = ''
+  documentFilters.parseStatus = ''
+  documentFilters.enabled = ''
+  documentPagination.pageNo = 1
   await loadDocuments()
 }
 
@@ -382,13 +406,39 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>知识库文档</h2>
-            <p>当前已接入单文件上传入口，后续再补解析触发、详情查看和版本管理。</p>
+            <p>当前已接入上传、解析与详情入口，本轮补齐基础筛选，提升文档管理可用性。</p>
           </div>
           <div class="document-actions">
             <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
             <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
           </div>
         </div>
+
+        <section class="filter-panel">
+          <div class="filter-grid">
+            <el-input
+              v-model="documentFilters.keyword"
+              placeholder="请输入文档名称或关键词"
+              clearable
+            />
+            <el-select v-model="documentFilters.parseStatus" placeholder="解析状态">
+              <el-option label="全部状态" value="" />
+              <el-option label="待处理" value="PENDING" />
+              <el-option label="处理中" value="PROCESSING" />
+              <el-option label="成功" value="SUCCESS" />
+              <el-option label="失败" value="FAILED" />
+            </el-select>
+            <el-select v-model="documentFilters.enabled" placeholder="启停状态">
+              <el-option label="全部状态" value="" />
+              <el-option label="启用" value="true" />
+              <el-option label="停用" value="false" />
+            </el-select>
+          </div>
+          <div class="filter-actions">
+            <el-button @click="handleResetDocuments">重置</el-button>
+            <el-button type="primary" @click="handleSearchDocuments">查询</el-button>
+          </div>
+        </section>
 
         <section v-if="documentError" class="document-error">
           <el-empty description="文档列表加载失败">
@@ -557,6 +607,26 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.filter-panel {
+  margin-bottom: 18px;
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.filter-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.filter-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 16px;
+}
+
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -700,6 +770,7 @@ onMounted(async () => {
   }
 
   .document-actions,
+  .filter-grid,
   .overview-grid,
   .detail-matrix {
     grid-template-columns: 1fr;
@@ -720,6 +791,7 @@ onMounted(async () => {
 
   .head-actions,
   .document-actions,
+  .filter-actions,
   .dialog-actions,
   .error-actions {
     flex-direction: column;
