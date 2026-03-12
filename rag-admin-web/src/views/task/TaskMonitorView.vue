@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox } from 'element-plus'
+import { useRouter } from 'vue-router'
 import { listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskRecord } from '@/types/task'
 
+const router = useRouter()
 const loading = ref(false)
 const loadError = ref('')
 const tasks = ref<TaskRecord[]>([])
@@ -163,6 +165,10 @@ async function handleRetry(task: TaskRecord): Promise<void> {
   }
 }
 
+async function handleDetail(taskId: number): Promise<void> {
+  await router.push(`/tasks/${taskId}`)
+}
+
 onMounted(async () => {
   await loadTasks()
 })
@@ -244,8 +250,9 @@ onMounted(async () => {
               {{ formatTime(row.updatedAt) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="140" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
+              <el-button link @click="handleDetail(row.taskId)">详情</el-button>
               <el-button
                 v-if="canRetry(row.taskStatus)"
                 link

@@ -73,6 +73,14 @@ const router = createRouter({
             title: '任务监控',
           },
         },
+        {
+          path: 'tasks/:id',
+          name: 'task-detail',
+          component: () => import('@/views/task/TaskDetailView.vue'),
+          meta: {
+            title: '任务详情',
+          },
+        },
       ],
     },
   ],

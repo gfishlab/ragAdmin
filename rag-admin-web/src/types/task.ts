@@ -7,3 +7,8 @@ export interface TaskRecord {
   createdAt: string
   updatedAt: string
 }
+
+export interface TaskDetail extends TaskRecord {
+  taskNo?: string | null
+  bizType?: string | null
+}
