@@ -1,6 +1,7 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
   CreateKnowledgeBaseDocumentRequest,
+  DocumentChunk,
   DocumentDetail,
   DocumentVersion,
   KnowledgeBase,
@@ -105,6 +106,19 @@ export async function listDocumentVersions(
 ): Promise<PageResponse<DocumentVersion>> {
   const response = await http.get<ApiResponse<PageResponse<DocumentVersion>>>(
     `/admin/documents/${documentId}/versions`,
+    {
+      params: query,
+    },
+  )
+  return unwrapResponse(response.data)
+}
+
+export async function listDocumentChunks(
+  documentId: number,
+  query: { pageNo: number; pageSize: number },
+): Promise<PageResponse<DocumentChunk>> {
+  const response = await http.get<ApiResponse<PageResponse<DocumentChunk>>>(
+    `/admin/documents/${documentId}/chunks`,
     {
       params: query,
     },

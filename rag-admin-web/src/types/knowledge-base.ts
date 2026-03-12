@@ -82,3 +82,13 @@ export interface DocumentVersion {
   active?: boolean
   createdAt: string
 }
+
+export interface DocumentChunk {
+  chunkId: number
+  chunkNo?: number | null
+  content?: string | null
+  contentSnippet?: string | null
+  score?: number | null
+  tokenCount?: number | null
+  charCount?: number | null
+}

@@ -2,9 +2,9 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getDocumentDetail, listDocumentVersions } from '@/api/knowledge-base'
+import { getDocumentDetail, listDocumentChunks, listDocumentVersions } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
-import type { DocumentDetail, DocumentVersion } from '@/types/knowledge-base'
+import type { DocumentChunk, DocumentDetail, DocumentVersion } from '@/types/knowledge-base'
 
 const route = useRoute()
 const router = useRouter()
@@ -21,9 +21,19 @@ const versionPagination = reactive({
   pageSize: 10,
   total: 0,
 })
+const chunkLoading = ref(false)
+const chunkError = ref('')
+const chunks = ref<DocumentChunk[]>([])
+const expandedChunkIds = ref<number[]>([])
+const chunkPagination = reactive({
+  pageNo: 1,
+  pageSize: 10,
+  total: 0,
+})
 
 const documentId = computed(() => Number(route.params.id))
 const hasVersions = computed(() => versions.value.length > 0)
+const hasChunks = computed(() => chunks.value.length > 0)
 
 function parseStatusType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'SUCCESS') {
@@ -51,6 +61,31 @@ function formatTime(value: string | null | undefined): string {
     return value
   }
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function chunkPreview(chunk: DocumentChunk): string {
+  const raw = chunk.contentSnippet || chunk.content || ''
+  if (expandedChunkIds.value.includes(chunk.chunkId) || raw.length <= 180) {
+    return raw
+  }
+  return `${raw.slice(0, 180)}...`
+}
+
+function canToggleChunk(chunk: DocumentChunk): boolean {
+  const raw = chunk.contentSnippet || chunk.content || ''
+  return raw.length > 180
+}
+
+function isChunkExpanded(chunkId: number): boolean {
+  return expandedChunkIds.value.includes(chunkId)
+}
+
+function toggleChunk(chunkId: number): void {
+  if (expandedChunkIds.value.includes(chunkId)) {
+    expandedChunkIds.value = expandedChunkIds.value.filter((id) => id !== chunkId)
+    return
+  }
+  expandedChunkIds.value = [...expandedChunkIds.value, chunkId]
 }
 
 async function loadDetail(): Promise<void> {
@@ -85,10 +120,31 @@ async function loadVersions(): Promise<void> {
   }
 }
 
+async function loadChunks(): Promise<void> {
+  chunkLoading.value = true
+  chunkError.value = ''
+  try {
+    const response = await listDocumentChunks(documentId.value, {
+      pageNo: chunkPagination.pageNo,
+      pageSize: chunkPagination.pageSize,
+    })
+    chunks.value = response.list
+    chunkPagination.total = response.total
+    expandedChunkIds.value = []
+  } catch (error) {
+    chunks.value = []
+    chunkPagination.total = 0
+    chunkError.value = resolveErrorMessage(error)
+  } finally {
+    chunkLoading.value = false
+  }
+}
+
 async function initialize(): Promise<void> {
   await loadDetail()
   if (!detailError.value) {
     await loadVersions()
+    await loadChunks()
   }
 }
 
@@ -108,6 +164,10 @@ async function handleRetryVersions(): Promise<void> {
   await loadVersions()
 }
 
+async function handleRetryChunks(): Promise<void> {
+  await loadChunks()
+}
+
 async function handleCurrentChange(pageNo: number): Promise<void> {
   versionPagination.pageNo = pageNo
   await loadVersions()
@@ -117,6 +177,17 @@ async function handleSizeChange(pageSize: number): Promise<void> {
   versionPagination.pageSize = pageSize
   versionPagination.pageNo = 1
   await loadVersions()
+}
+
+async function handleChunkCurrentChange(pageNo: number): Promise<void> {
+  chunkPagination.pageNo = pageNo
+  await loadChunks()
+}
+
+async function handleChunkSizeChange(pageSize: number): Promise<void> {
+  chunkPagination.pageSize = pageSize
+  chunkPagination.pageNo = 1
+  await loadChunks()
 }
 
 onMounted(async () => {
@@ -267,6 +338,79 @@ onMounted(async () => {
           </div>
         </template>
       </section>
+
+      <section class="chunk-panel soft-panel">
+        <div class="section-head">
+          <div>
+            <h2>切片浏览</h2>
+            <p>切片区支持分页、刷新和行内展开，便于快速检查解析结果质量。</p>
+          </div>
+          <el-button :loading="chunkLoading" @click="handleRetryChunks">刷新切片</el-button>
+        </div>
+
+        <section v-if="chunkError" class="chunk-error">
+          <el-empty description="切片列表加载失败">
+            <template #description>
+              <p class="error-text">{{ chunkError }}</p>
+            </template>
+            <el-button type="primary" @click="handleRetryChunks">重新加载</el-button>
+          </el-empty>
+        </section>
+
+        <template v-else>
+          <el-table :data="chunks" v-loading="chunkLoading" empty-text="当前文档暂无切片数据" stripe>
+            <el-table-column prop="chunkId" label="切片 ID" width="100" />
+            <el-table-column label="序号" width="100">
+              <template #default="{ row, $index }">
+                {{ row.chunkNo ?? $index + 1 + (chunkPagination.pageNo - 1) * chunkPagination.pageSize }}
+              </template>
+            </el-table-column>
+            <el-table-column label="内容" min-width="360">
+              <template #default="{ row }">
+                <div class="chunk-content">
+                  <p>{{ chunkPreview(row) || '暂无内容' }}</p>
+                  <el-button
+                    v-if="canToggleChunk(row)"
+                    link
+                    type="primary"
+                    @click="toggleChunk(row.chunkId)"
+                  >
+                    {{ isChunkExpanded(row.chunkId) ? '收起' : '展开' }}
+                  </el-button>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="得分" width="100">
+              <template #default="{ row }">
+                {{ row.score ?? '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="Token" width="100">
+              <template #default="{ row }">
+                {{ row.tokenCount ?? '-' }}
+              </template>
+            </el-table-column>
+            <el-table-column label="字符数" width="100">
+              <template #default="{ row }">
+                {{ row.charCount ?? '-' }}
+              </template>
+            </el-table-column>
+          </el-table>
+
+          <div class="table-footer" v-if="hasChunks || chunkPagination.total > 0">
+            <el-pagination
+              background
+              layout="total, sizes, prev, pager, next"
+              :current-page="chunkPagination.pageNo"
+              :page-size="chunkPagination.pageSize"
+              :page-sizes="[10, 20, 50]"
+              :total="chunkPagination.total"
+              @current-change="handleChunkCurrentChange"
+              @size-change="handleChunkSizeChange"
+            />
+          </div>
+        </template>
+      </section>
     </template>
   </section>
 </template>
@@ -282,6 +426,10 @@ onMounted(async () => {
 .detail-error,
 .detail-panel,
 .version-panel {
+  padding: 24px;
+}
+
+.chunk-panel {
   padding: 24px;
 }
 
@@ -382,6 +530,18 @@ onMounted(async () => {
   padding: 8px 0;
 }
 
+.chunk-error {
+  padding: 8px 0;
+}
+
+.chunk-content p {
+  margin: 0;
+  color: #5d4736;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .table-footer {
   display: flex;
   justify-content: flex-end;
@@ -420,7 +580,8 @@ onMounted(async () => {
   .detail-loading,
   .detail-error,
   .detail-panel,
-  .version-panel {
+  .version-panel,
+  .chunk-panel {
     padding: 20px;
   }
 
