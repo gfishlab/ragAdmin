@@ -11,3 +11,24 @@ export interface KnowledgeBase {
   rerankEnabled: boolean
   status: string
 }
+
+export interface KnowledgeBaseUpsertRequest {
+  kbCode: string
+  kbName: string
+  description: string | null
+  embeddingModelId: number | null
+  chatModelId: number | null
+  retrieveTopK: number
+  rerankEnabled: boolean
+  status: string
+}
+
+export interface ModelDefinition {
+  id: number
+  modelCode: string
+  modelName: string
+  modelType: string
+  capabilityTypes?: string[]
+  capabilityType?: string
+  status: string
+}

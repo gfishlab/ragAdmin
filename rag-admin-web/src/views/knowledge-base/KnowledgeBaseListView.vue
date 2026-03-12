@@ -1,10 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import type { KnowledgeBase } from '@/types/knowledge-base'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
 
+const route = useRoute()
+const router = useRouter()
 const loading = ref(false)
 const list = ref<KnowledgeBase[]>([])
 const pagination = reactive({
@@ -58,7 +61,25 @@ async function handleSizeChange(pageSize: number): Promise<void> {
   await loadList()
 }
 
+async function handleCreate(): Promise<void> {
+  await router.push('/knowledge-bases/create')
+}
+
+async function consumeCreatedFlag(): Promise<void> {
+  if (route.query.created !== '1') {
+    return
+  }
+  ElMessage.success('知识库创建成功')
+  const query = { ...route.query }
+  delete query.created
+  await router.replace({
+    path: route.path,
+    query,
+  })
+}
+
 onMounted(async () => {
+  await consumeCreatedFlag()
   await loadList()
 })
 </script>
@@ -69,10 +90,13 @@ onMounted(async () => {
       <div>
         <h1 class="page-title">知识库管理</h1>
         <p class="page-subtitle">
-          首版页面只承载分页列表与基础状态展示，用于验证登录态、接口结构与后台布局联调。
+          当前已接入新建知识库闭环，用于验证创建、回跳刷新与模型兜底策略。
         </p>
       </div>
-      <el-button type="primary" @click="loadList">刷新列表</el-button>
+      <div class="head-actions">
+        <el-button @click="loadList">刷新列表</el-button>
+        <el-button type="primary" @click="handleCreate">新建知识库</el-button>
+      </div>
     </header>
 
     <div class="summary-strip">
@@ -158,6 +182,11 @@ onMounted(async () => {
   align-items: flex-start;
 }
 
+.head-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .summary-strip {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -202,8 +231,18 @@ onMounted(async () => {
     flex-direction: column;
   }
 
+  .head-actions {
+    width: 100%;
+  }
+
   .summary-strip {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .head-actions {
+    flex-direction: column;
   }
 }
 </style>

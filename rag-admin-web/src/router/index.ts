@@ -41,6 +41,14 @@ const router = createRouter({
             title: '知识库管理',
           },
         },
+        {
+          path: 'knowledge-bases/create',
+          name: 'knowledge-base-create',
+          component: () => import('@/views/knowledge-base/KnowledgeBaseCreateView.vue'),
+          meta: {
+            title: '新建知识库',
+          },
+        },
       ],
     },
   ],
