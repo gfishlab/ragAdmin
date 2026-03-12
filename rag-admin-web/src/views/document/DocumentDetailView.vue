@@ -1,8 +1,13 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElButton, ElEmpty, ElSkeleton } from 'element-plus'
+import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
-import { getDocumentDetail, listDocumentChunks, listDocumentVersions } from '@/api/knowledge-base'
+import {
+  activateDocumentVersion,
+  getDocumentDetail,
+  listDocumentChunks,
+  listDocumentVersions,
+} from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
 import type { DocumentChunk, DocumentDetail, DocumentVersion } from '@/types/knowledge-base'
 
@@ -16,6 +21,7 @@ const detail = ref<DocumentDetail | null>(null)
 const versionLoading = ref(false)
 const versionError = ref('')
 const versions = ref<DocumentVersion[]>([])
+const activatingVersionIds = ref<number[]>([])
 const versionPagination = reactive({
   pageNo: 1,
   pageSize: 10,
@@ -61,6 +67,14 @@ function formatTime(value: string | null | undefined): string {
     return value
   }
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function canActivateVersion(version: DocumentVersion): boolean {
+  return !version.active
+}
+
+function isActivatingVersion(versionId: number): boolean {
+  return activatingVersionIds.value.includes(versionId)
 }
 
 function chunkPreview(chunk: DocumentChunk): string {
@@ -162,6 +176,39 @@ async function handleRetryDetail(): Promise<void> {
 
 async function handleRetryVersions(): Promise<void> {
   await loadVersions()
+}
+
+async function handleActivateVersion(version: DocumentVersion): Promise<void> {
+  if (!canActivateVersion(version) || isActivatingVersion(version.versionId)) {
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定将版本 #${version.versionId} 设为当前生效版本吗？`,
+      '确认激活版本',
+      {
+        confirmButtonText: '确认切换',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  activatingVersionIds.value = [...activatingVersionIds.value, version.versionId]
+
+  try {
+    await activateDocumentVersion(documentId.value, version.versionId)
+    ElMessage.success(`版本 #${version.versionId} 已设为当前生效版本`)
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    activatingVersionIds.value = activatingVersionIds.value.filter((id) => id !== version.versionId)
+    await loadDetail()
+    await loadVersions()
+  }
 }
 
 async function handleRetryChunks(): Promise<void> {
@@ -320,6 +367,19 @@ onMounted(async () => {
             <el-table-column label="创建时间" min-width="180">
               <template #default="{ row }">
                 {{ formatTime(row.createdAt) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="160" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  v-if="canActivateVersion(row)"
+                  link
+                  type="primary"
+                  :loading="isActivatingVersion(row.versionId)"
+                  @click="handleActivateVersion(row)"
+                >
+                  设为生效版本
+                </el-button>
               </template>
             </el-table-column>
           </el-table>

@@ -126,6 +126,13 @@ export async function listDocumentChunks(
   return unwrapResponse(response.data)
 }
 
+export async function activateDocumentVersion(documentId: number, versionId: number): Promise<void> {
+  const response = await http.put<ApiResponse<null>>(
+    `/admin/documents/${documentId}/versions/${versionId}/activate`,
+  )
+  unwrapResponse(response.data)
+}
+
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {
   const response = await http.get<ApiResponse<PageResponse<ModelDefinition>>>('/admin/models', {
     params: query,
