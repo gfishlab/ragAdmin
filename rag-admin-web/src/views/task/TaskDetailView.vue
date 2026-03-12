@@ -14,6 +14,12 @@ const loadError = ref('')
 const detail = ref<TaskDetail | null>(null)
 
 const taskId = computed(() => Number(route.params.id))
+const linkedDocumentId = computed(() => {
+  if (!detail.value?.bizId) {
+    return null
+  }
+  return detail.value.taskType === 'DOCUMENT_PARSE' ? detail.value.bizId : null
+})
 
 function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
   if (status === 'WAITING' || status === 'RUNNING') {
@@ -142,6 +148,40 @@ onMounted(async () => {
         </div>
       </section>
 
+      <section class="linkage-panel soft-panel">
+        <div class="section-head">
+          <div>
+            <h2>业务关联</h2>
+            <p>当前只在前端能明确判断时展示业务关联信息，不强行推断跳转目标。</p>
+          </div>
+        </div>
+
+        <div class="detail-matrix">
+          <article class="detail-item">
+            <span>业务 ID</span>
+            <strong>{{ detail.bizId ?? '暂无' }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>业务类型</span>
+            <strong>{{ detail.bizType || '暂无' }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>关联文档</span>
+            <strong>{{ linkedDocumentId ?? '当前无法确定' }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>说明</span>
+            <strong>
+              {{
+                linkedDocumentId
+                  ? '该任务当前可识别为文档解析类，关联对象为文档 ID。'
+                  : '当前仅保守展示业务标识，后续再补强跳转联动。'
+              }}
+            </strong>
+          </article>
+        </div>
+      </section>
+
       <section class="error-panel soft-panel">
         <div class="section-head">
           <div>
@@ -165,6 +205,7 @@ onMounted(async () => {
 .detail-loading,
 .detail-error,
 .detail-panel,
+.linkage-panel,
 .error-panel {
   padding: 24px;
 }
@@ -295,6 +336,7 @@ onMounted(async () => {
   .detail-loading,
   .detail-error,
   .detail-panel,
+  .linkage-panel,
   .error-panel {
     padding: 20px;
   }
