@@ -1,28 +1,24 @@
 package com.ragadmin.server.infra.ai.chat;
 
-import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(prefix = "rag.ai.ollama", name = "enabled", havingValue = "true")
 public class OllamaChatClient implements ChatModelClient {
 
-    private final RestClient restClient;
+    private final OllamaProperties ollamaProperties;
 
     public OllamaChatClient(OllamaProperties ollamaProperties) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()));
-        requestFactory.setReadTimeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()));
-        this.restClient = RestClient.builder()
-                .baseUrl(ollamaProperties.getBaseUrl())
-                .requestFactory(requestFactory)
-                .build();
+        this.ollamaProperties = ollamaProperties;
     }
 
     @Override
@@ -32,27 +28,19 @@ public class OllamaChatClient implements ChatModelClient {
 
     @Override
     public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-        OllamaChatResponse response = restClient.post()
-                .uri("/api/chat")
-                .body(new OllamaChatRequest(modelCode, messages, false))
-                .retrieve()
-                .body(OllamaChatResponse.class);
-        if (response == null || response.message() == null || response.message().content() == null) {
-            throw new BusinessException("CHAT_FAILED", "Ollama 聊天返回为空", HttpStatus.BAD_GATEWAY);
-        }
-        return new ChatCompletionResult(
-                response.message().content(),
-                null,
-                response.evalCount()
-        );
-    }
-
-    private record OllamaChatRequest(String model, List<ChatMessage> messages, boolean stream) {
-    }
-
-    private record OllamaChatResponse(OllamaResponseMessage message, Integer promptEvalCount, Integer evalCount) {
-    }
-
-    private record OllamaResponseMessage(String role, String content) {
+        OpenAiApi openAiApi = OpenAiApi.builder()
+                .baseUrl(SpringAiModelSupport.normalizeOllamaOpenAiBaseUrl(ollamaProperties.getBaseUrl()))
+                .apiKey("ollama")
+                .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(ollamaProperties.getTimeoutSeconds()))
+                .build();
+        OpenAiChatOptions options = OpenAiChatOptions.builder()
+                .model(modelCode)
+                .build();
+        OpenAiChatModel chatModel = OpenAiChatModel.builder()
+                .openAiApi(openAiApi)
+                .defaultOptions(options)
+                .build();
+        Prompt prompt = new Prompt(SpringAiModelSupport.toSpringMessages(messages), options);
+        return SpringAiModelSupport.toChatCompletionResult(chatModel.call(prompt));
     }
 }

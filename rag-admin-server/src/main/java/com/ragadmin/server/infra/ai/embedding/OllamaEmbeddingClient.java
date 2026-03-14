@@ -1,27 +1,29 @@
 package com.ragadmin.server.infra.ai.embedding;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.infra.ai.SpringAiModelSupport;
+import org.springframework.ai.document.MetadataMode;
+import org.springframework.ai.embedding.Embedding;
+import org.springframework.ai.embedding.EmbeddingRequest;
+import org.springframework.ai.embedding.EmbeddingResponse;
+import org.springframework.ai.openai.OpenAiEmbeddingModel;
+import org.springframework.ai.openai.OpenAiEmbeddingOptions;
+import org.springframework.ai.openai.api.OpenAiApi;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
 
-import java.time.Duration;
+import java.util.Comparator;
 import java.util.List;
 
 @Component
+@ConditionalOnProperty(prefix = "rag.ai.ollama", name = "enabled", havingValue = "true")
 public class OllamaEmbeddingClient implements EmbeddingModelClient {
 
-    private final RestClient restClient;
+    private final OllamaProperties ollamaProperties;
 
     public OllamaEmbeddingClient(OllamaProperties ollamaProperties) {
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()));
-        requestFactory.setReadTimeout(Duration.ofSeconds(ollamaProperties.getTimeoutSeconds()));
-        this.restClient = RestClient.builder()
-                .baseUrl(ollamaProperties.getBaseUrl())
-                .requestFactory(requestFactory)
-                .build();
+        this.ollamaProperties = ollamaProperties;
     }
 
     @Override
@@ -31,20 +33,22 @@ public class OllamaEmbeddingClient implements EmbeddingModelClient {
 
     @Override
     public List<List<Float>> embed(String modelCode, List<String> inputs) {
-        OllamaEmbedResponse response = restClient.post()
-                .uri("/api/embed")
-                .body(new OllamaEmbedRequest(modelCode, inputs))
-                .retrieve()
-                .body(OllamaEmbedResponse.class);
-        if (response == null || response.embeddings() == null || response.embeddings().isEmpty()) {
+        OpenAiApi openAiApi = OpenAiApi.builder()
+                .baseUrl(SpringAiModelSupport.normalizeOllamaOpenAiBaseUrl(ollamaProperties.getBaseUrl()))
+                .apiKey("ollama")
+                .restClientBuilder(SpringAiModelSupport.createRestClientBuilder(ollamaProperties.getTimeoutSeconds()))
+                .build();
+        OpenAiEmbeddingOptions options = OpenAiEmbeddingOptions.builder()
+                .model(modelCode)
+                .build();
+        OpenAiEmbeddingModel embeddingModel = new OpenAiEmbeddingModel(openAiApi, MetadataMode.NONE, options);
+        EmbeddingResponse response = embeddingModel.call(new EmbeddingRequest(inputs, options));
+        if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
             throw new BusinessException("EMBEDDING_FAILED", "Ollama Embedding 返回为空", HttpStatus.BAD_GATEWAY);
         }
-        return response.embeddings();
-    }
-
-    private record OllamaEmbedRequest(String model, List<String> input) {
-    }
-
-    private record OllamaEmbedResponse(List<List<Float>> embeddings) {
+        return response.getResults().stream()
+                .sorted(Comparator.comparingInt(Embedding::getIndex))
+                .map(embedding -> SpringAiModelSupport.toFloatList(embedding.getOutput()))
+                .toList();
     }
 }

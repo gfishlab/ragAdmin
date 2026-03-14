@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.3.5</version>
+        <version>3.5.10</version>
         <relativePath/>
     </parent>
 
@@ -29,7 +29,28 @@
         <mapstruct.version>1.6.3</mapstruct.version>
         <mybatis-plus.version>3.5.7</mybatis-plus.version>
         <minio.version>8.5.17</minio.version>
-        <spring-boot.version>3.3.5</spring-boot.version>
+        <spring-boot.version>3.5.10</spring-boot.version>
+        <spring-ai.version>1.1.2</spring-ai.version>
+        <spring-ai-alibaba.version>1.1.2.2</spring-ai-alibaba.version>
         <tika.version>2.9.2</tika.version>
     </properties>
+
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.springframework.ai</groupId>
+                <artifactId>spring-ai-bom</artifactId>
+                <version>${spring-ai.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <dependency>
+                <groupId>com.alibaba.cloud.ai</groupId>
+                <artifactId>spring-ai-alibaba-bom</artifactId>
+                <version>${spring-ai-alibaba.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
 </project>
