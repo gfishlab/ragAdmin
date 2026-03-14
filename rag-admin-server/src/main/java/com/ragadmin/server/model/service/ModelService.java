@@ -10,6 +10,7 @@ import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.model.dto.ModelCapabilityHealthResponse;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.CreateModelRequest;
@@ -58,6 +59,9 @@ public class ModelService {
 
     @Autowired
     private BailianProperties bailianProperties;
+
+    @Autowired
+    private OllamaProperties ollamaProperties;
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
@@ -269,6 +273,9 @@ public class ModelService {
         if ("BAILIAN".equalsIgnoreCase(providerCode)) {
             return requireEmbeddingDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultEmbeddingModel());
         }
+        if ("OLLAMA".equalsIgnoreCase(providerCode)) {
+            return requireEmbeddingDescriptorByProviderAndCode(providerCode, ollamaProperties.getDefaultEmbeddingModel());
+        }
         throw new BusinessException("DEFAULT_EMBEDDING_MODEL_UNSUPPORTED", "当前默认提供方未配置 Embedding 默认模型", HttpStatus.SERVICE_UNAVAILABLE);
     }
 
@@ -276,6 +283,9 @@ public class ModelService {
         String providerCode = resolveDefaultProviderCode();
         if ("BAILIAN".equalsIgnoreCase(providerCode)) {
             return requireChatDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultChatModel());
+        }
+        if ("OLLAMA".equalsIgnoreCase(providerCode)) {
+            return requireChatDescriptorByProviderAndCode(providerCode, ollamaProperties.getDefaultChatModel());
         }
         throw new BusinessException("DEFAULT_CHAT_MODEL_UNSUPPORTED", "当前默认提供方未配置聊天默认模型", HttpStatus.SERVICE_UNAVAILABLE);
     }

@@ -46,6 +46,8 @@ rag:
       timeout-seconds: 60
     ollama:
       enabled: false
+      default-chat-model: qwen2.5:7b
+      default-embedding-model: nomic-embed-text
       timeout-seconds: 30
   storage:
     minio:

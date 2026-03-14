@@ -8,6 +8,7 @@ import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
+import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
 import com.ragadmin.server.model.entity.AiModelEntity;
@@ -53,6 +54,7 @@ class ModelServiceTest {
 
     private final AiProperties aiProperties = new AiProperties();
     private final BailianProperties bailianProperties = new BailianProperties();
+    private final OllamaProperties ollamaProperties = new OllamaProperties();
 
     private ModelService modelService;
 
@@ -67,6 +69,7 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
         ReflectionTestUtils.setField(modelService, "aiProperties", aiProperties);
         ReflectionTestUtils.setField(modelService, "bailianProperties", bailianProperties);
+        ReflectionTestUtils.setField(modelService, "ollamaProperties", ollamaProperties);
     }
 
     @Test
@@ -139,6 +142,35 @@ class ModelServiceTest {
         assertEquals("qwen-max", descriptor.modelCode());
         assertEquals("BAILIAN", descriptor.providerCode());
         assertEquals("百炼", descriptor.providerName());
+    }
+
+    @Test
+    void shouldResolveDefaultEmbeddingModelDescriptorForOllama() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(60L);
+        provider.setProviderCode("OLLAMA");
+        provider.setProviderName("Ollama");
+
+        AiModelEntity model = new AiModelEntity();
+        model.setId(6L);
+        model.setProviderId(60L);
+        model.setModelCode("nomic-embed-text");
+
+        aiProperties.setDefaultProvider("OLLAMA");
+        ollamaProperties.setDefaultEmbeddingModel("nomic-embed-text");
+
+        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
+        when(aiModelMapper.selectOne(any())).thenReturn(model);
+        when(aiModelMapper.selectById(6L)).thenReturn(model);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(6L)))
+                .thenReturn(List.of(capability(6L, "EMBEDDING")));
+
+        EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(null);
+
+        assertEquals(6L, descriptor.modelId());
+        assertEquals("nomic-embed-text", descriptor.modelCode());
+        assertEquals("OLLAMA", descriptor.providerCode());
+        assertEquals("Ollama", descriptor.providerName());
     }
 
     @Test
