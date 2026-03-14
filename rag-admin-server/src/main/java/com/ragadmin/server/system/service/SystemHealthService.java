@@ -13,8 +13,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -117,6 +117,9 @@ public class SystemHealthService {
     }
 
     private DependencyHealthResponse checkOllama() {
+        if (!ollamaProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "Ollama 已禁用");
+        }
         if (!StringUtils.hasText(ollamaProperties.getBaseUrl())) {
             return new DependencyHealthResponse("UNKNOWN", "Ollama 未配置地址");
         }

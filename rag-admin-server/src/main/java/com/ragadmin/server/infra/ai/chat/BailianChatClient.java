@@ -13,10 +13,10 @@ import java.util.List;
 @Component
 public class BailianChatClient implements ChatModelClient {
 
-    private final RestClient restClient;
+    private final BailianProperties bailianProperties;
 
     public BailianChatClient(BailianProperties bailianProperties) {
-        this.restClient = BailianApiSupport.buildRestClient(bailianProperties);
+        this.bailianProperties = bailianProperties;
     }
 
     @Override
@@ -26,6 +26,8 @@ public class BailianChatClient implements ChatModelClient {
 
     @Override
     public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
+        // API Key 只允许放在本地私有配置，因此不能在 Bean 初始化阶段就强依赖密钥存在。
+        RestClient restClient = BailianApiSupport.buildRestClient(bailianProperties);
         BailianChatCompletionResponse response = restClient.post()
                 .uri("/chat/completions")
                 .body(new BailianChatCompletionRequest(modelCode, messages))

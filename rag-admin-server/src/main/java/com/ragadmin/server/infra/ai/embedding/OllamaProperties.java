@@ -5,8 +5,17 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "rag.ai.ollama")
 public class OllamaProperties {
 
+    private boolean enabled = false;
     private String baseUrl;
     private int timeoutSeconds = 30;
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
 
     public String getBaseUrl() {
         return baseUrl;

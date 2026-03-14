@@ -1,6 +1,8 @@
 package com.ragadmin.server.model.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.ragadmin.server.infra.ai.bailian.BailianProperties;
+import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.entity.AiProviderEntity;
@@ -24,26 +26,35 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
     private final AiProviderMapper aiProviderMapper;
     private final AiModelMapper aiModelMapper;
     private final AiModelCapabilityMapper aiModelCapabilityMapper;
+    private final BailianProperties bailianProperties;
+    private final OllamaProperties ollamaProperties;
 
     public ModelBootstrapInitializer(
             AiProviderMapper aiProviderMapper,
             AiModelMapper aiModelMapper,
-            AiModelCapabilityMapper aiModelCapabilityMapper
+            AiModelCapabilityMapper aiModelCapabilityMapper,
+            BailianProperties bailianProperties,
+            OllamaProperties ollamaProperties
     ) {
         this.aiProviderMapper = aiProviderMapper;
         this.aiModelMapper = aiModelMapper;
         this.aiModelCapabilityMapper = aiModelCapabilityMapper;
+        this.bailianProperties = bailianProperties;
+        this.ollamaProperties = ollamaProperties;
     }
 
     @Override
     public void run(ApplicationArguments args) {
-        AiProviderEntity bailian = ensureProvider("BAILIAN", "阿里百炼", "https://dashscope.aliyuncs.com");
-        AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
-
-        ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
-        ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);
-        ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
-        ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
+        if (bailianProperties.isEnabled()) {
+            AiProviderEntity bailian = ensureProvider("BAILIAN", "阿里百炼", "https://dashscope.aliyuncs.com");
+            ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
+            ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);
+        }
+        if (ollamaProperties.isEnabled()) {
+            AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
+            ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
+            ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
+        }
 
         log.info("已完成默认模型提供方与模型定义初始化");
     }

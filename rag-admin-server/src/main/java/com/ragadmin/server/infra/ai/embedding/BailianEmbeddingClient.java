@@ -13,10 +13,10 @@ import java.util.List;
 @Component
 public class BailianEmbeddingClient implements EmbeddingModelClient {
 
-    private final RestClient restClient;
+    private final BailianProperties bailianProperties;
 
     public BailianEmbeddingClient(BailianProperties bailianProperties) {
-        this.restClient = BailianApiSupport.buildRestClient(bailianProperties);
+        this.bailianProperties = bailianProperties;
     }
 
     @Override
@@ -26,6 +26,8 @@ public class BailianEmbeddingClient implements EmbeddingModelClient {
 
     @Override
     public List<List<Float>> embed(String modelCode, List<String> inputs) {
+        // API Key 只允许放在本地私有配置，因此不能在 Bean 初始化阶段就强依赖密钥存在。
+        RestClient restClient = BailianApiSupport.buildRestClient(bailianProperties);
         BailianEmbeddingResponse response = restClient.post()
                 .uri("/embeddings")
                 .body(new BailianEmbeddingRequest(modelCode, inputs, "float"))
