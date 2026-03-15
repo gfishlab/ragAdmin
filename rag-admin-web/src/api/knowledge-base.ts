@@ -85,6 +85,7 @@ function mapDocumentVersionResponse(item: {
   storageObjectKey: string
   contentHash?: string | null
   createdAt: string
+  active?: boolean | null
 }) {
   return {
     versionId: item.id,
@@ -92,7 +93,7 @@ function mapDocumentVersionResponse(item: {
     storageObjectKey: item.storageObjectKey,
     contentHash: item.contentHash ?? null,
     createdAt: item.createdAt,
-    active: false,
+    active: item.active ?? false,
   }
 }
 
