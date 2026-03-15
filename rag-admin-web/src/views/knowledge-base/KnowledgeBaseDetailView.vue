@@ -170,6 +170,10 @@ async function handleUpload(): Promise<void> {
     uploadError.value = '请先选择待上传文件'
     return
   }
+  if (uploadDocType.value === 'UNKNOWN') {
+    uploadError.value = '当前文件类型暂不支持，请上传 Markdown、TXT、PDF、DOCX、PPTX、XLSX 或图片文件'
+    return
+  }
 
   uploadSubmitting.value = true
   uploadError.value = ''

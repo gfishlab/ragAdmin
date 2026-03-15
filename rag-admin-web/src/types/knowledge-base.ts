@@ -67,10 +67,13 @@ export interface DocumentDetail {
   kbName?: string | null
   docName: string
   docType: string
+  currentVersion?: number | null
   parseStatus: string
   enabled: boolean
   storageBucket?: string | null
   storageObjectKey?: string | null
+  fileSize?: number | null
+  contentHash?: string | null
   createdAt: string
   updatedAt?: string | null
 }

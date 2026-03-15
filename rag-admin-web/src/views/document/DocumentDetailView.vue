@@ -425,6 +425,14 @@ onMounted(async () => {
             <span>更新时间</span>
             <strong>{{ formatTime(detail.updatedAt) }}</strong>
           </article>
+          <article class="detail-item">
+            <span>当前版本</span>
+            <strong>{{ detail.currentVersion ?? '暂无' }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>文件大小</span>
+            <strong>{{ detail.fileSize ? `${(detail.fileSize / 1024).toFixed(1)} KB` : '暂无' }}</strong>
+          </article>
         </div>
 
         <div class="storage-panel">
@@ -435,6 +443,10 @@ onMounted(async () => {
           <article class="storage-item">
             <span>对象 Key</span>
             <strong>{{ detail.storageObjectKey || '暂无' }}</strong>
+          </article>
+          <article class="storage-item">
+            <span>内容哈希</span>
+            <strong>{{ detail.contentHash || '暂无' }}</strong>
           </article>
         </div>
       </section>
