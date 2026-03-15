@@ -1,5 +1,5 @@
 import type { ApiResponse, PageResponse } from '@/types/api'
-import type { TaskDetail, TaskRecord } from '@/types/task'
+import type { TaskDetail, TaskRecord, TaskSummary } from '@/types/task'
 import { http, unwrapResponse } from './http'
 
 export interface TaskListQuery {
@@ -24,5 +24,15 @@ export async function retryTask(taskId: number): Promise<void> {
 
 export async function getTaskDetail(taskId: number): Promise<TaskDetail> {
   const response = await http.get<ApiResponse<TaskDetail>>(`/admin/tasks/${taskId}`)
+  return unwrapResponse(response.data)
+}
+
+export async function getTaskSummary(query: {
+  taskType?: string
+  bizId?: string
+}): Promise<TaskSummary> {
+  const response = await http.get<ApiResponse<TaskSummary>>('/admin/tasks/summary', {
+    params: query,
+  })
   return unwrapResponse(response.data)
 }

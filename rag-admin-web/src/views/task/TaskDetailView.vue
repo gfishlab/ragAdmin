@@ -15,10 +15,10 @@ const detail = ref<TaskDetail | null>(null)
 
 const taskId = computed(() => Number(route.params.id))
 const linkedDocumentId = computed(() => {
-  if (!detail.value?.bizId) {
+  if (!detail.value?.documentId) {
     return null
   }
-  return detail.value.taskType === 'DOCUMENT_PARSE' ? detail.value.bizId : null
+  return detail.value.taskType === 'DOCUMENT_PARSE' ? detail.value.documentId : null
 })
 const timelineSteps = computed(() => {
   if (!detail.value) {
@@ -220,7 +220,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>关联文档</span>
-            <strong>{{ linkedDocumentId ?? '当前无法确定' }}</strong>
+            <strong>{{ detail.documentName || linkedDocumentId || '当前无法确定' }}</strong>
           </article>
           <article class="detail-item">
             <span>说明</span>
