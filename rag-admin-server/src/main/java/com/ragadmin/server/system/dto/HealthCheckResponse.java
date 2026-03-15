@@ -7,6 +7,7 @@ public record HealthCheckResponse(
         DependencyHealthResponse minio,
         DependencyHealthResponse bailian,
         DependencyHealthResponse ollama,
-        DependencyHealthResponse milvus
+        DependencyHealthResponse milvus,
+        DependencyHealthResponse ocr
 ) {
 }

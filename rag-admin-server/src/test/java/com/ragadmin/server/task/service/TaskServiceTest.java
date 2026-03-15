@@ -7,6 +7,7 @@ import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.service.DocumentService;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
+import com.ragadmin.server.task.dto.TaskSummaryResponse;
 import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
 import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
@@ -23,6 +24,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -106,5 +108,19 @@ class TaskServiceTest {
         assertEquals(202L, response.taskId());
         assertEquals(401L, response.documentVersionId());
         assertEquals(2, response.retryCount());
+    }
+
+    @Test
+    void shouldReturnTaskSummaryCounts() {
+        when(documentParseTaskMapper.selectCount(any())).thenReturn(10L, 2L, 1L, 5L, 1L, 1L);
+
+        TaskSummaryResponse response = taskService.summary("DOCUMENT_PARSE", null);
+
+        assertEquals(10L, response.total());
+        assertEquals(2L, response.waiting());
+        assertEquals(1L, response.running());
+        assertEquals(5L, response.success());
+        assertEquals(1L, response.failed());
+        assertEquals(1L, response.canceled());
     }
 }

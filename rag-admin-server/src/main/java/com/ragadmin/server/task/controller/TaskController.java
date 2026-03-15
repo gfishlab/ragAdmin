@@ -4,6 +4,7 @@ import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskListItemResponse;
+import com.ragadmin.server.task.dto.TaskSummaryResponse;
 import com.ragadmin.server.task.service.TaskService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -29,6 +30,14 @@ public class TaskController {
             @RequestParam(defaultValue = "20") long pageSize
     ) {
         return ApiResponse.success(taskService.list(taskType, taskStatus, bizId, pageNo, pageSize));
+    }
+
+    @GetMapping("/summary")
+    public ApiResponse<TaskSummaryResponse> summary(
+            @RequestParam(required = false) String taskType,
+            @RequestParam(required = false) Long bizId
+    ) {
+        return ApiResponse.success(taskService.summary(taskType, bizId));
     }
 
     @GetMapping("/{taskId}")

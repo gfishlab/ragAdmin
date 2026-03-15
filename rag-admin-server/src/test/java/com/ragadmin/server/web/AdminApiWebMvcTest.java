@@ -389,7 +389,8 @@ class AdminApiWebMvcTest {
                 new DependencyHealthResponse("UP", "MinIO 正常"),
                 new DependencyHealthResponse("UP", "百炼正常"),
                 new DependencyHealthResponse("UP", "Ollama 正常"),
-                new DependencyHealthResponse("UP", "Milvus 正常")
+                new DependencyHealthResponse("UP", "Milvus 正常"),
+                new DependencyHealthResponse("UNKNOWN", "OCR 已禁用")
         ));
 
         protectedMockMvc.perform(get("/api/admin/system/health")

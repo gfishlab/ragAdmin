@@ -13,6 +13,7 @@ import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskListItemResponse;
 import com.ragadmin.server.task.dto.TaskRetryRecordResponse;
 import com.ragadmin.server.task.dto.TaskStepResponse;
+import com.ragadmin.server.task.dto.TaskSummaryResponse;
 import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
@@ -79,6 +80,18 @@ public class TaskService {
         );
     }
 
+    public TaskSummaryResponse summary(String taskType, Long bizId) {
+        validateTaskType(taskType);
+        return new TaskSummaryResponse(
+                countByStatus(bizId, null),
+                countByStatus(bizId, "WAITING"),
+                countByStatus(bizId, "RUNNING"),
+                countByStatus(bizId, "SUCCESS"),
+                countByStatus(bizId, "FAILED"),
+                countByStatus(bizId, "CANCELED")
+        );
+    }
+
     public TaskDetailResponse detail(Long taskId) {
         DocumentParseTaskEntity task = requireTask(taskId);
         DocumentEntity document = documentMapper.selectById(task.getDocumentId());
@@ -104,6 +117,12 @@ public class TaskService {
         if (StringUtils.hasText(taskType) && !TASK_TYPE_DOCUMENT_PARSE.equals(taskType)) {
             throw new BusinessException("TASK_TYPE_UNSUPPORTED", "当前仅支持 DOCUMENT_PARSE 任务", HttpStatus.BAD_REQUEST);
         }
+    }
+
+    private long countByStatus(Long bizId, String taskStatus) {
+        return documentParseTaskMapper.selectCount(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                .eq(StringUtils.hasText(taskStatus), DocumentParseTaskEntity::getTaskStatus, taskStatus)
+                .eq(bizId != null, DocumentParseTaskEntity::getDocumentId, bizId));
     }
 
     private DocumentParseTaskEntity requireTask(Long taskId) {

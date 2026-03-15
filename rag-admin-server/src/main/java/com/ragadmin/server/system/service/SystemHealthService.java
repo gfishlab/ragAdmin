@@ -2,6 +2,7 @@ package com.ragadmin.server.system.service;
 
 import com.ragadmin.server.infra.ai.bailian.BailianApiSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
+import com.ragadmin.server.document.parser.DocumentOcrProperties;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.vector.MilvusProperties;
@@ -44,6 +45,9 @@ public class SystemHealthService {
     @Autowired
     private MilvusProperties milvusProperties;
 
+    @Autowired
+    private DocumentOcrProperties documentOcrProperties;
+
     public HealthCheckResponse check() {
         DependencyHealthResponse postgres = checkPostgres();
         DependencyHealthResponse redis = checkRedis();
@@ -51,8 +55,9 @@ public class SystemHealthService {
         DependencyHealthResponse bailian = checkBailian();
         DependencyHealthResponse ollama = checkOllama();
         DependencyHealthResponse milvus = checkMilvus();
-        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus);
+        DependencyHealthResponse ocr = checkOcr();
+        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, ocr) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, ocr);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -187,6 +192,30 @@ public class SystemHealthService {
             return new DependencyHealthResponse("UP", "Milvus 连通正常，集合数=" + collectionCount);
         } catch (Exception ex) {
             return new DependencyHealthResponse("DOWN", buildMessage("Milvus 检查失败", ex));
+        }
+    }
+
+    private DependencyHealthResponse checkOcr() {
+        if (!documentOcrProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "OCR 已禁用");
+        }
+        if (!StringUtils.hasText(documentOcrProperties.getTesseractCommand())) {
+            return new DependencyHealthResponse("UNKNOWN", "Tesseract 命令未配置");
+        }
+        try {
+            Process process = new ProcessBuilder(documentOcrProperties.getTesseractCommand(), "--version")
+                    .redirectErrorStream(true)
+                    .start();
+            String output = new String(process.getInputStream().readAllBytes());
+            int exitCode = process.waitFor();
+            if (exitCode != 0) {
+                return new DependencyHealthResponse("DOWN", "Tesseract 检查失败");
+            }
+            String firstLine = output == null ? "" : output.lines().findFirst().orElse("");
+            String message = StringUtils.hasText(firstLine) ? firstLine.trim() : "Tesseract 可用";
+            return new DependencyHealthResponse("UP", message);
+        } catch (Exception ex) {
+            return new DependencyHealthResponse("DOWN", buildMessage("Tesseract 检查失败", ex));
         }
     }
 
