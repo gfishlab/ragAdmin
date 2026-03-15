@@ -15,6 +15,7 @@
 
 - 健康检查
 - 登录与登录态验证
+- 模型提供方与模型健康检查
 - 知识库创建与查询
 - 上传签名与文档登记
 - 文档解析与任务查询
@@ -82,7 +83,8 @@ curl.exe "$BaseUrl/api/admin/system/health"
 判定要点：
 
 - `code` 为 `OK`
-- `data.dependencies` 中至少能看到 `postgres`、`redis`、`minio`、`milvus`、`ollama`
+- `data` 中至少能看到 `postgres`、`redis`、`minio`、`milvus`、`bailian`
+- 若启用了 OCR，还应能看到 `ocr`
 
 ### 5.2 登录
 
@@ -155,6 +157,27 @@ curl.exe `
 $EmbeddingModelId = 2
 $ChatModelId = 1
 ```
+
+### 5.5.1 查询模型提供方并做提供方健康检查
+
+```powershell
+$ProviderResp = Invoke-RestMethod `
+  -Method Get `
+  -Uri "$BaseUrl/api/admin/model-providers" `
+  -Headers @{ Authorization = "Bearer $AccessToken" }
+
+$ProviderId = $ProviderResp.data[0].id
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/admin/model-providers/$ProviderId/health-check" `
+  -Headers @{ Authorization = "Bearer $AccessToken" }
+```
+
+判定要点：
+
+- `status` 为 `UP` 或符合当前环境预期
+- `capabilityChecks` 中能看到聊天或向量能力检查结果
 
 ### 5.6 创建知识库
 
@@ -281,6 +304,19 @@ curl.exe `
   curl.exe -H "Authorization: Bearer $AccessToken" "$BaseUrl/api/admin/tasks/$TaskId"
 }
 ```
+
+### 5.11.1 查询任务摘要
+
+```powershell
+curl.exe `
+  -H "Authorization: Bearer $AccessToken" `
+  "$BaseUrl/api/admin/tasks/summary"
+```
+
+判定要点：
+
+- 返回 `total`、`waiting`、`running`、`success`、`failed`、`canceled`
+- 触发解析后，至少有一个状态计数发生变化
 
 ### 5.12 查询文档切片
 

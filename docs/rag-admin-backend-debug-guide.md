@@ -29,15 +29,16 @@
 - 文件上传签名、文档登记、文档启停
 - 解析任务投递、任务列表、任务详情、任务重试、任务步骤记录
 - 文本类与 Tika 文档解析
+- 图片 OCR 与扫描 PDF OCR 兜底
 - 向量化、Milvus 引用写入
 - RAG 会话、问答、引用落库、问答反馈
 - 审计日志查询
 - 模型调用统计、知识库问答统计
 - 系统健康检查
+- OCR 健康检查
 
-当前仍属于首期后端版本，以下能力尚未完整实现：
+当前仍属于首期后端版本，以下能力仍未完整实现或暂未展开：
 
-- OCR / Tesseract
 - 多模型路由策略
 - 复杂重排
 - 多知识库联合检索
@@ -169,8 +170,10 @@ GET /api/admin/system/health
 - `postgres`
 - `redis`
 - `minio`
+- `bailian`
 - `ollama`
 - `milvus`
+- `ocr`
 
 如果这里不通，后续联调没有意义。
 
@@ -235,6 +238,7 @@ GET /api/admin/system/health
 
 - `GET /api/admin/model-providers`
 - `POST /api/admin/model-providers`
+- `POST /api/admin/model-providers/{providerId}/health-check`
 - `GET /api/admin/models`
 - `POST /api/admin/models`
 - `POST /api/admin/models/{modelId}/health-check`
@@ -256,6 +260,7 @@ GET /api/admin/system/health
 ### 6.5 任务
 
 - `GET /api/admin/tasks`
+- `GET /api/admin/tasks/summary`
 - `GET /api/admin/tasks/{taskId}`
 - `POST /api/admin/tasks/{taskId}/retry`
 
@@ -288,9 +293,9 @@ GET /api/admin/system/health
 
 优先检查：
 
-- Ollama 是否启动
-- 模型是否已拉取
-- `application-local.yml` 或 `application-dev.yml` 中 `rag.ai.ollama.base-url` 是否正确
+- 百炼 `apiKey` 是否已通过本地私有配置注入
+- 百炼模型编码是否与后台模型定义一致
+- 若启用 Ollama，再检查 `rag.ai.ollama.base-url` 与模型是否可用
 
 ### 7.3 文档解析失败
 
@@ -300,6 +305,8 @@ GET /api/admin/system/health
 - 对象 Key 是否确实已上传
 - 文档类型是否在当前支持范围内
 - Tika 依赖是否正确加载
+- 若是图片或扫描 PDF，检查 `rag.document.ocr.enabled` 是否启用
+- 检查运行机是否已安装 `tesseract` 且语言包可用
 
 ### 7.4 向量化失败
 
