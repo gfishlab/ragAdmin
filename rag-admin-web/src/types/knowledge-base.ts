@@ -59,6 +59,8 @@ export interface CreateKnowledgeBaseDocumentRequest {
   docType: string
   storageBucket: string
   storageObjectKey: string
+  fileSize?: number | null
+  contentHash?: string | null
 }
 
 export interface DocumentDetail {

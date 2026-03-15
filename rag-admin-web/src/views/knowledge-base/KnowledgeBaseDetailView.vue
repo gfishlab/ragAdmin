@@ -196,6 +196,8 @@ async function handleUpload(): Promise<void> {
       docType: uploadDocType.value,
       storageBucket: upload.bucket,
       storageObjectKey: upload.objectKey,
+      fileSize: file.size,
+      contentHash: null,
     }
     await createKnowledgeBaseDocument(knowledgeBaseId.value, payload)
 
