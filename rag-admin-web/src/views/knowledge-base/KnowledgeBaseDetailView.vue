@@ -53,14 +53,32 @@ function inferDocType(fileName: string): string {
   if (extension === 'pdf') {
     return 'PDF'
   }
-  if (extension === 'doc' || extension === 'docx') {
-    return 'DOC'
+  if (extension === 'docx') {
+    return 'DOCX'
+  }
+  if (extension === 'pptx') {
+    return 'PPTX'
+  }
+  if (extension === 'xlsx') {
+    return 'XLSX'
   }
   if (extension === 'md' || extension === 'markdown') {
     return 'MARKDOWN'
   }
   if (extension === 'txt') {
-    return 'TEXT'
+    return 'TXT'
+  }
+  if (extension === 'png') {
+    return 'PNG'
+  }
+  if (extension === 'jpg') {
+    return 'JPG'
+  }
+  if (extension === 'jpeg') {
+    return 'JPEG'
+  }
+  if (extension === 'webp') {
+    return 'WEBP'
   }
   return 'UNKNOWN'
 }
