@@ -53,6 +53,7 @@ export async function createKnowledgeBase(payload: KnowledgeBaseUpsertRequest): 
 function mapDocumentResponse(item: {
   id: number
   kbId: number | null
+  kbName?: string | null
   docName: string
   docType: string
   storageBucket?: string | null
@@ -68,12 +69,16 @@ function mapDocumentResponse(item: {
   return {
     documentId: item.id,
     kbId: item.kbId,
+    kbName: item.kbName ?? null,
     docName: item.docName,
     docType: item.docType,
     parseStatus: item.parseStatus,
     enabled: item.enabled,
     storageBucket: item.storageBucket ?? null,
     storageObjectKey: item.storageObjectKey ?? null,
+    currentVersion: item.currentVersion ?? null,
+    fileSize: item.fileSize ?? null,
+    contentHash: item.contentHash ?? null,
     createdAt: item.createdAt ?? '',
     updatedAt: item.updatedAt ?? null,
   }
