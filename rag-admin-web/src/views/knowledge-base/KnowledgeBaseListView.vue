@@ -112,7 +112,7 @@ onMounted(async () => {
       <div>
         <h1 class="page-title">知识库管理</h1>
         <p class="page-subtitle">
-          当前已接入新建知识库闭环，用于验证创建、回跳刷新与模型兜底策略。
+          当前已支持知识库列表、创建、编辑和详情查看，可直接作为管理台主入口使用。
         </p>
       </div>
       <div class="head-actions">
@@ -130,7 +130,7 @@ onMounted(async () => {
       <article class="summary-card soft-panel">
         <span>当前页</span>
         <strong>{{ pagination.pageNo }}</strong>
-        <p>首版仅保留分页，不提前加入筛选条件。</p>
+        <p>当前列表保持分页模式，优先保证知识库主流程稳定。</p>
       </article>
       <article class="summary-card soft-panel">
         <span>默认模型回退</span>

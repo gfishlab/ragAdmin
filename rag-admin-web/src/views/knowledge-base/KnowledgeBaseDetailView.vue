@@ -398,7 +398,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>知识库配置</h2>
-            <p>首版详情页聚焦基础配置与文档列表浏览，不提前引入写操作。</p>
+            <p>当前详情页已聚焦知识库配置、文档列表、上传接入和解析触发。</p>
           </div>
         </div>
 
@@ -549,7 +549,7 @@ onMounted(async () => {
           <div class="el-upload__text">将文件拖到此处，或 <em>点击选择</em></div>
           <template #tip>
             <div class="el-upload__tip">
-              首版支持单文件上传，文档类型将按文件扩展名自动推断。
+              当前支持单文件上传，文档类型按文件扩展名自动推断。
             </div>
           </template>
         </el-upload>

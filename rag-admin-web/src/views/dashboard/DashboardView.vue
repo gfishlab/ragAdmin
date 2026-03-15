@@ -4,7 +4,7 @@
       <div>
         <h1 class="page-title">概览</h1>
         <p class="page-subtitle">
-          这是首版前端基线的占位首页，先为知识库管理、任务流与健康检查留出统一容器。
+          当前概览页用于承接知识库、文档、任务与健康检查等核心管理入口。
         </p>
       </div>
     </header>
@@ -12,18 +12,18 @@
     <div class="dashboard-grid">
       <article class="metric-card soft-panel">
         <span>当前完成</span>
-        <strong>前端基线初始化</strong>
-        <p>已规划登录、Layout、统一请求层与知识库分页表格的整体链路。</p>
+        <strong>基础管理台</strong>
+        <p>已具备登录、知识库、文档、任务等核心页面与联调主链路。</p>
       </article>
       <article class="metric-card soft-panel">
         <span>当前联调焦点</span>
-        <strong>知识库管理</strong>
-        <p>后续创建、详情、文档上传都可以在这个切片上继续垂直推进。</p>
+        <strong>文档与任务链路</strong>
+        <p>当前重点是继续收紧上传、解析、任务监控和文档详情体验。</p>
       </article>
       <article class="metric-card soft-panel">
-        <span>后续页面</span>
-        <strong>模型、文档、任务监控</strong>
-        <p>保持同一套导航、鉴权和错误处理基线，不再重复搭脚手架。</p>
+        <span>当前基线</span>
+        <strong>统一导航与鉴权</strong>
+        <p>页面已共享同一套路由守卫、请求封装与错误处理方式。</p>
       </article>
     </div>
   </section>

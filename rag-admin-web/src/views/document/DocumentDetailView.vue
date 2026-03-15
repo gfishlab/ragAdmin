@@ -621,7 +621,7 @@ onMounted(async () => {
           <div class="el-upload__text">将新版本文件拖到此处，或 <em>点击选择</em></div>
           <template #tip>
             <div class="el-upload__tip">
-              当前仅创建新版本记录，不会自动切换为生效版本。
+              新版本创建后不会自动切换为生效版本，可在版本列表中手动激活。
             </div>
           </template>
         </el-upload>
