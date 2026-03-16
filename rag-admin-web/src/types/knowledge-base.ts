@@ -1,3 +1,7 @@
+import type { ModelDefinition } from './model'
+
+export type { ModelDefinition }
+
 export interface KnowledgeBase {
   id: number
   kbCode: string
@@ -20,16 +24,6 @@ export interface KnowledgeBaseUpsertRequest {
   chatModelId: number | null
   retrieveTopK: number
   rerankEnabled: boolean
-  status: string
-}
-
-export interface ModelDefinition {
-  id: number
-  modelCode: string
-  modelName: string
-  modelType: string
-  capabilityTypes?: string[]
-  capabilityType?: string
   status: string
 }
 

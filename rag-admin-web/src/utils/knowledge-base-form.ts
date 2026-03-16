@@ -59,7 +59,7 @@ export function normalizeKnowledgeBaseForm(form: KnowledgeBaseUpsertRequest): Kn
 
 function capabilitySet(model: ModelDefinition): Set<string> {
   return new Set(
-    [...(model.capabilityTypes ?? []), model.capabilityType]
+    [...(model.capabilityTypes ?? [])]
       .filter((item): item is string => Boolean(item))
       .map((item) => item.toUpperCase()),
   )
@@ -89,8 +89,12 @@ function appendSelectedModel(
   return [
     {
       id: selectedId,
+      providerId: 0,
+      providerCode: null,
+      providerName: null,
       modelCode: `selected-${selectedId}`,
       modelName: selectedName || `已绑定模型 #${selectedId}`,
+      capabilityTypes: [],
       modelType: fallbackType,
       status: 'ENABLED',
     },

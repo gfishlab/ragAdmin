@@ -42,6 +42,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'models',
+          name: 'models',
+          component: () => import('@/views/model/ModelManagementView.vue'),
+          meta: {
+            title: '模型管理',
+          },
+        },
+        {
           path: 'knowledge-bases/create',
           name: 'knowledge-base-create',
           component: () => import('@/views/knowledge-base/KnowledgeBaseCreateView.vue'),

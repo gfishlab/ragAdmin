@@ -8,23 +8,17 @@ import type {
   KnowledgeBase,
   KnowledgeBaseDocument,
   KnowledgeBaseUpsertRequest,
-  ModelDefinition,
   UploadUrlRequest,
   UploadUrlResponse,
 } from '@/types/knowledge-base'
+import type { ModelDefinition } from '@/types/model'
 import { http, unwrapResponse } from './http'
+import { listModels as listModelDefinitions, type ModelListQuery } from './model'
 
 export interface KnowledgeBaseListQuery {
   pageNo: number
   pageSize: number
   keyword?: string
-  status?: string
-}
-
-export interface ModelListQuery {
-  pageNo: number
-  pageSize: number
-  capabilityType?: string
   status?: string
 }
 
@@ -35,6 +29,8 @@ export interface KnowledgeBaseDocumentListQuery {
   parseStatus?: string
   enabled?: boolean
 }
+
+export type { ModelListQuery }
 
 export async function listKnowledgeBases(
   query: KnowledgeBaseListQuery,
@@ -230,8 +226,6 @@ export async function createDocumentVersion(
 }
 
 export async function listModels(query: ModelListQuery): Promise<PageResponse<ModelDefinition>> {
-  const response = await http.get<ApiResponse<PageResponse<ModelDefinition>>>('/admin/models', {
-    params: query,
-  })
-  return unwrapResponse(response.data)
+  return listModelDefinitions(query)
 }
+

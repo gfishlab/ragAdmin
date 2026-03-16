@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Collection, Histogram, List, SwitchButton } from '@element-plus/icons-vue'
+import { Collection, Connection, Histogram, List, SwitchButton } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
 
@@ -15,6 +15,7 @@ const activeMenu = computed(() => route.path)
 const menuItems = [
   { index: '/dashboard', label: '概览', icon: Histogram },
   { index: '/knowledge-bases', label: '知识库管理', icon: Collection },
+  { index: '/models', label: '模型管理', icon: Connection },
   { index: '/tasks', label: '任务监控', icon: List },
 ]
 
