@@ -25,6 +25,7 @@ const providerDialogVisible = ref(false)
 const providerCheckingIds = ref<number[]>([])
 const providers = ref<ModelProvider[]>([])
 const providerHealthResult = ref<ModelProviderHealthCheck | null>(null)
+const activeProviderHealthId = ref<number | null>(null)
 
 const modelLoading = ref(false)
 const modelSubmitting = ref(false)
@@ -32,6 +33,7 @@ const modelDialogVisible = ref(false)
 const modelCheckingIds = ref<number[]>([])
 const models = ref<ModelDefinition[]>([])
 const modelHealthResult = ref<ModelHealthCheck | null>(null)
+const activeModelHealthId = ref<number | null>(null)
 const modelLoadError = ref('')
 
 const pagination = reactive({
@@ -197,9 +199,11 @@ async function handleProviderHealthCheck(provider: ModelProvider): Promise<void>
   providerCheckingIds.value = [...providerCheckingIds.value, provider.id]
   try {
     providerHealthResult.value = await healthCheckModelProvider(provider.id)
+    activeProviderHealthId.value = provider.id
     ElMessage.success(`${provider.providerName} 探活完成`)
   } catch (error) {
     providerHealthResult.value = null
+    activeProviderHealthId.value = null
     ElMessage.error(resolveErrorMessage(error))
   } finally {
     providerCheckingIds.value = providerCheckingIds.value.filter((id) => id !== provider.id)
@@ -210,9 +214,11 @@ async function handleModelHealthCheck(model: ModelDefinition): Promise<void> {
   modelCheckingIds.value = [...modelCheckingIds.value, model.id]
   try {
     modelHealthResult.value = await healthCheckModel(model.id)
+    activeModelHealthId.value = model.id
     ElMessage.success(`${model.modelName} 探活完成`)
   } catch (error) {
     modelHealthResult.value = null
+    activeModelHealthId.value = null
     ElMessage.error(resolveErrorMessage(error))
   } finally {
     modelCheckingIds.value = modelCheckingIds.value.filter((id) => id !== model.id)
@@ -364,20 +370,33 @@ onMounted(async () => {
 
       <section v-if="providerHealthResult" class="health-result">
         <div class="health-header">
-          <strong>最近一次提供方探活结果</strong>
+          <strong>
+            最近一次提供方探活结果
+            <template v-if="activeProviderHealthId">
+              / #{{ activeProviderHealthId }}
+            </template>
+          </strong>
           <el-tag :type="statusTagType(providerHealthResult.status)">
             {{ providerHealthResult.status }}
           </el-tag>
         </div>
         <p class="health-message">{{ providerHealthResult.message }}</p>
-        <div class="health-tags">
-          <el-tag
+        <div class="health-detail-list">
+          <article
             v-for="item in providerHealthResult.capabilityChecks"
             :key="`${providerHealthResult.providerId}-${item.capabilityType}`"
-            :type="statusTagType(item.status)"
+            class="health-detail-item"
           >
-            {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
-          </el-tag>
+            <div class="health-item-head">
+              <el-tag :type="statusTagType(item.status)">
+                {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
+              </el-tag>
+              <span class="health-item-model">
+                {{ item.modelCode ? `模型 ${item.modelCode}` : '当前无可用模型' }}
+              </span>
+            </div>
+            <p class="health-item-message">{{ item.message }}</p>
+          </article>
         </div>
       </section>
     </section>
@@ -500,20 +519,30 @@ onMounted(async () => {
 
       <section v-if="modelHealthResult" class="health-result">
         <div class="health-header">
-          <strong>最近一次模型探活结果</strong>
+          <strong>
+            最近一次模型探活结果
+            <template v-if="activeModelHealthId">
+              / #{{ activeModelHealthId }}
+            </template>
+          </strong>
           <el-tag :type="statusTagType(modelHealthResult.status)">
             {{ modelHealthResult.status }}
           </el-tag>
         </div>
         <p class="health-message">{{ modelHealthResult.message }}</p>
-        <div class="health-tags">
-          <el-tag
+        <div class="health-detail-list">
+          <article
             v-for="item in modelHealthResult.capabilityChecks"
             :key="`${modelHealthResult.modelId}-${item.capabilityType}`"
-            :type="statusTagType(item.status)"
+            class="health-detail-item"
           >
-            {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
-          </el-tag>
+            <div class="health-item-head">
+              <el-tag :type="statusTagType(item.status)">
+                {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
+              </el-tag>
+            </div>
+            <p class="health-item-message">{{ item.message }}</p>
+          </article>
         </div>
       </section>
     </section>
@@ -732,8 +761,7 @@ onMounted(async () => {
   margin-top: 18px;
 }
 
-.capability-list,
-.health-tags {
+.capability-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -744,6 +772,37 @@ onMounted(async () => {
   padding: 16px 18px;
   border-radius: 18px;
   background: rgba(255, 248, 238, 0.88);
+}
+
+.health-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.health-detail-item {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.health-item-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.health-item-model {
+  color: #8a715e;
+  font-size: 12px;
+}
+
+.health-item-message {
+  margin: 10px 0 0;
+  color: #6d5948;
+  line-height: 1.6;
 }
 
 .inline-error {

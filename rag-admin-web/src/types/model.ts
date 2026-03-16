@@ -57,6 +57,8 @@ export interface ModelHealthCheck {
 
 export interface ModelProviderCapabilityHealthCheck {
   capabilityType: string
+  modelId?: number | null
+  modelCode?: string | null
   status: string
   message: string
 }
