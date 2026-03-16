@@ -10,6 +10,7 @@ import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
+import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,6 +52,7 @@ class DocumentServiceTest {
     void shouldUpdateMainDocumentWhenCreatingNewVersion() {
         DocumentEntity document = new DocumentEntity();
         document.setId(101L);
+        document.setKbId(1001L);
         document.setCurrentVersion(1);
         document.setParseStatus("SUCCESS");
 
@@ -61,6 +63,7 @@ class DocumentServiceTest {
         request.setFileSize(2048L);
 
         when(documentMapper.selectById(101L)).thenReturn(document);
+        when(knowledgeBaseService.requireById(1001L)).thenReturn(mockKnowledgeBase(1001L, "测试知识库"));
 
         documentService.createDocumentVersion(101L, request, 1L);
 
@@ -86,6 +89,7 @@ class DocumentServiceTest {
     void shouldSyncDocumentFieldsWhenActivatingHistoricalVersion() {
         DocumentEntity document = new DocumentEntity();
         document.setId(201L);
+        document.setKbId(2001L);
         document.setCurrentVersion(3);
         document.setParseStatus("FAILED");
 
@@ -197,5 +201,12 @@ class DocumentServiceTest {
         );
 
         assertEquals("DOCUMENT_VERSION_NOT_FOUND", exception.getCode());
+    }
+
+    private KnowledgeBaseEntity mockKnowledgeBase(Long kbId, String kbName) {
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(kbId);
+        knowledgeBase.setKbName(kbName);
+        return knowledgeBase;
     }
 }

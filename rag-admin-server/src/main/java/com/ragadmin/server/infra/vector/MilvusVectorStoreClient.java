@@ -11,6 +11,7 @@ import org.springframework.web.client.RestClient;
 import java.time.Duration;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Component
 public class MilvusVectorStoreClient {
@@ -35,7 +36,7 @@ public class MilvusVectorStoreClient {
             return;
         }
         try {
-            restClient.post()
+            Map<String, Object> response = restClient.post()
                     .uri("/v2/vectordb/collections/create")
                     .body(Map.of(
                             "collectionName", collectionName,
@@ -44,12 +45,24 @@ public class MilvusVectorStoreClient {
                             "primaryFieldName", "id",
                             "vectorFieldName", "vector",
                             "idType", "VarChar",
-                            "autoID", false
+                            "autoID", false,
+                            // VarChar 主键必须显式给出 max_length，否则 Milvus 会返回业务错误码但 HTTP 仍是 200。
+                            "params", Map.of("max_length", "128")
                     ))
                     .retrieve()
-                    .toBodilessEntity();
-        } catch (Exception ignore) {
-            // collection 已存在时，Milvus 会返回错误；当前阶段视为可接受
+                    .body(Map.class);
+            if (isSuccess(response)) {
+                return;
+            }
+            String message = responseMessage(response);
+            if (message.contains("already") || message.contains("exist")) {
+                return;
+            }
+            throw new BusinessException("MILVUS_COLLECTION_CREATE_FAILED", "Milvus 集合创建失败: " + message, HttpStatus.BAD_GATEWAY);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new BusinessException("MILVUS_COLLECTION_CREATE_FAILED", "Milvus 集合创建失败", HttpStatus.BAD_GATEWAY);
         }
     }
 
@@ -74,7 +87,7 @@ public class MilvusVectorStoreClient {
             return List.of();
         }
         try {
-            SearchResponse response = restClient.post()
+            Map<String, Object> response = restClient.post()
                     .uri("/v2/vectordb/entities/search")
                     .body(Map.of(
                             "collectionName", collectionName,
@@ -84,11 +97,17 @@ public class MilvusVectorStoreClient {
                             "outputFields", List.of("id")
                     ))
                     .retrieve()
-                    .body(SearchResponse.class);
-            if (response == null || response.data() == null) {
+                    .body(Map.class);
+            if (!isSuccess(response)) {
+                throw new BusinessException("MILVUS_SEARCH_FAILED", "Milvus 检索失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
+            }
+            Object data = response == null ? null : response.get("data");
+            if (!(data instanceof List<?> rows) || rows.isEmpty()) {
                 return List.of();
             }
-            return response.data().stream()
+            return rows.stream()
+                    .filter(Map.class::isInstance)
+                    .map(Map.class::cast)
                     .map(item -> new SearchResult(
                             String.valueOf(item.get("id")),
                             parseScore(item)
@@ -104,17 +123,41 @@ public class MilvusVectorStoreClient {
             return;
         }
         try {
-            restClient.post()
+            Map<String, Object> response = restClient.post()
                     .uri("/v2/vectordb/entities/upsert")
                     .body(Map.of(
                             "collectionName", collectionName,
                             "data", data
                     ))
                     .retrieve()
-                    .toBodilessEntity();
+                    .body(Map.class);
+            if (!isSuccess(response)) {
+                throw new BusinessException("MILVUS_INSERT_FAILED", "Milvus 向量写入失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
+            }
         } catch (Exception ex) {
+            if (ex instanceof BusinessException businessException) {
+                throw businessException;
+            }
             throw new BusinessException("MILVUS_INSERT_FAILED", "Milvus 向量写入失败", HttpStatus.BAD_GATEWAY);
         }
+    }
+
+    private boolean isSuccess(Map<String, Object> response) {
+        if (response == null) {
+            return false;
+        }
+        Object code = response.get("code");
+        if (code instanceof Number number) {
+            return number.intValue() == 0;
+        }
+        return "0".equals(Objects.toString(code, null));
+    }
+
+    private String responseMessage(Map<String, Object> response) {
+        if (response == null) {
+            return "空响应";
+        }
+        return Objects.toString(response.get("message"), "未知错误");
     }
 
     private double parseScore(Map<String, Object> item) {
@@ -126,8 +169,5 @@ public class MilvusVectorStoreClient {
     }
 
     public record SearchResult(String vectorId, double score) {
-    }
-
-    private record SearchResponse(List<Map<String, Object>> data) {
     }
 }

@@ -3,6 +3,7 @@ package com.ragadmin.server.system.service;
 import com.ragadmin.server.infra.ai.bailian.BailianApiSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.document.parser.DocumentOcrProperties;
+import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.vector.MilvusProperties;
@@ -21,6 +22,7 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -47,6 +49,9 @@ public class SystemHealthService {
 
     @Autowired
     private DocumentOcrProperties documentOcrProperties;
+
+    @Autowired
+    private ChunkVectorRefMapper chunkVectorRefMapper;
 
     public HealthCheckResponse check() {
         DependencyHealthResponse postgres = checkPostgres();
@@ -183,13 +188,21 @@ public class SystemHealthService {
                     .defaultHeader("Authorization", "Bearer " + milvusProperties.getToken())
                     .requestFactory(requestFactory)
                     .build();
-            MilvusCollectionsResponse response = client.post()
+
+            // 当前 Milvus REST 的 collections/list 在本地环境下会返回空集，不能可靠反映真实集合数。
+            // 这里先用轻量搜索接口确认连通性，再以业务侧已落库的 collectionName 去重数作为观测值。
+            client.post()
                     .uri("/v2/vectordb/collections/list")
-                    .body(Map.of("dbName", "_default"))
+                    .body(Collections.emptyMap())
                     .retrieve()
-                    .body(MilvusCollectionsResponse.class);
-            int collectionCount = response == null || response.data() == null ? 0 : response.data().size();
-            return new DependencyHealthResponse("UP", "Milvus 连通正常，集合数=" + collectionCount);
+                    .toBodilessEntity();
+
+            Integer collectionCount = jdbcTemplate.queryForObject(
+                    "SELECT COUNT(DISTINCT collection_name) FROM kb_chunk_vector_ref WHERE status = 'ENABLED'",
+                    Integer.class
+            );
+            int safeCount = collectionCount == null ? 0 : collectionCount;
+            return new DependencyHealthResponse("UP", "Milvus 连通正常，业务集合数=" + safeCount);
         } catch (Exception ex) {
             return new DependencyHealthResponse("DOWN", buildMessage("Milvus 检查失败", ex));
         }
@@ -231,8 +244,5 @@ public class SystemHealthService {
     }
 
     private record BailianModelsResponse(List<Map<String, Object>> data) {
-    }
-
-    private record MilvusCollectionsResponse(List<Object> data) {
     }
 }
