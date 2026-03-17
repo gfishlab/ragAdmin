@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getTaskDetail } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskDetail } from '@/types/task'
+import { TASK_TYPE_DOCUMENT_PARSE, formatTaskType } from '@/utils/task'
 
 const route = useRoute()
 const router = useRouter()
@@ -18,7 +19,7 @@ const linkedDocumentId = computed(() => {
   if (!detail.value?.documentId) {
     return null
   }
-  return detail.value.taskType === 'DOCUMENT_PARSE' ? detail.value.documentId : null
+  return detail.value.taskType === TASK_TYPE_DOCUMENT_PARSE ? detail.value.documentId : null
 })
 const timelineSteps = computed(() => {
   if (!detail.value) {
@@ -158,7 +159,7 @@ onMounted(async () => {
       <section class="overview-grid">
         <article class="overview-card soft-panel">
           <span>任务类型</span>
-          <strong>{{ detail.taskType }}</strong>
+          <strong>{{ formatTaskType(detail.taskType) }}</strong>
           <p>用于区分文档解析、索引构建等异步任务类别。</p>
         </article>
         <article class="overview-card soft-panel">

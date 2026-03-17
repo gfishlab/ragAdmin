@@ -5,6 +5,7 @@ import { useRouter } from 'vue-router'
 import { getTaskSummary, listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskRecord, TaskSummary } from '@/types/task'
+import { TASK_TYPE_OPTIONS, formatTaskType } from '@/utils/task'
 
 const router = useRouter()
 const loading = ref(false)
@@ -32,11 +33,6 @@ const taskStatusOptions = [
   { label: '成功', value: 'SUCCESS' },
   { label: '失败', value: 'FAILED' },
   { label: '已取消', value: 'CANCELED' },
-]
-
-const taskTypeOptions = [
-  { label: '全部类型', value: '' },
-  { label: '文档解析', value: 'DOCUMENT_PARSE' },
 ]
 
 function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
@@ -220,7 +216,7 @@ onMounted(async () => {
 
         <el-select v-model="query.taskType" placeholder="任务类型">
           <el-option
-            v-for="item in taskTypeOptions"
+            v-for="item in TASK_TYPE_OPTIONS"
             :key="item.value"
             :label="item.label"
             :value="item.value"
@@ -249,7 +245,11 @@ onMounted(async () => {
       <template v-else>
         <el-table :data="tasks" v-loading="loading" empty-text="当前暂无任务数据" stripe>
           <el-table-column prop="taskId" label="任务 ID" width="100" />
-          <el-table-column prop="taskType" label="任务类型" min-width="160" />
+          <el-table-column label="任务类型" min-width="160">
+            <template #default="{ row }">
+              {{ formatTaskType(row.taskType) }}
+            </template>
+          </el-table-column>
           <el-table-column label="任务状态" width="120">
             <template #default="{ row }">
               <el-tag :type="taskStatusType(row.taskStatus)">{{ row.taskStatus }}</el-tag>
