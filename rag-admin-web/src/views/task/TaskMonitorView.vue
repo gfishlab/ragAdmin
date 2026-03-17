@@ -5,7 +5,7 @@ import { useRouter } from 'vue-router'
 import { getTaskSummary, listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskRecord, TaskSummary } from '@/types/task'
-import { TASK_TYPE_OPTIONS, formatTaskType } from '@/utils/task'
+import { TASK_STATUS_OPTIONS, TASK_TYPE_OPTIONS, formatTaskStatus, formatTaskType } from '@/utils/task'
 
 const router = useRouter()
 const loading = ref(false)
@@ -26,14 +26,7 @@ const query = reactive({
 
 const hasData = computed(() => tasks.value.length > 0)
 
-const taskStatusOptions = [
-  { label: '全部状态', value: '' },
-  { label: '等待中', value: 'WAITING' },
-  { label: '运行中', value: 'RUNNING' },
-  { label: '成功', value: 'SUCCESS' },
-  { label: '失败', value: 'FAILED' },
-  { label: '已取消', value: 'CANCELED' },
-]
+const taskStatusOptions = [{ label: '全部状态', value: '' }, ...TASK_STATUS_OPTIONS]
 
 function taskStatusType(status: string): 'warning' | 'success' | 'danger' | 'info' {
   if (status === 'WAITING' || status === 'RUNNING') {
@@ -252,7 +245,7 @@ onMounted(async () => {
           </el-table-column>
           <el-table-column label="任务状态" width="120">
             <template #default="{ row }">
-              <el-tag :type="taskStatusType(row.taskStatus)">{{ row.taskStatus }}</el-tag>
+              <el-tag :type="taskStatusType(row.taskStatus)">{{ formatTaskStatus(row.taskStatus) }}</el-tag>
             </template>
           </el-table-column>
           <el-table-column label="文档名称" min-width="220">

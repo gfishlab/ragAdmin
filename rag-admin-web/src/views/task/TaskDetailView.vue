@@ -5,7 +5,14 @@ import { useRoute, useRouter } from 'vue-router'
 import { getTaskDetail } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
 import type { TaskDetail } from '@/types/task'
-import { TASK_TYPE_DOCUMENT_PARSE, formatTaskType } from '@/utils/task'
+import {
+  TASK_TYPE_DOCUMENT_PARSE,
+  formatDocumentParseStatus,
+  formatTaskBizType,
+  formatTaskRetryResult,
+  formatTaskStatus,
+  formatTaskType,
+} from '@/utils/task'
 
 const route = useRoute()
 const router = useRouter()
@@ -165,7 +172,7 @@ onMounted(async () => {
         <article class="overview-card soft-panel">
           <span>任务状态</span>
           <strong>
-            <el-tag :type="taskStatusType(detail.taskStatus)">{{ detail.taskStatus }}</el-tag>
+            <el-tag :type="taskStatusType(detail.taskStatus)">{{ formatTaskStatus(detail.taskStatus) }}</el-tag>
           </strong>
           <p>以后台真实任务状态为准，前端不对状态流转做推断。</p>
         </article>
@@ -191,7 +198,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>业务类型</span>
-            <strong>{{ detail.bizType || '暂无' }}</strong>
+            <strong>{{ formatTaskBizType(detail.bizType) }}</strong>
           </article>
           <article class="detail-item">
             <span>创建时间</span>
@@ -207,7 +214,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>文档解析状态</span>
-            <strong>{{ detail.documentParseStatus || '暂无' }}</strong>
+            <strong>{{ formatDocumentParseStatus(detail.documentParseStatus) }}</strong>
           </article>
         </div>
       </section>
@@ -227,7 +234,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>业务类型</span>
-            <strong>{{ detail.bizType || '暂无' }}</strong>
+            <strong>{{ formatTaskBizType(detail.bizType) }}</strong>
           </article>
           <article class="detail-item">
             <span>关联文档</span>
@@ -288,7 +295,11 @@ onMounted(async () => {
         <el-table :data="detail.steps" stripe>
           <el-table-column prop="stepCode" label="步骤编码" min-width="150" />
           <el-table-column prop="stepName" label="步骤名称" min-width="140" />
-          <el-table-column prop="stepStatus" label="状态" width="120" />
+          <el-table-column label="状态" width="120">
+            <template #default="{ row }">
+              {{ formatTaskStatus(row.stepStatus) }}
+            </template>
+          </el-table-column>
           <el-table-column label="开始时间" min-width="180">
             <template #default="{ row }">
               {{ formatTime(row.startedAt || '') }}
@@ -314,7 +325,11 @@ onMounted(async () => {
         <el-table :data="detail.retryRecords" stripe>
           <el-table-column prop="retryNo" label="重试次数" width="100" />
           <el-table-column prop="retryReason" label="重试原因" min-width="180" />
-          <el-table-column prop="retryResult" label="结果" width="120" />
+          <el-table-column label="结果" width="120">
+            <template #default="{ row }">
+              {{ formatTaskRetryResult(row.retryResult) }}
+            </template>
+          </el-table-column>
           <el-table-column label="时间" min-width="180">
             <template #default="{ row }">
               {{ formatTime(row.createdAt) }}
