@@ -405,7 +405,7 @@ async function handleBatchRetryParse(): Promise<void> {
     return
   }
   if (selectedRetryableDocumentCount.value === 0) {
-    ElMessage.warning('当前所选文档都不支持重新解析，请选择失败或待处理文档')
+    ElMessage.warning('当前所选文档都不支持解析，请选择失败或待处理文档')
     return
   }
 
@@ -413,11 +413,11 @@ async function handleBatchRetryParse(): Promise<void> {
   try {
     await ElMessageBox.confirm(
       skippedCount > 0
-        ? `将批量重试 ${selectedRetryableDocumentCount.value} 个文档，另外 ${skippedCount} 个文档因状态不允许会被跳过，是否继续？`
-        : `确定批量重试 ${selectedRetryableDocumentCount.value} 个文档吗？`,
-      '确认批量重试',
+        ? `将批量解析 ${selectedRetryableDocumentCount.value} 个文档，另外 ${skippedCount} 个文档因状态不允许会被跳过，是否继续？`
+        : `确定批量解析 ${selectedRetryableDocumentCount.value} 个文档吗？`,
+      '确认批量解析',
       {
-        confirmButtonText: '确认重试',
+        confirmButtonText: '确认解析',
         cancelButtonText: '取消',
         type: 'warning',
       },
@@ -459,7 +459,7 @@ async function handleBatchRetryParse(): Promise<void> {
     }
 
     ElMessage.warning(
-      `批量重试完成，成功 ${successCount} 个，失败 ${failedCount} 个${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`,
+      `批量解析完成，成功 ${successCount} 个，失败 ${failedCount} 个${skippedCount > 0 ? `，跳过 ${skippedCount} 个` : ''}`,
     )
   } finally {
     batchRetrySubmitting.value = false
@@ -829,7 +829,7 @@ onMounted(async () => {
               :loading="batchRetrySubmitting"
               @click="handleBatchRetryParse"
             >
-              批量重试
+              批量解析
             </el-button>
             <el-button
               type="danger"
