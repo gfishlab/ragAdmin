@@ -10,6 +10,7 @@ import {
   triggerDocumentParse,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
+import { DOCUMENT_PARSE_STATUS_OPTIONS, formatDocumentParseStatus, formatResourceStatus } from '@/utils/task'
 import type {
   CreateKnowledgeBaseDocumentRequest,
   KnowledgeBase,
@@ -411,7 +412,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>状态</span>
-            <el-tag :type="statusType(knowledgeBase.status)">{{ knowledgeBase.status }}</el-tag>
+            <el-tag :type="statusType(knowledgeBase.status)">{{ formatResourceStatus(knowledgeBase.status) }}</el-tag>
           </article>
           <article class="detail-item">
             <span>检索 TopK</span>
@@ -447,10 +448,12 @@ onMounted(async () => {
             />
             <el-select v-model="documentFilters.parseStatus" placeholder="解析状态">
               <el-option label="全部状态" value="" />
-              <el-option label="待处理" value="PENDING" />
-              <el-option label="处理中" value="PROCESSING" />
-              <el-option label="成功" value="SUCCESS" />
-              <el-option label="失败" value="FAILED" />
+              <el-option
+                v-for="item in DOCUMENT_PARSE_STATUS_OPTIONS"
+                :key="item.value"
+                :label="item.label"
+                :value="item.value"
+              />
             </el-select>
             <el-select v-model="documentFilters.enabled" placeholder="启停状态">
               <el-option label="全部状态" value="" />
@@ -480,7 +483,7 @@ onMounted(async () => {
             <el-table-column prop="docType" label="类型" width="100" />
             <el-table-column label="解析状态" width="130">
               <template #default="{ row }">
-                <el-tag :type="parseStatusType(row.parseStatus)">{{ row.parseStatus }}</el-tag>
+                <el-tag :type="parseStatusType(row.parseStatus)">{{ formatDocumentParseStatus(row.parseStatus) }}</el-tag>
               </template>
             </el-table-column>
             <el-table-column label="启停" width="100">

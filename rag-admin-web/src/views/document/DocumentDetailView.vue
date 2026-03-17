@@ -11,6 +11,7 @@ import {
   listDocumentVersions,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
+import { formatDocumentParseStatus, formatResourceStatus } from '@/utils/task'
 import type {
   CreateDocumentVersionRequest,
   DocumentChunk,
@@ -65,10 +66,6 @@ function parseStatusType(status: string): 'success' | 'warning' | 'danger' | 'in
     return 'danger'
   }
   return 'info'
-}
-
-function enabledLabel(enabled: boolean): string {
-  return enabled ? '启用' : '停用'
 }
 
 function formatTime(value: string | null | undefined): string {
@@ -389,7 +386,7 @@ onMounted(async () => {
         <article class="overview-card soft-panel">
           <span>解析状态</span>
           <strong>
-            <el-tag :type="parseStatusType(detail.parseStatus)">{{ detail.parseStatus }}</el-tag>
+            <el-tag :type="parseStatusType(detail.parseStatus)">{{ formatDocumentParseStatus(detail.parseStatus) }}</el-tag>
           </strong>
           <p>解析链路当前状态以后台任务执行结果为准。</p>
         </article>
@@ -415,7 +412,7 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>启停状态</span>
-            <strong>{{ enabledLabel(detail.enabled) }}</strong>
+            <strong>{{ detail.enabled ? formatResourceStatus('ENABLED') : formatResourceStatus('DISABLED') }}</strong>
           </article>
           <article class="detail-item">
             <span>创建时间</span>

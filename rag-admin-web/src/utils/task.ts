@@ -32,6 +32,11 @@ export const TASK_RETRY_RESULT_OPTIONS = [
   { label: '已取消', value: 'CANCELED' },
 ]
 
+export const RESOURCE_STATUS_OPTIONS = [
+  { label: '启用', value: 'ENABLED' },
+  { label: '禁用', value: 'DISABLED' },
+]
+
 export function formatTaskType(taskType: string | null | undefined): string {
   if (!taskType) {
     return '暂无'
@@ -70,4 +75,12 @@ export function formatTaskRetryResult(retryResult: string | null | undefined): s
   }
   const matched = TASK_RETRY_RESULT_OPTIONS.find((item) => item.value === retryResult)
   return matched?.label ?? retryResult
+}
+
+export function formatResourceStatus(status: string | null | undefined): string {
+  if (!status) {
+    return '暂无'
+  }
+  const matched = RESOURCE_STATUS_OPTIONS.find((item) => item.value === status)
+  return matched?.label ?? status
 }
