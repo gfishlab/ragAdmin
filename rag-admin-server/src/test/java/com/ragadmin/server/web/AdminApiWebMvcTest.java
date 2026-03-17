@@ -24,6 +24,7 @@ import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.model.controller.ModelController;
+import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.system.controller.SystemHealthController;
@@ -456,6 +457,39 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.id").value(5))
                 .andExpect(jsonPath("$.data.capabilityTypes[0]").value("TEXT_GENERATION"));
+    }
+
+    @Test
+    void shouldRunModelHealthCheckWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(modelService.get(5L)).thenReturn(new ModelResponse(
+                5L,
+                1L,
+                "BAILIAN",
+                "阿里百炼",
+                "deepseek-v3.2",
+                "DeepSeek V3.2",
+                List.of("TEXT_GENERATION"),
+                "CHAT",
+                null,
+                null,
+                "ENABLED"
+        ));
+        when(modelService.healthCheck(5L)).thenReturn(new ModelHealthCheckResponse(
+                5L,
+                "deepseek-v3.2",
+                "BAILIAN",
+                "UP",
+                "模型探活成功",
+                List.of()
+        ));
+
+        protectedMockMvc.perform(post("/api/admin/models/5/health-check")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.modelId").value(5))
+                .andExpect(jsonPath("$.data.status").value("UP"));
     }
 
     @Test

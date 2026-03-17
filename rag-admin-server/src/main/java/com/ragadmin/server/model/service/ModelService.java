@@ -203,6 +203,17 @@ public class ModelService {
         return aiModelMapper.selectBatchIds(ids);
     }
 
+    public ModelResponse get(Long modelId) {
+        AiModelEntity model = requireModel(modelId);
+        AiProviderEntity provider = requireProvider(model.getProviderId());
+        List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
+                .stream()
+                .map(AiModelCapabilityEntity::getCapabilityType)
+                .distinct()
+                .toList();
+        return toResponse(model, provider, capabilityTypes);
+    }
+
     public EmbeddingModelDescriptor requireEmbeddingModelDescriptor(Long modelId) {
         AiModelEntity model = requireModelWithCapability(modelId, "EMBEDDING");
         AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
