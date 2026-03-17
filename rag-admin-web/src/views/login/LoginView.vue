@@ -47,7 +47,7 @@ async function submit(): Promise<void> {
       <p class="eyebrow">RAG ADMIN / FRONT DESK</p>
       <h1>把知识库、模型与文档流程放进同一张控制台。</h1>
       <p class="description">
-        当前管理台已打通登录、鉴权、知识库、文档与任务主链路。视觉上采用温暖纸面感和编辑台语言，避免通用后台模板的空壳感。
+        在同一界面完成知识库、模型、文档与任务的日常管理，保持统一的操作入口和视觉语言。
       </p>
       <div class="feature-grid">
         <article class="feature-card soft-panel">
@@ -57,8 +57,8 @@ async function submit(): Promise<void> {
         </article>
         <article class="feature-card soft-panel">
           <span>02</span>
-          <strong>最小真实切片</strong>
-          <p>登录后直接进入知识库与任务主流程，优先验证接口契约与错误处理。</p>
+          <strong>统一管理入口</strong>
+          <p>登录后可直接进入知识库、模型、文档和任务等核心页面。</p>
         </article>
       </div>
     </section>

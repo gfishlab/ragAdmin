@@ -63,7 +63,7 @@ async function handleLogout(): Promise<void> {
     <div class="content-shell">
       <header class="topbar soft-panel">
         <div>
-          <p class="topbar-label">内部知识库管理平台</p>
+          <p class="topbar-label">知识工坊</p>
           <strong>{{ route.meta.title || '管理台' }}</strong>
         </div>
         <div class="topbar-actions">

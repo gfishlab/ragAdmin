@@ -585,7 +585,7 @@ onMounted(async () => {
     <el-dialog v-model="providerManagerVisible" title="管理模型提供方" width="960px">
       <div class="provider-manager-head">
         <p class="provider-manager-tip">
-          提供方用于承接模型路由和最小接入配置。当前页面不再单独展示提供方面板，统一收进这个次级入口。
+          提供方用于承接模型路由和接入配置，集中放在这里维护。
         </p>
         <el-button type="primary" @click="providerDialogVisible = true">新增提供方</el-button>
       </div>

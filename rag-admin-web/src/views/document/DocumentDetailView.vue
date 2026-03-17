@@ -368,7 +368,7 @@ onMounted(async () => {
           <p class="detail-eyebrow">Document / Detail</p>
           <h1 class="page-title">{{ detail.docName }}</h1>
           <p class="page-subtitle">
-            当前页面已支持文档主体信息、版本激活、新增版本和切片浏览，适合直接检查解析结果。
+            查看文档基础信息、版本记录和切片内容，便于检查解析结果。
           </p>
         </div>
         <div class="head-actions">
@@ -601,7 +601,7 @@ onMounted(async () => {
     >
       <section class="upload-dialog">
         <p class="upload-hint">
-          当前目标文档：
+          目标文档：
           <strong>{{ detail?.docName }}</strong>
         </p>
 

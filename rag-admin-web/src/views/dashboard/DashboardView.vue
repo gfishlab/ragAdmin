@@ -4,26 +4,26 @@
       <div>
         <h1 class="page-title">概览</h1>
         <p class="page-subtitle">
-          当前概览页用于承接知识库、文档、任务与健康检查等核心管理入口。
+          汇总展示知识库、模型、文档与任务等核心管理入口。
         </p>
       </div>
     </header>
 
     <div class="dashboard-grid">
       <article class="metric-card soft-panel">
-        <span>当前完成</span>
-        <strong>基础管理台</strong>
-        <p>已具备登录、知识库、文档、任务等核心页面与联调主链路。</p>
+        <span>知识库管理</span>
+        <strong>统一入口</strong>
+        <p>支持从列表进入创建、编辑和详情页面，集中管理知识库配置。</p>
       </article>
       <article class="metric-card soft-panel">
-        <span>当前联调焦点</span>
-        <strong>文档与任务链路</strong>
-        <p>当前重点是继续收紧上传、解析、任务监控和文档详情体验。</p>
+        <span>文档与任务</span>
+        <strong>链路可追踪</strong>
+        <p>文档上传、解析、切片和任务监控都可在管理端直接查看。</p>
       </article>
       <article class="metric-card soft-panel">
-        <span>当前基线</span>
-        <strong>统一导航与鉴权</strong>
-        <p>页面已共享同一套路由守卫、请求封装与错误处理方式。</p>
+        <span>模型与配置</span>
+        <strong>集中维护</strong>
+        <p>模型配置、探活结果和提供方接入信息已收敛到统一入口。</p>
       </article>
     </div>
   </section>

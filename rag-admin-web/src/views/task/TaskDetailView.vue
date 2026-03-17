@@ -154,7 +154,7 @@ onMounted(async () => {
           <p class="detail-eyebrow">Task / Detail</p>
           <h1 class="page-title">任务 #{{ detail.taskId }}</h1>
           <p class="page-subtitle">
-            当前页面已补齐任务状态流转、步骤记录、重试记录和关联文档入口，适合直接用于联调排查。
+            查看任务状态流转、执行步骤、重试记录和关联文档信息。
           </p>
         </div>
         <div class="head-actions">
@@ -179,7 +179,7 @@ onMounted(async () => {
         <article class="overview-card soft-panel">
           <span>业务 ID</span>
           <strong>{{ detail.bizId ?? '暂无' }}</strong>
-          <p>当前版本先只展示业务 ID，不强行推断业务跳转目标。</p>
+          <p>用于标识任务关联的业务对象。</p>
         </article>
       </section>
 
@@ -187,7 +187,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>任务详情</h2>
-            <p>当前展示任务基础字段、关联对象、重试信息与文档解析状态。</p>
+            <p>展示任务基础字段、关联对象、重试信息与文档解析状态。</p>
           </div>
         </div>
 
@@ -238,15 +238,15 @@ onMounted(async () => {
           </article>
           <article class="detail-item">
             <span>关联文档</span>
-            <strong>{{ detail.documentName || linkedDocumentId || '当前无法确定' }}</strong>
+            <strong>{{ detail.documentName || linkedDocumentId || '暂无' }}</strong>
           </article>
           <article class="detail-item">
             <span>说明</span>
             <strong>
               {{
                 linkedDocumentId
-                  ? '该任务当前可识别为文档解析类，关联对象为文档 ID。'
-                  : '当前仅展示业务标识，暂无可识别的文档关联。'
+                  ? '该任务关联到具体文档，可直接进入文档详情查看。'
+                  : '当前仅展示业务标识，未识别到可直接跳转的文档。'
               }}
             </strong>
           </article>
@@ -261,7 +261,7 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>状态流转</h2>
-            <p>时间线优先使用任务真实开始时间和结束时间，缺失时再退化为占位信息。</p>
+            <p>时间线优先展示任务真实开始时间和结束时间。</p>
           </div>
         </div>
 
@@ -345,7 +345,7 @@ onMounted(async () => {
             <p>若任务失败，可在此查看完整错误内容；成功任务通常为空。</p>
           </div>
         </div>
-        <pre class="error-block">{{ detail.errorMessage || '当前任务暂无错误信息。' }}</pre>
+        <pre class="error-block">{{ detail.errorMessage || '暂无错误信息。' }}</pre>
       </section>
     </template>
   </section>
