@@ -273,8 +273,8 @@ public class ModelService {
                 message,
                 checks
         );
-        log.info("模型探活完成，modelId={}, modelName={}, modelCode={}, status={}",
-                modelId, model.getModelName(), model.getModelCode(), response.status());
+        log.info("模型探活完成，modelId={}, modelName={}, modelCode={}, status={}, capabilityChecks={}",
+                modelId, model.getModelName(), model.getModelCode(), response.status(), buildCapabilitySummary(checks));
         return response;
     }
 
@@ -318,6 +318,12 @@ public class ModelService {
             String message = ex.getMessage() == null || ex.getMessage().isBlank() ? "探活失败" : ex.getMessage();
             return new ModelCapabilityHealthResponse(capabilityType, "DOWN", message);
         }
+    }
+
+    private String buildCapabilitySummary(List<ModelCapabilityHealthResponse> checks) {
+        return checks.stream()
+                .map(item -> item.capabilityType() + "=" + item.status())
+                .collect(Collectors.joining(", "));
     }
 
     private AiModelEntity requireModel(Long modelId) {

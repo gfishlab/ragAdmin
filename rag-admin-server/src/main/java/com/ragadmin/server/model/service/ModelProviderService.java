@@ -20,9 +20,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ModelProviderService {
@@ -100,8 +102,8 @@ public class ModelProviderService {
                 message,
                 checks
         );
-        log.info("模型提供方探活完成，providerId={}, providerName={}, providerCode={}, status={}",
-                providerId, provider.getProviderName(), provider.getProviderCode(), response.status());
+        log.info("模型提供方探活完成，providerId={}, providerName={}, providerCode={}, status={}, capabilityChecks={}",
+                providerId, provider.getProviderName(), provider.getProviderCode(), response.status(), buildCapabilitySummary(checks));
         return response;
     }
 
@@ -152,6 +154,20 @@ public class ModelProviderService {
             return fallback;
         }
         return message;
+    }
+
+    private String buildCapabilitySummary(List<ModelProviderCapabilityHealthResponse> checks) {
+        return checks.stream()
+                .map(item -> item.capabilityType() + "=" + item.status()
+                        + formatModelCode(item.modelCode()))
+                .collect(Collectors.joining(", "));
+    }
+
+    private String formatModelCode(String modelCode) {
+        if (!StringUtils.hasText(modelCode)) {
+            return "(model=null)";
+        }
+        return "(model=" + modelCode + ")";
     }
 
     private ModelProviderResponse toResponse(AiProviderEntity entity) {
