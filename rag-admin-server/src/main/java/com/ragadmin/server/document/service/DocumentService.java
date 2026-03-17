@@ -2,6 +2,8 @@ package com.ragadmin.server.document.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
+import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.dto.ActivateDocumentVersionResponse;
@@ -13,15 +15,21 @@ import com.ragadmin.server.document.dto.DocumentVersionResponse;
 import com.ragadmin.server.document.dto.InternalTaskCompleteRequest;
 import com.ragadmin.server.document.dto.ParseDocumentResponse;
 import com.ragadmin.server.document.entity.ChunkEntity;
+import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.entity.DocumentParseTaskEntity;
 import com.ragadmin.server.document.entity.DocumentVersionEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
+import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
+import com.ragadmin.server.task.entity.TaskStepRecordEntity;
+import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
+import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -29,6 +37,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Service
 public class DocumentService {
@@ -44,6 +53,18 @@ public class DocumentService {
 
     @Autowired
     private ChunkMapper chunkMapper;
+
+    @Autowired
+    private ChatAnswerReferenceMapper chatAnswerReferenceMapper;
+
+    @Autowired
+    private ChunkVectorRefMapper chunkVectorRefMapper;
+
+    @Autowired
+    private TaskStepRecordMapper taskStepRecordMapper;
+
+    @Autowired
+    private TaskRetryRecordMapper taskRetryRecordMapper;
 
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
@@ -81,6 +102,53 @@ public class DocumentService {
 
     public DocumentResponse getDocument(Long documentId) {
         return toResponse(requireDocument(documentId));
+    }
+
+    @Transactional
+    public void delete(Long documentId) {
+        DocumentEntity document = requireDocument(documentId);
+
+        Long activeTaskCount = documentParseTaskMapper.selectCount(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                .eq(DocumentParseTaskEntity::getDocumentId, documentId)
+                .in(DocumentParseTaskEntity::getTaskStatus, "WAITING", "RUNNING"));
+        if (activeTaskCount != null && activeTaskCount > 0) {
+            throw new BusinessException("DOCUMENT_TASK_RUNNING", "文档存在进行中的解析任务，请稍后再删除", HttpStatus.BAD_REQUEST);
+        }
+
+        List<Long> parseTaskIds = documentParseTaskMapper.selectList(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                        .select(DocumentParseTaskEntity::getId)
+                        .eq(DocumentParseTaskEntity::getDocumentId, documentId))
+                .stream()
+                .map(DocumentParseTaskEntity::getId)
+                .toList();
+        List<Long> chunkIds = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
+                        .select(ChunkEntity::getId)
+                        .eq(ChunkEntity::getDocumentId, documentId))
+                .stream()
+                .map(ChunkEntity::getId)
+                .toList();
+
+        if (!parseTaskIds.isEmpty()) {
+            taskStepRecordMapper.delete(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                    .in(TaskStepRecordEntity::getTaskId, parseTaskIds));
+            taskRetryRecordMapper.delete(new LambdaQueryWrapper<TaskRetryRecordEntity>()
+                    .in(TaskRetryRecordEntity::getTaskId, parseTaskIds));
+        }
+
+        if (!chunkIds.isEmpty()) {
+            chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
+                    .in(ChatAnswerReferenceEntity::getChunkId, chunkIds));
+            chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                    .in(ChunkVectorRefEntity::getChunkId, chunkIds));
+        }
+
+        chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
+                .eq(ChunkEntity::getDocumentId, documentId));
+        documentParseTaskMapper.delete(new LambdaQueryWrapper<DocumentParseTaskEntity>()
+                .eq(DocumentParseTaskEntity::getDocumentId, documentId));
+        documentVersionMapper.delete(new LambdaQueryWrapper<DocumentVersionEntity>()
+                .eq(DocumentVersionEntity::getDocumentId, documentId));
+        documentMapper.deleteById(document.getId());
     }
 
     @Transactional

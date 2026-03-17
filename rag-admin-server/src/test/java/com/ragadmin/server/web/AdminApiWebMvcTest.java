@@ -561,6 +561,20 @@ class AdminApiWebMvcTest {
         verify(knowledgeBaseService).delete(21L);
     }
 
+    @Test
+    void shouldDeleteDocumentWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        doNothing().when(documentService).delete(31L);
+
+        protectedMockMvc.perform(delete("/api/admin/documents/31")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(documentService).delete(31L);
+    }
+
     private AuthenticatedUser authenticatedUser() {
         return new AuthenticatedUser()
                 .setUserId(1L)

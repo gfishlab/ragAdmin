@@ -33,7 +33,15 @@ export interface KnowledgeBaseDocument {
   docType: string
   parseStatus: string
   enabled: boolean
+  kbId?: number | null
+  kbName?: string | null
+  storageBucket?: string | null
+  storageObjectKey?: string | null
+  currentVersion?: number | null
+  fileSize?: number | null
+  contentHash?: string | null
   createdAt: string
+  updatedAt?: string | null
 }
 
 export interface UploadUrlRequest {

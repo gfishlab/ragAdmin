@@ -16,6 +16,7 @@ import com.ragadmin.server.document.service.DocumentService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -68,6 +69,12 @@ public class DocumentController {
     @GetMapping("/documents/{documentId}")
     public ApiResponse<DocumentResponse> getDocument(@PathVariable Long documentId) {
         return ApiResponse.success(documentService.getDocument(documentId));
+    }
+
+    @DeleteMapping("/documents/{documentId}")
+    public ApiResponse<Void> deleteDocument(@PathVariable Long documentId) {
+        documentService.delete(documentId);
+        return ApiResponse.success(null);
     }
 
     @PutMapping("/documents/{documentId}/status")

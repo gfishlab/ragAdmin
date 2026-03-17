@@ -179,6 +179,11 @@ export async function triggerDocumentParse(documentId: number): Promise<void> {
   unwrapResponse(response.data)
 }
 
+export async function deleteKnowledgeBaseDocument(documentId: number): Promise<void> {
+  const response = await http.delete<ApiResponse<null>>(`/admin/documents/${documentId}`)
+  unwrapResponse(response.data)
+}
+
 export async function getDocumentDetail(documentId: number): Promise<DocumentDetail> {
   const response = await http.get<ApiResponse<any>>(`/admin/documents/${documentId}`)
   return mapDocumentResponse(unwrapResponse(response.data))

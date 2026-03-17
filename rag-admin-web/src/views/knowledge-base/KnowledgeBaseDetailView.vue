@@ -1,9 +1,11 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
-import { ElButton, ElEmpty, ElMessage, ElSkeleton } from 'element-plus'
+import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
+import type { UploadFile, UploadFiles, UploadUserFile } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
 import {
   createKnowledgeBaseDocument,
+  deleteKnowledgeBaseDocument,
   getKnowledgeBaseDetail,
   getKnowledgeBaseDocumentUploadCapability,
   getKnowledgeBaseDocumentUploadUrl,
@@ -20,6 +22,20 @@ import type {
   KnowledgeBaseDocument,
   UploadUrlResponse,
 } from '@/types/knowledge-base'
+
+interface UploadResultItem {
+  key: string
+  name: string
+  status: 'success' | 'warning' | 'error'
+  message: string
+}
+
+interface SelectedUploadFileSummary {
+  key: string
+  name: string
+  sizeLabel: string
+  docType: string
+}
 
 const route = useRoute()
 const router = useRouter()
@@ -42,19 +58,42 @@ const documentPagination = reactive({
   total: 0,
 })
 const uploadDialogVisible = ref(false)
-const selectedFile = ref<File | null>(null)
+const uploadFileList = ref<UploadUserFile[]>([])
 const uploadSubmitting = ref(false)
-const uploadStage = ref<'idle' | 'getting-url' | 'uploading' | 'registering'>('idle')
 const uploadError = ref('')
+const uploadResults = ref<UploadResultItem[]>([])
 const uploadCapability = ref<DocumentUploadCapability | null>(null)
 const uploadCapabilityLoading = ref(false)
 const uploadCapabilityError = ref('')
 const autoParseAfterUpload = ref(true)
 const parsingDocumentIds = ref<number[]>([])
+const deletingDocumentIds = ref<number[]>([])
+const uploadProgress = reactive({
+  total: 0,
+  completed: 0,
+  currentFileName: '',
+})
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
-const uploadDocType = computed(() => inferDocumentType(selectedFile.value?.name ?? ''))
+const selectedFiles = computed<File[]>(() =>
+  uploadFileList.value.flatMap((item) => (item.raw instanceof File ? [item.raw] : [])),
+)
+const hasSelectedFiles = computed(() => selectedFiles.value.length > 0)
+const selectedFileSummaries = computed<SelectedUploadFileSummary[]>(() =>
+  selectedFiles.value.map((file) => ({
+    key: buildFileKey(file),
+    name: file.name,
+    sizeLabel: formatFileSize(file.size),
+    docType: inferDocumentType(file.name),
+  })),
+)
+const hasPdfSelection = computed(() =>
+  selectedFileSummaries.value.some((item) => isPdfDocumentType(item.docType)),
+)
+const hasOcrImageSelection = computed(() =>
+  selectedFileSummaries.value.some((item) => isOcrImageDocumentType(item.docType)),
+)
 const supportedDocTypesText = computed(() => {
   return uploadCapability.value?.supportedDocTypes.join(' / ') ?? 'TXT / MARKDOWN / PDF / DOCX / PPTX / XLSX / PNG / JPG / JPEG / WEBP'
 })
@@ -105,6 +144,10 @@ function isParsing(documentId: number): boolean {
   return parsingDocumentIds.value.includes(documentId)
 }
 
+function isDeletingDocument(documentId: number): boolean {
+  return deletingDocumentIds.value.includes(documentId)
+}
+
 function formatTime(value: string): string {
   if (!value) {
     return '暂无时间'
@@ -118,21 +161,38 @@ function formatTime(value: string): string {
   })
 }
 
+function formatFileSize(size: number): string {
+  if (size >= 1024 * 1024) {
+    return `${(size / 1024 / 1024).toFixed(2)} MB`
+  }
+  if (size >= 1024) {
+    return `${(size / 1024).toFixed(2)} KB`
+  }
+  return `${size} B`
+}
+
+function buildFileKey(file: File): string {
+  return `${file.name}_${file.size}_${file.lastModified}`
+}
+
 function resetUploadState(): void {
-  selectedFile.value = null
+  uploadFileList.value = []
   uploadSubmitting.value = false
-  uploadStage.value = 'idle'
   uploadError.value = ''
+  uploadResults.value = []
   autoParseAfterUpload.value = true
+  uploadProgress.total = 0
+  uploadProgress.completed = 0
+  uploadProgress.currentFileName = ''
 }
 
-function handleSelectFile(uploadFile: { raw?: File }): void {
-  selectedFile.value = uploadFile.raw ?? null
+function handleSelectFile(_: UploadFile, fileList: UploadFiles): void {
+  uploadFileList.value = [...fileList]
   uploadError.value = ''
 }
 
-function handleRemoveFile(): void {
-  selectedFile.value = null
+function handleRemoveFile(_: UploadFile, fileList: UploadFiles): void {
+  uploadFileList.value = [...fileList]
 }
 
 async function uploadToObjectStorage(upload: UploadUrlResponse, file: File): Promise<void> {
@@ -149,39 +209,42 @@ async function uploadToObjectStorage(upload: UploadUrlResponse, file: File): Pro
   }
 }
 
-async function handleUpload(): Promise<void> {
-  if (!selectedFile.value) {
-    uploadError.value = '请先选择待上传文件'
-    return
+async function uploadSingleFile(file: File): Promise<UploadResultItem> {
+  const key = buildFileKey(file)
+  const docType = inferDocumentType(file.name)
+
+  if (docType === 'UNKNOWN') {
+    return {
+      key,
+      name: file.name,
+      status: 'error',
+      message: '文件类型暂不支持，请上传 Markdown、TXT、PDF、DOCX、PPTX、XLSX 或图片文件',
+    }
   }
-  if (uploadDocType.value === 'UNKNOWN') {
-    uploadError.value = '当前文件类型暂不支持，请上传 Markdown、TXT、PDF、DOCX、PPTX、XLSX 或图片文件'
-    return
-  }
-  if (isOcrImageDocumentType(uploadDocType.value) && !uploadCapability.value?.ocrAvailable) {
-    uploadError.value = uploadCapability.value?.ocrMessage || '当前图片解析依赖 OCR，请先完成 OCR 环境配置'
-    return
+  if (isOcrImageDocumentType(docType) && !uploadCapability.value?.ocrAvailable) {
+    return {
+      key,
+      name: file.name,
+      status: 'error',
+      message: uploadCapability.value?.ocrMessage || '当前图片解析依赖 OCR，请先完成 OCR 环境配置',
+    }
   }
 
-  uploadSubmitting.value = true
-  uploadError.value = ''
-
+  let stepLabel = '获取上传凭证'
   try {
-    uploadStage.value = 'getting-url'
-    const file = selectedFile.value
     const upload = await getKnowledgeBaseDocumentUploadUrl({
       fileName: file.name,
       contentType: file.type || 'application/octet-stream',
       bizType: 'KB_DOCUMENT',
     })
 
-    uploadStage.value = 'uploading'
+    stepLabel = '上传文件'
     await uploadToObjectStorage(upload, file)
 
-    uploadStage.value = 'registering'
+    stepLabel = '登记文档'
     const payload: CreateKnowledgeBaseDocumentRequest = {
       docName: file.name,
-      docType: uploadDocType.value,
+      docType,
       storageBucket: upload.bucket,
       storageObjectKey: upload.objectKey,
       fileSize: file.size,
@@ -189,36 +252,98 @@ async function handleUpload(): Promise<void> {
     }
     const documentId = await createKnowledgeBaseDocument(knowledgeBaseId.value, payload)
 
-    let parseQueued = false
     if (autoParseAfterUpload.value && documentId) {
       try {
         await triggerDocumentParse(documentId)
-        parseQueued = true
+        return {
+          key,
+          name: file.name,
+          status: 'success',
+          message: '上传成功，已进入解析队列',
+        }
       } catch (error) {
-        ElMessage.warning(`文档已上传，但自动解析提交失败：${resolveErrorMessage(error)}`)
+        return {
+          key,
+          name: file.name,
+          status: 'warning',
+          message: `上传成功，但自动解析提交失败：${resolveErrorMessage(error)}`,
+        }
       }
     }
 
-    ElMessage.success(parseQueued ? '文档已上传并加入解析队列' : '文档已接入当前知识库')
-    uploadDialogVisible.value = false
-    resetUploadState()
-    documentPagination.pageNo = 1
-    await loadDocuments()
-  } catch (error) {
-    if (uploadStage.value === 'getting-url') {
-      uploadError.value = `获取上传凭证失败：${resolveErrorMessage(error)}`
-    } else if (uploadStage.value === 'uploading') {
-      uploadError.value = `文件上传失败：${resolveErrorMessage(error)}`
-    } else if (uploadStage.value === 'registering') {
-      uploadError.value = `文件已上传，但文档登记失败：${resolveErrorMessage(error)}`
-    } else {
-      uploadError.value = resolveErrorMessage(error)
+    return {
+      key,
+      name: file.name,
+      status: 'success',
+      message: '上传成功，已接入当前知识库',
     }
+  } catch (error) {
+    return {
+      key,
+      name: file.name,
+      status: 'error',
+      message: `${stepLabel}失败：${resolveErrorMessage(error)}`,
+    }
+  }
+}
+
+async function handleUpload(): Promise<void> {
+  if (!hasSelectedFiles.value) {
+    uploadError.value = '请先选择待上传文件'
+    return
+  }
+
+  uploadSubmitting.value = true
+  uploadError.value = ''
+  uploadResults.value = []
+  uploadProgress.total = selectedFiles.value.length
+  uploadProgress.completed = 0
+
+  const files = [...selectedFiles.value]
+  const successKeys = new Set<string>()
+  const results: UploadResultItem[] = []
+
+  try {
+    for (const file of files) {
+      uploadProgress.currentFileName = file.name
+      const result = await uploadSingleFile(file)
+      results.push(result)
+      uploadProgress.completed += 1
+      if (result.status !== 'error') {
+        successKeys.add(result.key)
+      }
+    }
+
+    uploadResults.value = results
+    uploadFileList.value = uploadFileList.value.filter(
+      (item) => !(item.raw instanceof File) || !successKeys.has(buildFileKey(item.raw)),
+    )
+
+    const successCount = results.filter((item) => item.status !== 'error').length
+    const warningCount = results.filter((item) => item.status === 'warning').length
+    const failedCount = results.length - successCount
+
+    if (successCount > 0) {
+      documentPagination.pageNo = 1
+      await loadDocuments()
+    }
+
+    if (failedCount === 0) {
+      const summary =
+        warningCount > 0
+          ? `已完成 ${results.length} 个文件上传，其中 ${warningCount} 个需要手动补提解析`
+          : `已完成 ${results.length} 个文件上传`
+      ElMessage.success(summary)
+      uploadDialogVisible.value = false
+      resetUploadState()
+      return
+    }
+
+    uploadError.value = '部分文件上传失败，已保留失败文件，可修正后直接重试'
+    ElMessage.warning(`本次上传完成，成功 ${successCount} 个，失败 ${failedCount} 个`)
   } finally {
     uploadSubmitting.value = false
-    if (uploadDialogVisible.value) {
-      uploadStage.value = 'idle'
-    }
+    uploadProgress.currentFileName = ''
   }
 }
 
@@ -250,6 +375,37 @@ async function handleTriggerParse(document: KnowledgeBaseDocument): Promise<void
   } finally {
     parsingDocumentIds.value = parsingDocumentIds.value.filter((id) => id !== document.documentId)
     await loadDocuments()
+  }
+}
+
+async function handleDeleteDocument(document: KnowledgeBaseDocument): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除文档《${document.docName}》吗？删除后将同时清理解析任务、切片和引用关系。`,
+      '确认删除文档',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  deletingDocumentIds.value = [...deletingDocumentIds.value, document.documentId]
+
+  try {
+    await deleteKnowledgeBaseDocument(document.documentId)
+    if (documents.value.length === 1 && documentPagination.pageNo > 1) {
+      documentPagination.pageNo -= 1
+    }
+    await loadDocuments()
+    ElMessage.success(`文档《${document.docName}》已删除`)
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    deletingDocumentIds.value = deletingDocumentIds.value.filter((id) => id !== document.documentId)
   }
 }
 
@@ -561,7 +717,7 @@ onMounted(async () => {
                 {{ formatTime(row.createdAt) }}
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="200" fixed="right">
+            <el-table-column label="操作" width="260" fixed="right">
               <template #default="{ row }">
                 <el-button link @click="handleDocumentDetail(row.documentId)">详情</el-button>
                 <el-button
@@ -572,6 +728,14 @@ onMounted(async () => {
                   @click="handleTriggerParse(row)"
                 >
                   开始解析
+                </el-button>
+                <el-button
+                  link
+                  type="danger"
+                  :loading="isDeletingDocument(row.documentId)"
+                  @click="handleDeleteDocument(row)"
+                >
+                  删除
                 </el-button>
               </template>
             </el-table-column>
@@ -609,9 +773,10 @@ onMounted(async () => {
         <el-upload
           class="upload-box"
           drag
+          v-model:file-list="uploadFileList"
+          multiple
           :accept="DOCUMENT_UPLOAD_ACCEPT"
           :auto-upload="false"
-          :limit="1"
           :show-file-list="true"
           :on-change="handleSelectFile"
           :on-remove="handleRemoveFile"
@@ -620,38 +785,47 @@ onMounted(async () => {
           <div class="el-upload__text">将文件拖到此处，或 <em>点击选择</em></div>
           <template #tip>
             <div class="el-upload__tip">
-              当前支持单文件上传，文档类型按扩展名自动推断。图片与扫描版 PDF 依赖 OCR。
+              当前支持批量上传，系统会逐个获取凭证、上传并登记文档。图片与扫描版 PDF 依赖 OCR。
             </div>
           </template>
         </el-upload>
 
         <el-alert
-          v-if="isPdfDocumentType(uploadDocType) && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
+          v-if="hasPdfSelection && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
           type="warning"
           :closable="false"
           show-icon
           title="当前 OCR 未就绪，扫描版 PDF 可能无法抽取到文本。"
         />
         <el-alert
-          v-else-if="isOcrImageDocumentType(uploadDocType) && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
+          v-else-if="hasOcrImageSelection && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
           type="error"
           :closable="false"
           show-icon
           :title="uploadCapability?.ocrMessage || '当前图片解析依赖 OCR，请先完成 OCR 环境配置。'"
         />
 
-        <div class="upload-meta soft-panel" v-if="selectedFile">
-          <article class="upload-meta-item">
+        <div class="upload-progress soft-panel" v-if="uploadSubmitting || uploadProgress.completed > 0">
+          <article class="upload-progress-item">
+            <span>上传进度</span>
+            <strong>{{ uploadProgress.completed }} / {{ uploadProgress.total }}</strong>
+          </article>
+          <article class="upload-progress-item">
+            <span>当前文件</span>
+            <strong>{{ uploadProgress.currentFileName || '等待中' }}</strong>
+          </article>
+        </div>
+
+        <div class="upload-meta soft-panel" v-if="selectedFileSummaries.length">
+          <article
+            v-for="file in selectedFileSummaries"
+            :key="file.key"
+            class="upload-meta-item"
+          >
             <span>文件名</span>
-            <strong>{{ selectedFile.name }}</strong>
-          </article>
-          <article class="upload-meta-item">
-            <span>文件大小</span>
-            <strong>{{ (selectedFile.size / 1024 / 1024).toFixed(2) }} MB</strong>
-          </article>
-          <article class="upload-meta-item">
-            <span>文档类型</span>
-            <strong>{{ uploadDocType }}</strong>
+            <strong>{{ file.name }}</strong>
+            <small>大小：{{ file.sizeLabel }}</small>
+            <small>类型：{{ file.docType }}</small>
           </article>
         </div>
 
@@ -659,6 +833,28 @@ onMounted(async () => {
           <el-checkbox v-model="autoParseAfterUpload">上传后立即解析</el-checkbox>
           <span>推荐开启，上传完成后系统会自动提交解析任务。</span>
         </label>
+
+        <div class="upload-result-list soft-panel" v-if="uploadResults.length">
+          <article
+            v-for="item in uploadResults"
+            :key="`${item.key}-${item.status}`"
+            class="upload-result-item"
+          >
+            <div class="upload-result-head">
+              <strong>{{ item.name }}</strong>
+              <el-tag :type="item.status === 'success' ? 'success' : item.status === 'warning' ? 'warning' : 'danger'">
+                {{
+                  item.status === 'success'
+                    ? '成功'
+                    : item.status === 'warning'
+                      ? '部分成功'
+                      : '失败'
+                }}
+              </el-tag>
+            </div>
+            <p class="upload-result-message">{{ item.message }}</p>
+          </article>
+        </div>
 
         <el-alert
           v-if="uploadError"
@@ -673,7 +869,7 @@ onMounted(async () => {
         <div class="dialog-actions">
           <el-button :disabled="uploadSubmitting" @click="handleCloseUploadDialog">取消</el-button>
           <el-button type="primary" :loading="uploadSubmitting" @click="handleUpload">
-            开始上传
+            开始批量上传
           </el-button>
         </div>
       </template>
@@ -853,9 +1049,11 @@ onMounted(async () => {
 
 .upload-meta {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   padding: 18px;
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .upload-meta-item {
@@ -879,6 +1077,41 @@ onMounted(async () => {
   word-break: break-word;
 }
 
+.upload-meta-item small {
+  display: block;
+  margin-top: 8px;
+  color: #7a6451;
+  line-height: 1.5;
+}
+
+.upload-progress {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  padding: 18px;
+}
+
+.upload-progress-item {
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.upload-progress-item span {
+  display: block;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.upload-progress-item strong {
+  display: block;
+  margin-top: 10px;
+  color: #2f241d;
+  word-break: break-word;
+}
+
 .upload-option {
   display: flex;
   align-items: center;
@@ -888,6 +1121,39 @@ onMounted(async () => {
   border-radius: 16px;
   background: rgba(255, 250, 242, 0.72);
   color: #6d5948;
+}
+
+.upload-result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.upload-result-item {
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.upload-result-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.upload-result-head strong {
+  color: #2f241d;
+  word-break: break-word;
+}
+
+.upload-result-message {
+  margin: 10px 0 0;
+  color: #6d5948;
+  line-height: 1.6;
 }
 
 .dialog-actions {
@@ -906,15 +1172,11 @@ onMounted(async () => {
     width: 100%;
   }
 
-  .document-actions,
   .filter-grid,
   .overview-grid,
   .detail-matrix,
-  .upload-option {
-    grid-template-columns: 1fr;
-  }
-
-  .upload-meta {
+  .upload-meta,
+  .upload-progress {
     grid-template-columns: 1fr;
   }
 }
@@ -932,8 +1194,13 @@ onMounted(async () => {
   .filter-actions,
   .dialog-actions,
   .error-actions,
-  .upload-option {
+  .upload-option,
+  .upload-result-head {
     flex-direction: column;
+  }
+
+  .upload-option {
+    align-items: flex-start;
   }
 }
 </style>
