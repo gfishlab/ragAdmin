@@ -24,6 +24,7 @@ import { resolveErrorMessage } from '@/api/http'
 
 const providerLoading = ref(false)
 const providerSubmitting = ref(false)
+const providerManagerVisible = ref(false)
 const providerDialogVisible = ref(false)
 const providerCheckingIds = ref<number[]>([])
 const providers = ref<ModelProvider[]>([])
@@ -408,13 +409,13 @@ onMounted(async () => {
       <div>
         <h1 class="page-title">模型管理</h1>
         <p class="page-subtitle">
-          当前页面集中管理模型提供方与模型定义，已支持列表、筛选、探活、新增、编辑和删除，避免错误模型能力配置继续流入联调链路。
+          当前页面聚焦模型配置收口，支持列表、筛选、探活、新增、编辑和删除。提供方维护保留在次级入口，避免主页面干扰模型联调。
         </p>
       </div>
       <div class="head-actions">
         <el-button @click="loadPageData">刷新页面</el-button>
-        <el-button type="primary" @click="providerDialogVisible = true">新增提供方</el-button>
-        <el-button type="primary" plain @click="openCreateModelDialog">新增模型</el-button>
+        <el-button plain @click="providerManagerVisible = true">管理提供方</el-button>
+        <el-button type="primary" @click="openCreateModelDialog">新增模型</el-button>
       </div>
     </header>
 
@@ -422,7 +423,7 @@ onMounted(async () => {
       <article class="summary-card soft-panel">
         <span>提供方数量</span>
         <strong>{{ providers.length }}</strong>
-        <p>当前已接入的模型提供方总量。</p>
+        <p>仅作为模型路由目标维护，主页面不再单独展开展示。</p>
       </article>
       <article class="summary-card soft-panel">
         <span>模型总量</span>
@@ -432,88 +433,15 @@ onMounted(async () => {
       <article class="summary-card soft-panel">
         <span>当前目标</span>
         <strong>配置收口</strong>
-        <p>把模型新增、编辑、删除和探活统一收敛到一个管理页。</p>
+        <p>把主流程集中到模型配置，把提供方维护降级为次级操作。</p>
       </article>
     </div>
-
-    <section class="provider-panel soft-panel">
-      <div class="section-head">
-        <div>
-          <h2 class="section-title">模型提供方</h2>
-          <p class="section-subtitle">查看当前接入方，支持单条探活与最小新增能力。</p>
-        </div>
-      </div>
-
-      <el-table :data="providers" v-loading="providerLoading" empty-text="暂无模型提供方" stripe>
-        <el-table-column prop="providerCode" label="Provider Code" min-width="150" />
-        <el-table-column prop="providerName" label="提供方名称" min-width="160" />
-        <el-table-column label="接入地址" min-width="240">
-          <template #default="{ row }">
-            {{ row.baseUrl || '未配置' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="密钥引用" min-width="180">
-          <template #default="{ row }">
-            {{ row.apiKeySecretRef || '未配置' }}
-          </template>
-        </el-table-column>
-        <el-table-column label="状态" width="110">
-          <template #default="{ row }">
-            <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              :loading="providerChecking(row.id)"
-              @click="handleProviderHealthCheck(row)"
-            >
-              探活
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <section v-if="providerHealthResult" class="health-result">
-        <div class="health-header">
-          <strong>
-            最近一次提供方探活结果
-            <template v-if="activeProviderHealthId">
-              / #{{ activeProviderHealthId }}
-            </template>
-          </strong>
-          <el-tag :type="statusTagType(providerHealthResult.status)">
-            {{ providerHealthResult.status }}
-          </el-tag>
-        </div>
-        <p class="health-message">{{ providerHealthResult.message }}</p>
-        <div class="health-detail-list">
-          <article
-            v-for="item in providerHealthResult.capabilityChecks"
-            :key="`${providerHealthResult.providerId}-${item.capabilityType}`"
-            class="health-detail-item"
-          >
-            <div class="health-item-head">
-              <el-tag :type="statusTagType(item.status)">
-                {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
-              </el-tag>
-              <span class="health-item-model">
-                {{ item.modelCode ? `模型 ${item.modelCode}` : '当前无可用模型' }}
-              </span>
-            </div>
-            <p class="health-item-message">{{ item.message }}</p>
-          </article>
-        </div>
-      </section>
-    </section>
 
     <section class="model-panel soft-panel">
       <div class="section-head">
         <div>
           <h2 class="section-title">模型定义</h2>
-          <p class="section-subtitle">支持按提供方、能力和状态筛选，并提供编辑、删除和探活能力。</p>
+          <p class="section-subtitle">支持按提供方、能力和状态筛选，并提供新增、编辑、删除和探活能力。</p>
         </div>
       </div>
 
@@ -658,6 +586,79 @@ onMounted(async () => {
         </div>
       </section>
     </section>
+
+    <el-dialog v-model="providerManagerVisible" title="管理模型提供方" width="960px">
+      <div class="provider-manager-head">
+        <p class="provider-manager-tip">
+          提供方用于承接模型路由和最小接入配置。当前页面不再单独展示提供方面板，统一收进这个次级入口。
+        </p>
+        <el-button type="primary" @click="providerDialogVisible = true">新增提供方</el-button>
+      </div>
+
+      <el-table :data="providers" v-loading="providerLoading" empty-text="暂无模型提供方" stripe>
+        <el-table-column prop="providerCode" label="Provider Code" min-width="150" />
+        <el-table-column prop="providerName" label="提供方名称" min-width="160" />
+        <el-table-column label="接入地址" min-width="240">
+          <template #default="{ row }">
+            {{ row.baseUrl || '未配置' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="密钥引用" min-width="180">
+          <template #default="{ row }">
+            {{ row.apiKeySecretRef || '未配置' }}
+          </template>
+        </el-table-column>
+        <el-table-column label="状态" width="110">
+          <template #default="{ row }">
+            <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="操作" width="160" fixed="right">
+          <template #default="{ row }">
+            <el-button
+              link
+              type="primary"
+              :loading="providerChecking(row.id)"
+              @click="handleProviderHealthCheck(row)"
+            >
+              探活
+            </el-button>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <section v-if="providerHealthResult" class="health-result">
+        <div class="health-header">
+          <strong>
+            最近一次提供方探活结果
+            <template v-if="activeProviderHealthId">
+              / #{{ activeProviderHealthId }}
+            </template>
+          </strong>
+          <el-tag :type="statusTagType(providerHealthResult.status)">
+            {{ providerHealthResult.status }}
+          </el-tag>
+        </div>
+        <p class="health-message">{{ providerHealthResult.message }}</p>
+        <div class="health-detail-list">
+          <article
+            v-for="item in providerHealthResult.capabilityChecks"
+            :key="`${providerHealthResult.providerId}-${item.capabilityType}`"
+            class="health-detail-item"
+          >
+            <div class="health-item-head">
+              <el-tag :type="statusTagType(item.status)">
+                {{ capabilityLabel(item.capabilityType) }} / {{ item.status }}
+              </el-tag>
+              <span class="health-item-model">
+                {{ item.modelCode ? `模型 ${item.modelCode}` : '当前无可用模型' }}
+              </span>
+            </div>
+            <p class="health-item-message">{{ item.message }}</p>
+          </article>
+        </div>
+      </section>
+    </el-dialog>
 
     <el-dialog v-model="providerDialogVisible" title="新增模型提供方" width="560px">
       <el-form label-position="top">
@@ -810,9 +811,22 @@ onMounted(async () => {
 }
 
 .summary-card,
-.provider-panel,
 .model-panel {
   padding: 20px 22px;
+}
+
+.provider-manager-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-bottom: 16px;
+}
+
+.provider-manager-tip {
+  margin: 0;
+  color: #6d5948;
+  line-height: 1.7;
 }
 
 .summary-card span {
@@ -937,7 +951,8 @@ onMounted(async () => {
 @media (max-width: 960px) {
   .model-head,
   .section-head,
-  .health-header {
+  .health-header,
+  .provider-manager-head {
     flex-direction: column;
   }
 
