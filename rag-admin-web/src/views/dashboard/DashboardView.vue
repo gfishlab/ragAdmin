@@ -65,28 +65,26 @@ async function goTo(path: string): Promise<void> {
     </header>
 
     <section class="entry-grid">
-      <article
+      <button
         v-for="entry in quickEntries"
         :key="entry.key"
+        type="button"
         class="entry-card soft-panel"
         :class="entry.accent"
+        @click="goTo(entry.path)"
       >
-        <div class="entry-icon">
-          <el-icon><component :is="entry.icon" /></el-icon>
+        <div class="entry-top">
+          <div class="entry-icon">
+            <el-icon><component :is="entry.icon" /></el-icon>
+          </div>
+          <span class="entry-link">{{ entry.actionText }}</span>
         </div>
         <div class="entry-copy">
           <span class="entry-eyebrow">{{ entry.eyebrow }}</span>
           <strong>{{ entry.title }}</strong>
           <p>{{ entry.description }}</p>
         </div>
-        <el-button
-          class="entry-action"
-          :type="entry.accent === 'is-primary' ? 'primary' : 'default'"
-          @click="goTo(entry.path)"
-        >
-          {{ entry.actionText }}
-        </el-button>
-      </article>
+      </button>
     </section>
   </section>
 </template>
@@ -95,11 +93,16 @@ async function goTo(path: string): Promise<void> {
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 22px;
 }
 
 .dashboard-head {
-  padding: 24px 28px;
+  position: relative;
+  overflow: hidden;
+  padding: 30px 34px;
+  background:
+    radial-gradient(circle at right top, rgba(211, 120, 41, 0.12), transparent 30%),
+    linear-gradient(180deg, rgba(255, 251, 246, 0.95), rgba(255, 248, 241, 0.9));
 }
 
 .dashboard-eyebrow,
@@ -116,42 +119,76 @@ async function goTo(path: string): Promise<void> {
 
 .entry-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 18px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 20px;
 }
 
 .entry-card {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  min-height: 240px;
-  padding: 26px;
+  grid-column: span 6;
+  gap: 20px;
+  min-height: 250px;
+  padding: 28px;
+  border: 1px solid rgba(179, 139, 96, 0.12);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    transform 180ms ease,
+    box-shadow 180ms ease,
+    border-color 180ms ease;
 }
 
 .entry-card.is-primary {
   background:
-    radial-gradient(circle at top right, rgba(211, 120, 41, 0.18), transparent 34%),
-    rgba(255, 249, 241, 0.92);
+    radial-gradient(circle at top right, rgba(211, 120, 41, 0.24), transparent 34%),
+    linear-gradient(160deg, rgba(255, 248, 238, 0.96), rgba(255, 252, 247, 0.9));
 }
 
 .entry-card.is-warm {
   background:
-    linear-gradient(135deg, rgba(255, 245, 232, 0.92), rgba(255, 251, 246, 0.92));
+    linear-gradient(145deg, rgba(252, 241, 226, 0.94), rgba(255, 250, 244, 0.9));
 }
 
 .entry-card.is-light {
-  background: rgba(255, 251, 246, 0.88);
+  background:
+    linear-gradient(180deg, rgba(255, 252, 248, 0.95), rgba(255, 249, 242, 0.88));
+}
+
+.entry-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(198, 107, 34, 0.22);
+  box-shadow: 0 22px 38px rgba(141, 69, 16, 0.1);
+}
+
+.entry-card:nth-child(1),
+.entry-card:nth-child(2) {
+  min-height: 280px;
+}
+
+.entry-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .entry-icon {
   display: grid;
   place-items: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 16px;
-  background: rgba(198, 107, 34, 0.12);
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: rgba(198, 107, 34, 0.14);
   color: #8d4510;
-  font-size: 22px;
+  font-size: 24px;
+}
+
+.entry-link {
+  color: #8d4510;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .entry-copy {
@@ -162,8 +199,8 @@ async function goTo(path: string): Promise<void> {
 
 .entry-copy strong {
   font-family: "Noto Serif SC", serif;
-  font-size: 28px;
-  line-height: 1.2;
+  font-size: 32px;
+  line-height: 1.15;
 }
 
 .entry-copy p {
@@ -172,14 +209,13 @@ async function goTo(path: string): Promise<void> {
   line-height: 1.7;
 }
 
-.entry-action {
-  align-self: flex-start;
-  margin-top: auto;
-}
-
 @media (max-width: 960px) {
   .entry-grid {
     grid-template-columns: 1fr;
+  }
+
+  .entry-card {
+    grid-column: auto;
   }
 }
 
@@ -187,10 +223,6 @@ async function goTo(path: string): Promise<void> {
   .dashboard-head,
   .entry-card {
     padding: 20px;
-  }
-
-  .entry-action {
-    width: 100%;
   }
 }
 </style>
