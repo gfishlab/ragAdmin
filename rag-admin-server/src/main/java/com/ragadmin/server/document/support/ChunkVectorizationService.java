@@ -21,9 +21,9 @@ import java.util.Map;
 public class ChunkVectorizationService {
 
     /**
-     * 百炼 Embedding 单次请求最多接收 25 条文本，这里按固定批次拆分，避免大文档切片过多时整批失败。
+     * 当前百炼 Embedding 接口单次请求最多接收 10 条文本，这里统一按 10 条分批，避免大文档切片过多时整批失败。
      */
-    static final int EMBEDDING_BATCH_SIZE = 25;
+    static final int EMBEDDING_BATCH_SIZE = 10;
 
     private final ModelService modelService;
     private final EmbeddingClientRegistry embeddingClientRegistry;

@@ -47,7 +47,7 @@ class ChunkVectorizationServiceTest {
     private ChunkVectorizationService chunkVectorizationService;
 
     @Test
-    void shouldBatchEmbeddingRequestsByTwentyFive() {
+    void shouldBatchEmbeddingRequestsByTen() {
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(8L);
         knowledgeBase.setEmbeddingModelId(3L);
@@ -81,9 +81,10 @@ class ChunkVectorizationServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> inputsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(embeddingModelClient, times(2)).embed(eq("text-embedding-v3"), inputsCaptor.capture());
-        assertEquals(25, inputsCaptor.getAllValues().get(0).size());
-        assertEquals(1, inputsCaptor.getAllValues().get(1).size());
+        verify(embeddingModelClient, times(3)).embed(eq("text-embedding-v3"), inputsCaptor.capture());
+        assertEquals(10, inputsCaptor.getAllValues().get(0).size());
+        assertEquals(10, inputsCaptor.getAllValues().get(1).size());
+        assertEquals(6, inputsCaptor.getAllValues().get(2).size());
 
         verify(milvusVectorStoreClient).ensureCollection("kb_8_emb_3_d_3", 3);
         verify(milvusVectorStoreClient).upsert(eq("kb_8_emb_3_d_3"), eq(chunks), anyList());
