@@ -28,6 +28,8 @@ import com.ragadmin.server.model.entity.AiProviderEntity;
 import com.ragadmin.server.model.mapper.AiModelCapabilityMapper;
 import com.ragadmin.server.model.mapper.AiModelMapper;
 import com.ragadmin.server.model.mapper.AiProviderMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class ModelService {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelService.class);
 
     @Autowired
     private AiModelMapper aiModelMapper;
@@ -203,17 +207,6 @@ public class ModelService {
         return aiModelMapper.selectBatchIds(ids);
     }
 
-    public ModelResponse get(Long modelId) {
-        AiModelEntity model = requireModel(modelId);
-        AiProviderEntity provider = requireProvider(model.getProviderId());
-        List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
-                .stream()
-                .map(AiModelCapabilityEntity::getCapabilityType)
-                .distinct()
-                .toList();
-        return toResponse(model, provider, capabilityTypes);
-    }
-
     public EmbeddingModelDescriptor requireEmbeddingModelDescriptor(Long modelId) {
         AiModelEntity model = requireModelWithCapability(modelId, "EMBEDDING");
         AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
@@ -253,12 +246,16 @@ public class ModelService {
     public ModelHealthCheckResponse healthCheck(Long modelId) {
         AiModelEntity model = requireModel(modelId);
         AiProviderEntity provider = requireProvider(model.getProviderId());
+        log.info("开始模型探活，modelId={}, modelName={}, modelCode={}",
+                modelId, model.getModelName(), model.getModelCode());
         List<String> capabilityTypes = aiModelCapabilityMapper.selectEnabledByModelIds(List.of(modelId))
                 .stream()
                 .map(AiModelCapabilityEntity::getCapabilityType)
                 .distinct()
                 .toList();
         if (capabilityTypes.isEmpty()) {
+            log.warn("模型探活失败，modelId={}, modelName={}, modelCode={}, message={}",
+                    modelId, model.getModelName(), model.getModelCode(), "模型未配置能力类型");
             throw new BusinessException("MODEL_CAPABILITY_EMPTY", "模型未配置能力类型", HttpStatus.BAD_REQUEST);
         }
 
@@ -268,7 +265,7 @@ public class ModelService {
                 .toList();
         boolean success = checks.stream().allMatch(item -> "UP".equals(item.status()));
         String message = success ? "模型探活成功" : "模型探活失败，请检查 capabilityChecks";
-        return new ModelHealthCheckResponse(
+        ModelHealthCheckResponse response = new ModelHealthCheckResponse(
                 model.getId(),
                 model.getModelCode(),
                 provider.getProviderCode(),
@@ -276,6 +273,9 @@ public class ModelService {
                 message,
                 checks
         );
+        log.info("模型探活完成，modelId={}, modelName={}, modelCode={}, status={}",
+                modelId, model.getModelName(), model.getModelCode(), response.status());
+        return response;
     }
 
     private void ensureModelCodeUnique(Long currentModelId, Long providerId, String modelCode) {

@@ -15,6 +15,8 @@ import com.ragadmin.server.model.mapper.AiProviderMapper;
 import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -24,6 +26,8 @@ import java.util.List;
 
 @Service
 public class ModelProviderService {
+
+    private static final Logger log = LoggerFactory.getLogger(ModelProviderService.class);
 
     @Autowired
     private AiProviderMapper aiProviderMapper;
@@ -66,10 +70,6 @@ public class ModelProviderService {
         return toResponse(entity);
     }
 
-    public ModelProviderResponse get(Long providerId) {
-        return toResponse(requireProvider(providerId));
-    }
-
     public AiProviderEntity requireProvider(Long providerId) {
         AiProviderEntity provider = aiProviderMapper.selectById(providerId);
         if (provider == null) {
@@ -80,6 +80,8 @@ public class ModelProviderService {
 
     public ModelProviderHealthCheckResponse healthCheck(Long providerId) {
         AiProviderEntity provider = requireProvider(providerId);
+        log.info("开始模型提供方探活，providerId={}, providerName={}, providerCode={}",
+                providerId, provider.getProviderName(), provider.getProviderCode());
         List<ModelProviderCapabilityHealthResponse> checks = new ArrayList<>();
         checks.add(checkChatCapability(provider));
         checks.add(checkEmbeddingCapability(provider));
@@ -90,7 +92,7 @@ public class ModelProviderService {
         String message = hasDown ? "提供方探活失败，请检查 capabilityChecks"
                 : hasUp ? "提供方探活成功" : "提供方当前没有可探活的模型能力";
 
-        return new ModelProviderHealthCheckResponse(
+        ModelProviderHealthCheckResponse response = new ModelProviderHealthCheckResponse(
                 provider.getId(),
                 provider.getProviderCode(),
                 provider.getProviderName(),
@@ -98,6 +100,9 @@ public class ModelProviderService {
                 message,
                 checks
         );
+        log.info("模型提供方探活完成，providerId={}, providerName={}, providerCode={}, status={}",
+                providerId, provider.getProviderName(), provider.getProviderCode(), response.status());
+        return response;
     }
 
     private ModelProviderCapabilityHealthResponse checkChatCapability(AiProviderEntity provider) {

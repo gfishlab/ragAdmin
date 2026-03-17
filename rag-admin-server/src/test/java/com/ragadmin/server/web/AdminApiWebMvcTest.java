@@ -27,10 +27,9 @@ import com.ragadmin.server.model.controller.ModelController;
 import com.ragadmin.server.model.controller.ModelProviderController;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelProviderHealthCheckResponse;
-import com.ragadmin.server.model.dto.ModelProviderResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
-import com.ragadmin.server.model.service.ModelProviderService;
 import com.ragadmin.server.model.service.ModelService;
+import com.ragadmin.server.model.service.ModelProviderService;
 import com.ragadmin.server.system.controller.SystemHealthController;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
 import com.ragadmin.server.system.dto.HealthCheckResponse;
@@ -473,19 +472,6 @@ class AdminApiWebMvcTest {
     @Test
     void shouldRunModelHealthCheckWhenBearerTokenIsValid() throws Exception {
         when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
-        when(modelService.get(5L)).thenReturn(new ModelResponse(
-                5L,
-                1L,
-                "BAILIAN",
-                "阿里百炼",
-                "deepseek-v3.2",
-                "DeepSeek V3.2",
-                List.of("TEXT_GENERATION"),
-                "CHAT",
-                null,
-                null,
-                "ENABLED"
-        ));
         when(modelService.healthCheck(5L)).thenReturn(new ModelHealthCheckResponse(
                 5L,
                 "deepseek-v3.2",
@@ -506,14 +492,6 @@ class AdminApiWebMvcTest {
     @Test
     void shouldRunModelProviderHealthCheckWhenBearerTokenIsValid() throws Exception {
         when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
-        when(modelProviderService.get(1L)).thenReturn(new ModelProviderResponse(
-                1L,
-                "BAILIAN",
-                "阿里百炼",
-                "https://dashscope.aliyuncs.com",
-                "secret/bailian/api-key",
-                "ENABLED"
-        ));
         when(modelProviderService.healthCheck(1L)).thenReturn(new ModelProviderHealthCheckResponse(
                 1L,
                 "BAILIAN",

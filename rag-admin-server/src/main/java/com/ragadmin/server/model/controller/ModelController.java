@@ -8,8 +8,6 @@ import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.UpdateModelRequest;
 import com.ragadmin.server.model.service.ModelService;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,8 +22,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/admin/models")
 public class ModelController {
-
-    private static final Logger log = LoggerFactory.getLogger(ModelController.class);
 
     @Autowired
     private ModelService modelService;
@@ -59,18 +55,6 @@ public class ModelController {
 
     @PostMapping("/{modelId}/health-check")
     public ApiResponse<ModelHealthCheckResponse> healthCheck(@PathVariable Long modelId) {
-        ModelResponse model = modelService.get(modelId);
-        log.info("开始模型探活，modelId={}, modelName={}, modelCode={}",
-                modelId, model.modelName(), model.modelCode());
-        try {
-            ModelHealthCheckResponse response = modelService.healthCheck(modelId);
-            log.info("模型探活完成，modelId={}, modelName={}, modelCode={}, status={}",
-                    modelId, model.modelName(), model.modelCode(), response.status());
-            return ApiResponse.success(response);
-        } catch (RuntimeException ex) {
-            log.warn("模型探活失败，modelId={}, modelName={}, modelCode={}, message={}",
-                    modelId, model.modelName(), model.modelCode(), ex.getMessage());
-            throw ex;
-        }
+        return ApiResponse.success(modelService.healthCheck(modelId));
     }
 }
