@@ -44,7 +44,7 @@ async function submit(): Promise<void> {
 <template>
   <div class="login-page">
     <section class="hero-copy">
-      <p class="eyebrow">RAG ADMIN / FRONT DESK</p>
+      <p class="eyebrow">RAG ADMIN</p>
       <h1>把知识库、模型与文档流程放进同一张控制台。</h1>
       <p class="description">
         在同一界面完成知识库、模型、文档与任务的日常管理，保持统一的操作入口和视觉语言。

@@ -216,7 +216,7 @@ onMounted(async () => {
           />
         </el-select>
 
-        <el-input v-model="query.bizId" placeholder="请输入业务 ID" clearable />
+        <el-input v-model="query.bizId" placeholder="请输入业务编号" clearable />
       </div>
 
       <div class="filter-actions">
@@ -237,7 +237,7 @@ onMounted(async () => {
 
       <template v-else>
         <el-table :data="tasks" v-loading="loading" empty-text="当前暂无任务数据" stripe>
-          <el-table-column prop="taskId" label="任务 ID" width="100" />
+          <el-table-column prop="taskId" label="任务编号" width="100" />
           <el-table-column label="任务类型" min-width="160">
             <template #default="{ row }">
               {{ formatTaskType(row.taskType) }}
@@ -253,7 +253,7 @@ onMounted(async () => {
               {{ row.documentName || '暂无' }}
             </template>
           </el-table-column>
-          <el-table-column prop="bizId" label="业务 ID" width="120" />
+          <el-table-column prop="bizId" label="业务编号" width="120" />
           <el-table-column label="重试次数" width="100">
             <template #default="{ row }">
               {{ row.retryCount ?? 0 }}

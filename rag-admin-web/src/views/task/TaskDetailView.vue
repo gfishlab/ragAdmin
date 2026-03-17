@@ -151,7 +151,7 @@ onMounted(async () => {
     <template v-else-if="detail">
       <header class="detail-head">
         <div>
-          <p class="detail-eyebrow">Task / Detail</p>
+          <p class="detail-eyebrow">任务详情</p>
           <h1 class="page-title">任务 #{{ detail.taskId }}</h1>
           <p class="page-subtitle">
             查看任务状态流转、执行步骤、重试记录和关联文档信息。
@@ -177,7 +177,7 @@ onMounted(async () => {
           <p>以后台真实任务状态为准，前端不对状态流转做推断。</p>
         </article>
         <article class="overview-card soft-panel">
-          <span>业务 ID</span>
+          <span>业务编号</span>
           <strong>{{ detail.bizId ?? '暂无' }}</strong>
           <p>用于标识任务关联的业务对象。</p>
         </article>
@@ -193,7 +193,7 @@ onMounted(async () => {
 
         <div class="detail-matrix">
           <article class="detail-item">
-            <span>任务 ID</span>
+            <span>任务编号</span>
             <strong>{{ detail.taskId }}</strong>
           </article>
           <article class="detail-item">
@@ -229,7 +229,7 @@ onMounted(async () => {
 
         <div class="detail-matrix">
           <article class="detail-item">
-            <span>业务 ID</span>
+            <span>业务编号</span>
             <strong>{{ detail.bizId ?? '暂无' }}</strong>
           </article>
           <article class="detail-item">

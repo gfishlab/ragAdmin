@@ -144,7 +144,7 @@ onMounted(async () => {
         <el-table-column prop="id" label="ID" width="80" />
         <el-table-column prop="kbCode" label="知识库编码" min-width="150" />
         <el-table-column prop="kbName" label="知识库名称" min-width="180" />
-        <el-table-column label="Embedding 模型" min-width="180">
+        <el-table-column label="向量模型" min-width="180">
           <template #default="{ row }">
             {{ modelLabel(row.embeddingModelName) }}
           </template>
@@ -154,7 +154,7 @@ onMounted(async () => {
             {{ modelLabel(row.chatModelName) }}
           </template>
         </el-table-column>
-        <el-table-column prop="retrieveTopK" label="TopK" width="90" />
+        <el-table-column prop="retrieveTopK" label="检索数量" width="100" />
         <el-table-column label="重排" width="90">
           <template #default="{ row }">
             <el-tag :type="row.rerankEnabled ? 'warning' : 'info'">

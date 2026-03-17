@@ -366,7 +366,7 @@ onMounted(async () => {
     <template v-else-if="knowledgeBase">
       <header class="detail-head">
         <div>
-          <p class="detail-eyebrow">Knowledge Base / Detail</p>
+          <p class="detail-eyebrow">知识库详情</p>
           <h1 class="page-title">{{ knowledgeBase.kbName }}</h1>
           <p class="page-subtitle">
             {{ knowledgeBase.description || '当前知识库暂无补充说明，可继续通过编辑页完善描述。' }}
@@ -391,9 +391,9 @@ onMounted(async () => {
           <p>未显式绑定时由平台默认聊天模型兜底。</p>
         </article>
         <article class="overview-card soft-panel">
-          <span>Embedding 模型</span>
+          <span>向量模型</span>
           <strong>{{ modelLabel(knowledgeBase.embeddingModelName) }}</strong>
-          <p>向量构建链路使用的 Embedding 配置。</p>
+          <p>向量构建链路使用的模型配置。</p>
         </article>
       </section>
 
@@ -407,7 +407,7 @@ onMounted(async () => {
 
         <div class="detail-matrix">
           <article class="detail-item">
-            <span>知识库 ID</span>
+            <span>知识库编号</span>
             <strong>{{ knowledgeBase.id }}</strong>
           </article>
           <article class="detail-item">
@@ -415,7 +415,7 @@ onMounted(async () => {
             <el-tag :type="statusType(knowledgeBase.status)">{{ formatResourceStatus(knowledgeBase.status) }}</el-tag>
           </article>
           <article class="detail-item">
-            <span>检索 TopK</span>
+            <span>检索数量</span>
             <strong>{{ knowledgeBase.retrieveTopK }}</strong>
           </article>
           <article class="detail-item">
@@ -478,7 +478,7 @@ onMounted(async () => {
 
         <template v-else>
           <el-table :data="documents" v-loading="documentLoading" empty-text="当前知识库暂无文档" stripe>
-            <el-table-column prop="documentId" label="文档 ID" width="100" />
+            <el-table-column prop="documentId" label="文档编号" width="100" />
             <el-table-column prop="docName" label="文档名称" min-width="220" />
             <el-table-column prop="docType" label="类型" width="100" />
             <el-table-column label="解析状态" width="130">
@@ -537,8 +537,8 @@ onMounted(async () => {
     >
       <section class="upload-dialog">
         <p class="upload-hint">
-          当前上传目标知识库：
-          <strong>{{ knowledgeBase?.kbName }}</strong>
+          目标知识库：
+            <strong>{{ knowledgeBase?.kbName }}</strong>
         </p>
 
         <el-upload

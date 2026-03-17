@@ -365,7 +365,7 @@ onMounted(async () => {
     <template v-else-if="detail">
       <header class="detail-head">
         <div>
-          <p class="detail-eyebrow">Document / Detail</p>
+          <p class="detail-eyebrow">文档详情</p>
           <h1 class="page-title">{{ detail.docName }}</h1>
           <p class="page-subtitle">
             查看文档基础信息、版本记录和切片内容，便于检查解析结果。
@@ -379,7 +379,7 @@ onMounted(async () => {
 
       <section class="overview-grid">
         <article class="overview-card soft-panel">
-          <span>文档 ID</span>
+          <span>文档编号</span>
           <strong>{{ detail.documentId }}</strong>
           <p>当前文档的唯一业务标识。</p>
         </article>
@@ -438,7 +438,7 @@ onMounted(async () => {
             <strong>{{ detail.storageBucket || '暂无' }}</strong>
           </article>
           <article class="storage-item">
-            <span>对象 Key</span>
+            <span>对象键</span>
             <strong>{{ detail.storageObjectKey || '暂无' }}</strong>
           </article>
           <article class="storage-item">
@@ -472,7 +472,7 @@ onMounted(async () => {
         <template v-else>
           <el-table :data="versions" v-loading="versionLoading" empty-text="当前文档暂无版本数据" stripe>
             <el-table-column prop="versionId" label="版本 ID" width="100" />
-            <el-table-column prop="storageObjectKey" label="对象 Key" min-width="280" />
+            <el-table-column prop="storageObjectKey" label="对象键" min-width="280" />
             <el-table-column label="内容哈希" min-width="220">
               <template #default="{ row }">
                 {{ row.contentHash || '暂无' }}
@@ -564,7 +564,7 @@ onMounted(async () => {
                 {{ row.score ?? '-' }}
               </template>
             </el-table-column>
-            <el-table-column label="Token" width="100">
+            <el-table-column label="令牌数" width="100">
               <template #default="{ row }">
                 {{ row.tokenCount ?? '-' }}
               </template>

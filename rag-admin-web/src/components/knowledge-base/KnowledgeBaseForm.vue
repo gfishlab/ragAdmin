@@ -39,11 +39,11 @@ const rules: FormRules<KnowledgeBaseUpsertRequest> = {
   ],
   kbName: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }],
   retrieveTopK: [
-    { required: true, message: '请输入检索 TopK', trigger: 'change' },
+    { required: true, message: '请输入检索数量', trigger: 'change' },
     {
       validator: (_rule, value: number, callback) => {
         if (!Number.isInteger(value) || value < 1 || value > 20) {
-          callback(new Error('检索 TopK 需为 1 到 20 的整数'))
+          callback(new Error('检索数量需为 1 到 20 的整数'))
           return
         }
         callback()
@@ -67,7 +67,7 @@ async function handleSubmit(): Promise<void> {
   <section class="form-panel soft-panel">
     <div class="form-head">
       <div>
-        <p class="form-eyebrow">{{ eyebrow || 'Knowledge Base / Workspace' }}</p>
+        <p class="form-eyebrow">{{ eyebrow || '知识库配置' }}</p>
         <h2>{{ title }}</h2>
         <p class="form-description">{{ description }}</p>
       </div>
@@ -142,13 +142,13 @@ async function handleSubmit(): Promise<void> {
           </p>
         </el-form-item>
 
-        <el-form-item label="Embedding 模型">
+        <el-form-item label="向量模型">
           <el-select
             v-model="formModel.embeddingModelId"
             clearable
             filterable
             :loading="modelLoading"
-            placeholder="留空时使用平台默认 Embedding 模型"
+            placeholder="留空时使用平台默认向量模型"
           >
             <el-option
               v-for="item in embeddingModelOptions"
@@ -163,13 +163,13 @@ async function handleSubmit(): Promise<void> {
             </el-option>
           </el-select>
           <p class="field-tip">
-            {{ hasRealModelOptions ? '不选择时由平台默认 Embedding 模型兜底。' : '当前无可用 Embedding 模型，留空即可。' }}
+            {{ hasRealModelOptions ? '不选择时由平台默认向量模型兜底。' : '当前无可用向量模型，留空即可。' }}
           </p>
         </el-form-item>
       </div>
 
       <div class="form-grid three-columns">
-        <el-form-item label="检索 TopK" prop="retrieveTopK">
+        <el-form-item label="检索数量" prop="retrieveTopK">
           <el-input-number v-model="formModel.retrieveTopK" :min="1" :max="20" />
         </el-form-item>
         <el-form-item label="重排开关">

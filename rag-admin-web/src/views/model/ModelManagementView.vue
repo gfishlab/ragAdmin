@@ -506,7 +506,7 @@ onMounted(async () => {
             {{ modelTypeLabel(row.modelType) }}
           </template>
         </el-table-column>
-        <el-table-column label="Max Tokens" width="120">
+        <el-table-column label="最大令牌数" width="120">
           <template #default="{ row }">
             {{ row.maxTokens ?? '未配置' }}
           </template>
@@ -591,7 +591,7 @@ onMounted(async () => {
       </div>
 
       <el-table :data="providers" v-loading="providerLoading" empty-text="暂无模型提供方" stripe>
-        <el-table-column prop="providerCode" label="Provider Code" min-width="150" />
+        <el-table-column prop="providerCode" label="提供方编码" min-width="150" />
         <el-table-column prop="providerName" label="提供方名称" min-width="160" />
         <el-table-column label="接入地址" min-width="240">
           <template #default="{ row }">
@@ -657,7 +657,7 @@ onMounted(async () => {
 
     <el-dialog v-model="providerDialogVisible" title="新增模型提供方" width="560px">
       <el-form label-position="top">
-        <el-form-item label="Provider Code">
+        <el-form-item label="提供方编码">
           <el-input v-model="providerForm.providerCode" placeholder="例如 BAILIAN / OLLAMA / OPENAI" />
         </el-form-item>
         <el-form-item label="提供方名称">
@@ -746,9 +746,9 @@ onMounted(async () => {
           </el-form-item>
         </div>
         <div class="form-grid">
-          <el-form-item label="Max Tokens">
-            <el-input-number v-model="modelForm.maxTokens" :min="1" :step="256" controls-position="right" />
-          </el-form-item>
+        <el-form-item label="最大令牌数">
+          <el-input-number v-model="modelForm.maxTokens" :min="1" :step="256" controls-position="right" />
+        </el-form-item>
           <el-form-item label="默认温度">
             <el-input-number
               v-model="modelForm.temperatureDefault"
