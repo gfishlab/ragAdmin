@@ -58,10 +58,6 @@ async function handleLogout(): Promise<void> {
           <span>{{ item.label }}</span>
         </el-menu-item>
       </el-menu>
-      <div class="side-footnote">
-        <span class="footnote-label">阶段目标</span>
-        <strong>登录、鉴权、列表联调</strong>
-      </div>
     </aside>
 
     <div class="content-shell">
@@ -149,23 +145,6 @@ async function handleLogout(): Promise<void> {
 
 :deep(.nav-menu .el-menu-item.is-active) {
   background: rgba(198, 107, 34, 0.12);
-}
-
-.side-footnote {
-  margin-top: auto;
-  padding: 18px;
-  border-radius: 18px;
-  background: rgba(141, 69, 16, 0.08);
-  color: #5d4736;
-}
-
-.footnote-label {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #9d7a58;
 }
 
 .content-shell {

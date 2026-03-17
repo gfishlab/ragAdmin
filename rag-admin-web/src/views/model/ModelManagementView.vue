@@ -409,7 +409,7 @@ onMounted(async () => {
       <div>
         <h1 class="page-title">模型管理</h1>
         <p class="page-subtitle">
-          当前页面聚焦模型配置收口，支持列表、筛选、探活、新增、编辑和删除。提供方维护保留在次级入口，避免主页面干扰模型联调。
+          支持模型列表、筛选、探活、新增、编辑和删除。提供方维护保留在次级入口，避免影响主流程操作。
         </p>
       </div>
       <div class="head-actions">
@@ -429,11 +429,6 @@ onMounted(async () => {
         <span>模型总量</span>
         <strong>{{ pagination.total }}</strong>
         <p>模型分页接口返回的真实总量。</p>
-      </article>
-      <article class="summary-card soft-panel">
-        <span>当前目标</span>
-        <strong>配置收口</strong>
-        <p>把主流程集中到模型配置，把提供方维护降级为次级操作。</p>
       </article>
     </div>
 
@@ -806,7 +801,7 @@ onMounted(async () => {
 
 .summary-strip {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
   gap: 18px;
 }
 
