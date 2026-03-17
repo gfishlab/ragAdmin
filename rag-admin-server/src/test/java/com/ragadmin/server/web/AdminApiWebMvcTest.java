@@ -15,6 +15,7 @@ import com.ragadmin.server.chat.service.ChatService;
 import com.ragadmin.server.common.exception.GlobalExceptionHandler;
 import com.ragadmin.server.document.controller.DocumentController;
 import com.ragadmin.server.document.controller.FileController;
+import com.ragadmin.server.document.dto.DocumentUploadCapabilityResponse;
 import com.ragadmin.server.document.dto.DocumentResponse;
 import com.ragadmin.server.document.dto.UploadUrlResponse;
 import com.ragadmin.server.document.service.DocumentService;
@@ -334,6 +335,29 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.bucket").value("ragadmin"))
                 .andExpect(jsonPath("$.data.objectKey").value("kb_document/20260310/demo/sample.md"));
+    }
+
+    @Test
+    void shouldReturnUploadCapabilityWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(fileUploadService.getUploadCapability()).thenReturn(new DocumentUploadCapabilityResponse(
+                true,
+                true,
+                "tesseract 5.5.0",
+                "chi_sim+eng",
+                5,
+                List.of("TXT", "PDF", "PNG"),
+                List.of("PNG", "JPG", "JPEG", "WEBP")
+        ));
+
+        protectedMockMvc.perform(get("/api/admin/files/upload-capability")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.ocrEnabled").value(true))
+                .andExpect(jsonPath("$.data.ocrAvailable").value(true))
+                .andExpect(jsonPath("$.data.ocrLanguage").value("chi_sim+eng"))
+                .andExpect(jsonPath("$.data.ocrImageDocTypes[0]").value("PNG"));
     }
 
     @Test

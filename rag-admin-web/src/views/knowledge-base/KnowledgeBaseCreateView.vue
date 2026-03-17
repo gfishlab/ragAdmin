@@ -45,7 +45,17 @@ async function loadModelOptions(): Promise<void> {
 async function handleSubmit(): Promise<void> {
   submitting.value = true
   try {
-    await createKnowledgeBase(normalizeKnowledgeBaseForm(form))
+    const knowledgeBaseId = await createKnowledgeBase(normalizeKnowledgeBaseForm(form))
+    if (knowledgeBaseId) {
+      await router.replace({
+        path: `/knowledge-bases/${knowledgeBaseId}`,
+        query: {
+          created: '1',
+          openUpload: '1',
+        },
+      })
+      return
+    }
     await router.replace({
       path: '/knowledge-bases',
       query: {

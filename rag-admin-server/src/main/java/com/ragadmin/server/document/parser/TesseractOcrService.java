@@ -17,6 +17,10 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Component
 public class TesseractOcrService {
@@ -29,6 +33,41 @@ public class TesseractOcrService {
 
     public boolean isEnabled() {
         return ocrProperties.isEnabled();
+    }
+
+    public OcrCapability describeCapability() {
+        if (!ocrProperties.isEnabled()) {
+            return new OcrCapability(false, false, "OCR 已禁用", ocrProperties.getLanguage(), ocrProperties.getMaxPdfPages());
+        }
+        if (!StringUtils.hasText(ocrProperties.getTesseractCommand())) {
+            return new OcrCapability(true, false, "Tesseract 命令未配置", ocrProperties.getLanguage(), ocrProperties.getMaxPdfPages());
+        }
+        try {
+            String output = runCommandForOutput(buildCommand("--version"));
+            String firstLine = output.lines().findFirst().orElse("Tesseract 可用").trim();
+            List<String> availableLanguages = listAvailableLanguages();
+            List<String> missingLanguages = configuredLanguages().stream()
+                    .filter(language -> !availableLanguages.contains(language))
+                    .toList();
+            if (!missingLanguages.isEmpty()) {
+                return new OcrCapability(
+                        true,
+                        false,
+                        "缺少 OCR 语言包: " + String.join(", ", missingLanguages),
+                        ocrProperties.getLanguage(),
+                        ocrProperties.getMaxPdfPages()
+                );
+            }
+            return new OcrCapability(true, true, firstLine, ocrProperties.getLanguage(), ocrProperties.getMaxPdfPages());
+        } catch (Exception ex) {
+            return new OcrCapability(
+                    true,
+                    false,
+                    normalizeMessage(ex.getMessage(), "Tesseract 检查失败"),
+                    ocrProperties.getLanguage(),
+                    ocrProperties.getMaxPdfPages()
+            );
+        }
     }
 
     public String extractImageText(InputStream inputStream, String extension) throws Exception {
@@ -84,13 +123,15 @@ public class TesseractOcrService {
     }
 
     private String runTesseract(Path inputFile, Path outputBase) throws Exception {
-        Process process = new ProcessBuilder(
-                ocrProperties.getTesseractCommand(),
+        List<String> command = buildCommand(
                 inputFile.toString(),
                 outputBase.toString(),
                 "-l",
                 ocrProperties.getLanguage()
-        ).redirectErrorStream(true).start();
+        );
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
         String commandOutput;
         try (InputStream processStream = process.getInputStream()) {
             commandOutput = StreamUtils.copyToString(processStream, StandardCharsets.UTF_8);
@@ -106,11 +147,60 @@ public class TesseractOcrService {
         return Files.readString(outputFile, StandardCharsets.UTF_8);
     }
 
-    private String buildOcrError(String commandOutput) {
-        if (!StringUtils.hasText(commandOutput)) {
-            return "Tesseract OCR 执行失败";
+    private String runCommandForOutput(List<String> command) throws Exception {
+        Process process = new ProcessBuilder(command)
+                .redirectErrorStream(true)
+                .start();
+        String output;
+        try (InputStream processStream = process.getInputStream()) {
+            output = StreamUtils.copyToString(processStream, StandardCharsets.UTF_8);
         }
-        String message = commandOutput.trim();
+        if (!process.waitFor(10, TimeUnit.SECONDS)) {
+            process.destroyForcibly();
+            throw new IllegalStateException("Tesseract 检查超时");
+        }
+        if (process.exitValue() != 0) {
+            throw new IllegalStateException(normalizeMessage(output, "Tesseract 检查失败"));
+        }
+        return output;
+    }
+
+    private List<String> listAvailableLanguages() throws Exception {
+        String output = runCommandForOutput(buildCommand("--list-langs"));
+        return output.lines()
+                .skip(1)
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private List<String> configuredLanguages() {
+        return Arrays.stream(ocrProperties.getLanguage().split("\\+"))
+                .map(String::trim)
+                .filter(StringUtils::hasText)
+                .toList();
+    }
+
+    private List<String> buildCommand(String... args) {
+        List<String> command = new ArrayList<>();
+        command.add(ocrProperties.getTesseractCommand());
+        command.addAll(List.of(args));
+        if (StringUtils.hasText(ocrProperties.getDataPath())) {
+            command.add("--tessdata-dir");
+            command.add(ocrProperties.getDataPath().trim());
+        }
+        return command;
+    }
+
+    private String buildOcrError(String commandOutput) {
+        return normalizeMessage(commandOutput, "Tesseract OCR 执行失败");
+    }
+
+    private String normalizeMessage(String rawMessage, String defaultMessage) {
+        if (!StringUtils.hasText(rawMessage)) {
+            return defaultMessage;
+        }
+        String message = rawMessage.trim();
         return message.length() > 500 ? message.substring(0, 500) : message;
     }
 }

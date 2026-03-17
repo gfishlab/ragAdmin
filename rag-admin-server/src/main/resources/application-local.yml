@@ -55,3 +55,10 @@ rag:
       base-url: http://127.0.0.1:19530
       token: root:Milvus
       enabled: true
+  document:
+    ocr:
+      enabled: true
+      tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
+      data-path: .ocr-data/tessdata
+      language: chi_sim+eng
+      max-pdf-pages: 5

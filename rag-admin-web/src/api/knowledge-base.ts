@@ -2,6 +2,7 @@ import type { ApiResponse, PageResponse } from '@/types/api'
 import type {
   CreateDocumentVersionRequest,
   CreateKnowledgeBaseDocumentRequest,
+  DocumentUploadCapability,
   DocumentChunk,
   DocumentDetail,
   DocumentVersion,
@@ -157,6 +158,11 @@ export async function getKnowledgeBaseDocumentUploadUrl(
   payload: UploadUrlRequest,
 ): Promise<UploadUrlResponse> {
   const response = await http.post<ApiResponse<UploadUrlResponse>>('/admin/files/upload-url', payload)
+  return unwrapResponse(response.data)
+}
+
+export async function getKnowledgeBaseDocumentUploadCapability(): Promise<DocumentUploadCapability> {
+  const response = await http.get<ApiResponse<DocumentUploadCapability>>('/admin/files/upload-capability')
   return unwrapResponse(response.data)
 }
 

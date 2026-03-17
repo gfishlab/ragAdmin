@@ -5,14 +5,17 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   createKnowledgeBaseDocument,
   getKnowledgeBaseDetail,
+  getKnowledgeBaseDocumentUploadCapability,
   getKnowledgeBaseDocumentUploadUrl,
   listKnowledgeBaseDocuments,
   triggerDocumentParse,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
+import { DOCUMENT_UPLOAD_ACCEPT, inferDocumentType, isOcrImageDocumentType, isPdfDocumentType } from '@/utils/document-upload'
 import { DOCUMENT_PARSE_STATUS_OPTIONS, formatDocumentParseStatus, formatResourceStatus } from '@/utils/task'
 import type {
   CreateKnowledgeBaseDocumentRequest,
+  DocumentUploadCapability,
   KnowledgeBase,
   KnowledgeBaseDocument,
   UploadUrlResponse,
@@ -43,46 +46,25 @@ const selectedFile = ref<File | null>(null)
 const uploadSubmitting = ref(false)
 const uploadStage = ref<'idle' | 'getting-url' | 'uploading' | 'registering'>('idle')
 const uploadError = ref('')
+const uploadCapability = ref<DocumentUploadCapability | null>(null)
+const uploadCapabilityLoading = ref(false)
+const uploadCapabilityError = ref('')
+const autoParseAfterUpload = ref(true)
 const parsingDocumentIds = ref<number[]>([])
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
-const uploadDocType = computed(() => inferDocType(selectedFile.value?.name ?? ''))
+const uploadDocType = computed(() => inferDocumentType(selectedFile.value?.name ?? ''))
+const supportedDocTypesText = computed(() => {
+  return uploadCapability.value?.supportedDocTypes.join(' / ') ?? 'TXT / MARKDOWN / PDF / DOCX / PPTX / XLSX / PNG / JPG / JPEG / WEBP'
+})
 
-function inferDocType(fileName: string): string {
-  const extension = fileName.split('.').pop()?.toLowerCase() ?? ''
-  if (extension === 'pdf') {
-    return 'PDF'
+const uploadOcrAlertType = computed<'success' | 'warning' | 'info'>(() => {
+  if (!uploadCapability.value?.ocrEnabled) {
+    return 'info'
   }
-  if (extension === 'docx') {
-    return 'DOCX'
-  }
-  if (extension === 'pptx') {
-    return 'PPTX'
-  }
-  if (extension === 'xlsx') {
-    return 'XLSX'
-  }
-  if (extension === 'md' || extension === 'markdown') {
-    return 'MARKDOWN'
-  }
-  if (extension === 'txt') {
-    return 'TXT'
-  }
-  if (extension === 'png') {
-    return 'PNG'
-  }
-  if (extension === 'jpg') {
-    return 'JPG'
-  }
-  if (extension === 'jpeg') {
-    return 'JPEG'
-  }
-  if (extension === 'webp') {
-    return 'WEBP'
-  }
-  return 'UNKNOWN'
-}
+  return uploadCapability.value.ocrAvailable ? 'success' : 'warning'
+})
 
 function modelLabel(name: string | null): string {
   return name || '平台默认模型'
@@ -141,6 +123,7 @@ function resetUploadState(): void {
   uploadSubmitting.value = false
   uploadStage.value = 'idle'
   uploadError.value = ''
+  autoParseAfterUpload.value = true
 }
 
 function handleSelectFile(uploadFile: { raw?: File }): void {
@@ -175,6 +158,10 @@ async function handleUpload(): Promise<void> {
     uploadError.value = '当前文件类型暂不支持，请上传 Markdown、TXT、PDF、DOCX、PPTX、XLSX 或图片文件'
     return
   }
+  if (isOcrImageDocumentType(uploadDocType.value) && !uploadCapability.value?.ocrAvailable) {
+    uploadError.value = uploadCapability.value?.ocrMessage || '当前图片解析依赖 OCR，请先完成 OCR 环境配置'
+    return
+  }
 
   uploadSubmitting.value = true
   uploadError.value = ''
@@ -200,9 +187,19 @@ async function handleUpload(): Promise<void> {
       fileSize: file.size,
       contentHash: null,
     }
-    await createKnowledgeBaseDocument(knowledgeBaseId.value, payload)
+    const documentId = await createKnowledgeBaseDocument(knowledgeBaseId.value, payload)
 
-    ElMessage.success('文档已接入当前知识库')
+    let parseQueued = false
+    if (autoParseAfterUpload.value && documentId) {
+      try {
+        await triggerDocumentParse(documentId)
+        parseQueued = true
+      } catch (error) {
+        ElMessage.warning(`文档已上传，但自动解析提交失败：${resolveErrorMessage(error)}`)
+      }
+    }
+
+    ElMessage.success(parseQueued ? '文档已上传并加入解析队列' : '文档已接入当前知识库')
     uploadDialogVisible.value = false
     resetUploadState()
     documentPagination.pageNo = 1
@@ -222,6 +219,19 @@ async function handleUpload(): Promise<void> {
     if (uploadDialogVisible.value) {
       uploadStage.value = 'idle'
     }
+  }
+}
+
+async function loadUploadCapability(): Promise<void> {
+  uploadCapabilityLoading.value = true
+  uploadCapabilityError.value = ''
+  try {
+    uploadCapability.value = await getKnowledgeBaseDocumentUploadCapability()
+  } catch (error) {
+    uploadCapability.value = null
+    uploadCapabilityError.value = resolveErrorMessage(error)
+  } finally {
+    uploadCapabilityLoading.value = false
   }
 }
 
@@ -282,7 +292,7 @@ async function loadDocuments(): Promise<void> {
 }
 
 async function initialize(): Promise<void> {
-  await loadDetail()
+  await Promise.all([loadDetail(), loadUploadCapability()])
   if (!detailError.value) {
     await loadDocuments()
   }
@@ -331,6 +341,29 @@ async function handleDocumentDetail(documentId: number): Promise<void> {
   await router.push(`/documents/${documentId}`)
 }
 
+async function consumeEntryFlags(): Promise<void> {
+  const created = route.query.created === '1'
+  const openUpload = route.query.openUpload === '1'
+  if (!created && !openUpload) {
+    return
+  }
+
+  if (created) {
+    ElMessage.success('知识库创建成功，请继续上传文档')
+  }
+  if (openUpload) {
+    handleOpenUploadDialog()
+  }
+
+  const query = { ...route.query }
+  delete query.created
+  delete query.openUpload
+  await router.replace({
+    path: route.path,
+    query,
+  })
+}
+
 async function handleCurrentChange(pageNo: number): Promise<void> {
   documentPagination.pageNo = pageNo
   await loadDocuments()
@@ -344,6 +377,7 @@ async function handleSizeChange(pageSize: number): Promise<void> {
 
 onMounted(async () => {
   await initialize()
+  await consumeEntryFlags()
 })
 </script>
 
@@ -374,6 +408,7 @@ onMounted(async () => {
         </div>
         <div class="head-actions">
           <el-button @click="loadDetail">刷新详情</el-button>
+          <el-button type="primary" plain @click="handleOpenUploadDialog">上传文档</el-button>
           <el-button @click="handleBack">返回列表</el-button>
           <el-button type="primary" @click="handleEdit">编辑知识库</el-button>
         </div>
@@ -431,13 +466,35 @@ onMounted(async () => {
         <div class="section-head">
           <div>
             <h2>知识库文档</h2>
-            <p>当前已接入上传、解析与详情入口，本轮补齐基础筛选，提升文档管理可用性。</p>
+            <p>知识库创建后默认没有文档，需要先上传原始文件；上传成功后可自动进入解析队列。</p>
           </div>
           <div class="document-actions">
             <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
             <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
           </div>
         </div>
+
+        <el-alert
+          :type="uploadOcrAlertType"
+          :closable="false"
+          show-icon
+          class="capability-alert"
+          :title="`支持格式：${supportedDocTypesText}`"
+        >
+          <template #default>
+            <p class="capability-text">
+              OCR 状态：
+              {{
+                uploadCapabilityLoading
+                  ? '正在检查 OCR 环境...'
+                  : uploadCapability?.ocrMessage || uploadCapabilityError || '未获取到 OCR 状态'
+              }}
+            </p>
+            <p class="capability-text">
+              图片文件依赖 OCR；扫描版 PDF 在普通文本抽取为空时会自动尝试 OCR。
+            </p>
+          </template>
+        </el-alert>
 
         <section class="filter-panel">
           <div class="filter-grid">
@@ -478,6 +535,14 @@ onMounted(async () => {
 
         <template v-else>
           <el-table :data="documents" v-loading="documentLoading" empty-text="当前知识库暂无文档" stripe>
+            <template #empty>
+              <el-empty description="当前知识库还没有文档">
+                <template #description>
+                  <p class="error-text">先上传 PDF、Word、Markdown 或图片文件，再开始解析和向量化。</p>
+                </template>
+                <el-button type="primary" @click="handleOpenUploadDialog">上传第一份文档</el-button>
+              </el-empty>
+            </template>
             <el-table-column prop="documentId" label="文档编号" width="100" />
             <el-table-column prop="docName" label="文档名称" min-width="220" />
             <el-table-column prop="docType" label="类型" width="100" />
@@ -544,6 +609,7 @@ onMounted(async () => {
         <el-upload
           class="upload-box"
           drag
+          :accept="DOCUMENT_UPLOAD_ACCEPT"
           :auto-upload="false"
           :limit="1"
           :show-file-list="true"
@@ -554,10 +620,25 @@ onMounted(async () => {
           <div class="el-upload__text">将文件拖到此处，或 <em>点击选择</em></div>
           <template #tip>
             <div class="el-upload__tip">
-              当前支持单文件上传，文档类型按文件扩展名自动推断。
+              当前支持单文件上传，文档类型按扩展名自动推断。图片与扫描版 PDF 依赖 OCR。
             </div>
           </template>
         </el-upload>
+
+        <el-alert
+          v-if="isPdfDocumentType(uploadDocType) && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
+          type="warning"
+          :closable="false"
+          show-icon
+          title="当前 OCR 未就绪，扫描版 PDF 可能无法抽取到文本。"
+        />
+        <el-alert
+          v-else-if="isOcrImageDocumentType(uploadDocType) && uploadCapability?.ocrEnabled && !uploadCapability?.ocrAvailable"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="uploadCapability?.ocrMessage || '当前图片解析依赖 OCR，请先完成 OCR 环境配置。'"
+        />
 
         <div class="upload-meta soft-panel" v-if="selectedFile">
           <article class="upload-meta-item">
@@ -573,6 +654,11 @@ onMounted(async () => {
             <strong>{{ uploadDocType }}</strong>
           </article>
         </div>
+
+        <label class="upload-option">
+          <el-checkbox v-model="autoParseAfterUpload">上传后立即解析</el-checkbox>
+          <span>推荐开启，上传完成后系统会自动提交解析任务。</span>
+        </label>
 
         <el-alert
           v-if="uploadError"
@@ -632,6 +718,19 @@ onMounted(async () => {
 .document-actions {
   display: flex;
   gap: 12px;
+}
+
+.capability-alert {
+  margin-bottom: 18px;
+}
+
+.capability-text {
+  margin: 0;
+  line-height: 1.7;
+}
+
+.capability-text + .capability-text {
+  margin-top: 6px;
 }
 
 .filter-panel {
@@ -780,6 +879,17 @@ onMounted(async () => {
   word-break: break-word;
 }
 
+.upload-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 16px;
+  border-radius: 16px;
+  background: rgba(255, 250, 242, 0.72);
+  color: #6d5948;
+}
+
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -799,7 +909,8 @@ onMounted(async () => {
   .document-actions,
   .filter-grid,
   .overview-grid,
-  .detail-matrix {
+  .detail-matrix,
+  .upload-option {
     grid-template-columns: 1fr;
   }
 
@@ -820,7 +931,8 @@ onMounted(async () => {
   .document-actions,
   .filter-actions,
   .dialog-actions,
-  .error-actions {
+  .error-actions,
+  .upload-option {
     flex-direction: column;
   }
 }

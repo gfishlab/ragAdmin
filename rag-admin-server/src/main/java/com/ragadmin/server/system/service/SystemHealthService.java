@@ -2,7 +2,8 @@ package com.ragadmin.server.system.service;
 
 import com.ragadmin.server.infra.ai.bailian.BailianApiSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
-import com.ragadmin.server.document.parser.DocumentOcrProperties;
+import com.ragadmin.server.document.parser.OcrCapability;
+import com.ragadmin.server.document.parser.TesseractOcrService;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
@@ -48,7 +49,7 @@ public class SystemHealthService {
     private MilvusProperties milvusProperties;
 
     @Autowired
-    private DocumentOcrProperties documentOcrProperties;
+    private TesseractOcrService tesseractOcrService;
 
     @Autowired
     private ChunkVectorRefMapper chunkVectorRefMapper;
@@ -209,27 +210,13 @@ public class SystemHealthService {
     }
 
     private DependencyHealthResponse checkOcr() {
-        if (!documentOcrProperties.isEnabled()) {
+        OcrCapability capability = tesseractOcrService.describeCapability();
+        if (!capability.enabled()) {
             return new DependencyHealthResponse("UNKNOWN", "OCR 已禁用");
         }
-        if (!StringUtils.hasText(documentOcrProperties.getTesseractCommand())) {
-            return new DependencyHealthResponse("UNKNOWN", "Tesseract 命令未配置");
-        }
-        try {
-            Process process = new ProcessBuilder(documentOcrProperties.getTesseractCommand(), "--version")
-                    .redirectErrorStream(true)
-                    .start();
-            String output = new String(process.getInputStream().readAllBytes());
-            int exitCode = process.waitFor();
-            if (exitCode != 0) {
-                return new DependencyHealthResponse("DOWN", "Tesseract 检查失败");
-            }
-            String firstLine = output == null ? "" : output.lines().findFirst().orElse("");
-            String message = StringUtils.hasText(firstLine) ? firstLine.trim() : "Tesseract 可用";
-            return new DependencyHealthResponse("UP", message);
-        } catch (Exception ex) {
-            return new DependencyHealthResponse("DOWN", buildMessage("Tesseract 检查失败", ex));
-        }
+        return capability.available()
+                ? new DependencyHealthResponse("UP", capability.message())
+                : new DependencyHealthResponse("DOWN", capability.message());
     }
 
     private String buildMessage(String prefix, Exception ex) {

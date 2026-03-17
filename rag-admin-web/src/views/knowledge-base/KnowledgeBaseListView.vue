@@ -73,6 +73,15 @@ async function handleDetail(id: number): Promise<void> {
   await router.push(`/knowledge-bases/${id}`)
 }
 
+async function handleUpload(id: number): Promise<void> {
+  await router.push({
+    path: `/knowledge-bases/${id}`,
+    query: {
+      openUpload: '1',
+    },
+  })
+}
+
 async function handleDelete(item: KnowledgeBase): Promise<void> {
   try {
     await ElMessageBox.confirm(
@@ -181,9 +190,10 @@ onMounted(async () => {
             {{ row.description || '暂无描述' }}
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <el-button link @click="handleDetail(row.id)">详情</el-button>
+            <el-button link type="primary" @click="handleUpload(row.id)">上传文档</el-button>
             <el-button link type="primary" @click="handleEdit(row.id)">编辑</el-button>
             <el-button link type="danger" @click="handleDelete(row)">删除</el-button>
           </template>

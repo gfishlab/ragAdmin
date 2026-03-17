@@ -48,6 +48,16 @@ export interface UploadUrlResponse {
   uploadUrl: string
 }
 
+export interface DocumentUploadCapability {
+  ocrEnabled: boolean
+  ocrAvailable: boolean
+  ocrMessage: string
+  ocrLanguage: string
+  ocrMaxPdfPages: number
+  supportedDocTypes: string[]
+  ocrImageDocTypes: string[]
+}
+
 export interface CreateKnowledgeBaseDocumentRequest {
   docName: string
   docType: string

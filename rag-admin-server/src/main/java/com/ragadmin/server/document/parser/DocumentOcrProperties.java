@@ -7,6 +7,7 @@ public class DocumentOcrProperties {
 
     private boolean enabled = false;
     private String tesseractCommand = "tesseract";
+    private String dataPath;
     private String language = "chi_sim+eng";
     private int maxPdfPages = 5;
 
@@ -32,6 +33,14 @@ public class DocumentOcrProperties {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    public String getDataPath() {
+        return dataPath;
+    }
+
+    public void setDataPath(String dataPath) {
+        this.dataPath = dataPath;
     }
 
     public int getMaxPdfPages() {
