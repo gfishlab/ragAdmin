@@ -23,6 +23,9 @@ import com.ragadmin.server.knowledge.controller.KnowledgeBaseController;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.model.controller.ModelController;
+import com.ragadmin.server.model.dto.ModelResponse;
+import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.system.controller.SystemHealthController;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
 import com.ragadmin.server.system.dto.HealthCheckResponse;
@@ -48,11 +51,14 @@ import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -79,6 +85,9 @@ class AdminApiWebMvcTest {
 
     @Mock
     private SystemHealthService systemHealthService;
+
+    @Mock
+    private ModelService modelService;
 
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
@@ -108,6 +117,9 @@ class AdminApiWebMvcTest {
         SystemHealthController systemHealthController = new SystemHealthController();
         ReflectionTestUtils.setField(systemHealthController, "systemHealthService", systemHealthService);
 
+        ModelController modelController = new ModelController();
+        ReflectionTestUtils.setField(modelController, "modelService", modelService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -123,7 +135,8 @@ class AdminApiWebMvcTest {
                         knowledgeBaseController,
                         documentController,
                         fileController,
-                        systemHealthController
+                        systemHealthController,
+                        modelController
                 )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
@@ -407,6 +420,56 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.postgres.status").value("UP"))
                 .andExpect(jsonPath("$.data.bailian.status").value("UP"))
                 .andExpect(jsonPath("$.data.milvus.status").value("UP"));
+    }
+
+    @Test
+    void shouldUpdateModelWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(modelService.update(eq(5L), any())).thenReturn(new ModelResponse(
+                5L,
+                1L,
+                "BAILIAN",
+                "阿里百炼",
+                "deepseek-v3.2",
+                "deepseek-v3.2",
+                List.of("TEXT_GENERATION"),
+                "CHAT",
+                null,
+                null,
+                "ENABLED"
+        ));
+
+        protectedMockMvc.perform(put("/api/admin/models/5")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "providerId": 1,
+                                  "modelCode": "deepseek-v3.2",
+                                  "modelName": "deepseek-v3.2",
+                                  "capabilityTypes": ["TEXT_GENERATION"],
+                                  "modelType": "CHAT",
+                                  "status": "ENABLED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.id").value(5))
+                .andExpect(jsonPath("$.data.capabilityTypes[0]").value("TEXT_GENERATION"));
+    }
+
+    @Test
+    void shouldDeleteModelWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        doNothing().when(modelService).delete(5L);
+
+        protectedMockMvc.perform(delete("/api/admin/models/5")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data").doesNotExist());
+
+        verify(modelService).delete(5L);
     }
 
     private AuthenticatedUser authenticatedUser() {
