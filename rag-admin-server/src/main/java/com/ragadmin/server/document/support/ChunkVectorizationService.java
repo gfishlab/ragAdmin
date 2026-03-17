@@ -20,6 +20,11 @@ import java.util.Map;
 @Service
 public class ChunkVectorizationService {
 
+    /**
+     * 百炼 Embedding 单次请求最多接收 25 条文本，这里按固定批次拆分，避免大文档切片过多时整批失败。
+     */
+    static final int EMBEDDING_BATCH_SIZE = 25;
+
     private final ModelService modelService;
     private final EmbeddingClientRegistry embeddingClientRegistry;
     private final MilvusVectorStoreClient milvusVectorStoreClient;
@@ -44,7 +49,10 @@ public class ChunkVectorizationService {
         }
         EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
         EmbeddingModelClient client = embeddingClientRegistry.getClient(descriptor.providerCode());
-        List<List<Float>> embeddings = client.embed(descriptor.modelCode(), chunks.stream().map(ChunkEntity::getChunkText).toList());
+        List<List<Float>> embeddings = java.util.stream.IntStream.iterate(0, index -> index < chunks.size(), index -> index + EMBEDDING_BATCH_SIZE)
+                .mapToObj(start -> embedBatch(client, descriptor.modelCode(), chunks, start))
+                .flatMap(List::stream)
+                .toList();
         if (embeddings.size() != chunks.size()) {
             throw new BusinessException("EMBEDDING_SIZE_MISMATCH", "Embedding 返回数量与 chunk 数量不一致", HttpStatus.BAD_GATEWAY);
         }
@@ -67,6 +75,19 @@ public class ChunkVectorizationService {
             ref.setStatus("ENABLED");
             chunkVectorRefMapper.insert(ref);
         }
+    }
+
+    private List<List<Float>> embedBatch(
+            EmbeddingModelClient client,
+            String modelCode,
+            List<ChunkEntity> chunks,
+            int start
+    ) {
+        int end = Math.min(start + EMBEDDING_BATCH_SIZE, chunks.size());
+        List<String> inputs = chunks.subList(start, end).stream()
+                .map(ChunkEntity::getChunkText)
+                .toList();
+        return client.embed(modelCode, inputs);
     }
 
     @Transactional

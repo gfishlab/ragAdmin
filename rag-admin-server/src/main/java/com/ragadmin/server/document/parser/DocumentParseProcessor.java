@@ -87,8 +87,16 @@ public class DocumentParseProcessor {
     }
 
     public void processSingleTask(Long taskId) {
+        ProcessingContext context;
         try {
-            ProcessingContext context = markRunning(taskId);
+            context = markRunning(taskId);
+        } catch (IllegalStateException ex) {
+            // 调度轮询与多实例并发场景下，任务可能已被其他工作线程抢占，这里按已处理跳过，避免误标记失败。
+            log.warn("解析任务跳过执行，taskId={}, reason={}", taskId, ex.getMessage());
+            return;
+        }
+
+        try {
             KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(context.document().getKbId());
 
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
