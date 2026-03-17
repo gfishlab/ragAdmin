@@ -5,12 +5,15 @@ import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
 import com.ragadmin.server.model.dto.ModelResponse;
+import com.ragadmin.server.model.dto.UpdateModelRequest;
 import com.ragadmin.server.model.service.ModelService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -37,6 +40,17 @@ public class ModelController {
     @PostMapping
     public ApiResponse<ModelResponse> create(@Valid @RequestBody CreateModelRequest request) {
         return ApiResponse.success(modelService.create(request));
+    }
+
+    @PutMapping("/{modelId}")
+    public ApiResponse<ModelResponse> update(@PathVariable Long modelId, @Valid @RequestBody UpdateModelRequest request) {
+        return ApiResponse.success(modelService.update(modelId, request));
+    }
+
+    @DeleteMapping("/{modelId}")
+    public ApiResponse<Void> delete(@PathVariable Long modelId) {
+        modelService.delete(modelId);
+        return ApiResponse.success(null);
     }
 
     @PostMapping("/{modelId}/health-check")

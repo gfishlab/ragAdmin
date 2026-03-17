@@ -6,6 +6,7 @@ import type {
   ModelProvider,
   ModelProviderCreateRequest,
   ModelProviderHealthCheck,
+  UpdateModelRequest,
 } from '@/types/model'
 import { http, unwrapResponse } from './http'
 
@@ -44,6 +45,16 @@ export async function listModels(query: ModelListQuery): Promise<PageResponse<Mo
 export async function createModel(payload: ModelCreateRequest): Promise<ModelDefinition> {
   const response = await http.post<ApiResponse<ModelDefinition>>('/admin/models', payload)
   return unwrapResponse(response.data)
+}
+
+export async function updateModel(modelId: number, payload: UpdateModelRequest): Promise<ModelDefinition> {
+  const response = await http.put<ApiResponse<ModelDefinition>>(`/admin/models/${modelId}`, payload)
+  return unwrapResponse(response.data)
+}
+
+export async function deleteModel(modelId: number): Promise<void> {
+  const response = await http.delete<ApiResponse<null>>(`/admin/models/${modelId}`)
+  unwrapResponse(response.data)
 }
 
 export async function healthCheckModel(modelId: number): Promise<ModelHealthCheck> {

@@ -2,8 +2,12 @@ package com.ragadmin.server.model.service;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.ragadmin.server.chat.entity.ChatMessageEntity;
+import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
+import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
@@ -11,10 +15,13 @@ import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
+import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
+import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
+import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelCapabilityHealthResponse;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
-import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelResponse;
+import com.ragadmin.server.model.dto.UpdateModelRequest;
 import com.ragadmin.server.model.entity.AiModelCapabilityEntity;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.entity.AiProviderEntity;
@@ -44,6 +51,15 @@ public class ModelService {
 
     @Autowired
     private AiModelCapabilityMapper aiModelCapabilityMapper;
+
+    @Autowired
+    private KnowledgeBaseMapper knowledgeBaseMapper;
+
+    @Autowired
+    private ChunkVectorRefMapper chunkVectorRefMapper;
+
+    @Autowired
+    private ChatMessageMapper chatMessageMapper;
 
     @Autowired
     private ModelProviderService modelProviderService;
@@ -118,13 +134,8 @@ public class ModelService {
     @Transactional
     public ModelResponse create(CreateModelRequest request) {
         AiProviderEntity provider = modelProviderService.requireProvider(request.getProviderId());
-        AiModelEntity existing = aiModelMapper.selectOne(new LambdaQueryWrapper<AiModelEntity>()
-                .eq(AiModelEntity::getProviderId, request.getProviderId())
-                .eq(AiModelEntity::getModelCode, request.getModelCode())
-                .last("LIMIT 1"));
-        if (existing != null) {
-            throw new BusinessException("MODEL_CODE_EXISTS", "模型编码已存在", HttpStatus.BAD_REQUEST);
-        }
+        List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
+        ensureModelCodeUnique(null, request.getProviderId(), request.getModelCode());
 
         AiModelEntity entity = new AiModelEntity();
         entity.setProviderId(request.getProviderId());
@@ -135,16 +146,39 @@ public class ModelService {
         entity.setTemperatureDefault(request.getTemperatureDefault());
         entity.setStatus(request.getStatus());
         aiModelMapper.insert(entity);
+        replaceCapabilities(entity.getId(), capabilityTypes);
 
-        for (String capabilityType : request.getCapabilityTypes().stream().distinct().toList()) {
-            AiModelCapabilityEntity capability = new AiModelCapabilityEntity();
-            capability.setModelId(entity.getId());
-            capability.setCapabilityType(capabilityType);
-            capability.setEnabled(Boolean.TRUE);
-            aiModelCapabilityMapper.insert(capability);
-        }
+        return toResponse(entity, provider, capabilityTypes);
+    }
 
-        return toResponse(entity, provider, request.getCapabilityTypes().stream().distinct().toList());
+    @Transactional
+    public ModelResponse update(Long modelId, UpdateModelRequest request) {
+        AiModelEntity entity = requireModel(modelId);
+        AiProviderEntity provider = modelProviderService.requireProvider(request.getProviderId());
+        List<String> capabilityTypes = validateCapabilityTypes(request.getModelType(), request.getCapabilityTypes());
+        ensureModelCodeUnique(modelId, request.getProviderId(), request.getModelCode());
+        validateCapabilityReferenceChange(modelId, capabilityTypes);
+
+        entity.setProviderId(request.getProviderId());
+        entity.setModelCode(request.getModelCode());
+        entity.setModelName(request.getModelName());
+        entity.setModelType(request.getModelType());
+        entity.setMaxTokens(request.getMaxTokens());
+        entity.setTemperatureDefault(request.getTemperatureDefault());
+        entity.setStatus(request.getStatus());
+        aiModelMapper.updateById(entity);
+        replaceCapabilities(modelId, capabilityTypes);
+
+        return toResponse(entity, provider, capabilityTypes);
+    }
+
+    @Transactional
+    public void delete(Long modelId) {
+        AiModelEntity model = requireModel(modelId);
+        validateDeleteReference(modelId, model.getModelName());
+        aiModelCapabilityMapper.delete(new LambdaQueryWrapper<AiModelCapabilityEntity>()
+                .eq(AiModelCapabilityEntity::getModelId, modelId));
+        aiModelMapper.deleteById(modelId);
     }
 
     public AiModelEntity requireModelWithCapability(Long modelId, String capabilityType) {
@@ -233,6 +267,29 @@ public class ModelService {
         );
     }
 
+    private void ensureModelCodeUnique(Long currentModelId, Long providerId, String modelCode) {
+        AiModelEntity existing = aiModelMapper.selectOne(new LambdaQueryWrapper<AiModelEntity>()
+                .eq(AiModelEntity::getProviderId, providerId)
+                .eq(AiModelEntity::getModelCode, modelCode)
+                .ne(currentModelId != null, AiModelEntity::getId, currentModelId)
+                .last("LIMIT 1"));
+        if (existing != null) {
+            throw new BusinessException("MODEL_CODE_EXISTS", "模型编码已存在", HttpStatus.BAD_REQUEST);
+        }
+    }
+
+    private void replaceCapabilities(Long modelId, List<String> capabilityTypes) {
+        aiModelCapabilityMapper.delete(new LambdaQueryWrapper<AiModelCapabilityEntity>()
+                .eq(AiModelCapabilityEntity::getModelId, modelId));
+        for (String capabilityType : capabilityTypes) {
+            AiModelCapabilityEntity capability = new AiModelCapabilityEntity();
+            capability.setModelId(modelId);
+            capability.setCapabilityType(capabilityType);
+            capability.setEnabled(Boolean.TRUE);
+            aiModelCapabilityMapper.insert(capability);
+        }
+    }
+
     private ModelCapabilityHealthResponse checkCapability(AiProviderEntity provider, AiModelEntity model, String capabilityType) {
         try {
             if ("TEXT_GENERATION".equals(capabilityType)) {
@@ -266,6 +323,75 @@ public class ModelService {
             throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
         }
         return provider;
+    }
+
+    private List<String> validateCapabilityTypes(String modelType, List<String> capabilityTypes) {
+        if (!StringUtils.hasText(modelType)) {
+            throw new BusinessException("MODEL_TYPE_INVALID", "模型类型不能为空", HttpStatus.BAD_REQUEST);
+        }
+        List<String> distinctCapabilityTypes = capabilityTypes == null ? List.of() : capabilityTypes.stream().distinct().toList();
+        if (distinctCapabilityTypes.isEmpty()) {
+            throw new BusinessException("MODEL_CAPABILITY_EMPTY", "模型未配置能力类型", HttpStatus.BAD_REQUEST);
+        }
+        if ("CHAT".equalsIgnoreCase(modelType)) {
+            if (!distinctCapabilityTypes.equals(List.of("TEXT_GENERATION"))) {
+                throw new BusinessException("MODEL_CAPABILITY_INVALID", "聊天模型只能配置文本生成能力", HttpStatus.BAD_REQUEST);
+            }
+            return distinctCapabilityTypes;
+        }
+        if ("EMBEDDING".equalsIgnoreCase(modelType)) {
+            if (!distinctCapabilityTypes.equals(List.of("EMBEDDING"))) {
+                throw new BusinessException("MODEL_CAPABILITY_INVALID", "向量模型只能配置向量生成能力", HttpStatus.BAD_REQUEST);
+            }
+            return distinctCapabilityTypes;
+        }
+        throw new BusinessException("MODEL_TYPE_INVALID", "当前仅支持 CHAT 或 EMBEDDING 模型类型", HttpStatus.BAD_REQUEST);
+    }
+
+    private void validateCapabilityReferenceChange(Long modelId, List<String> capabilityTypes) {
+        boolean hasEmbeddingCapability = capabilityTypes.contains("EMBEDDING");
+        boolean hasChatCapability = capabilityTypes.contains("TEXT_GENERATION");
+        if (!hasEmbeddingCapability) {
+            Long embeddingRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
+                    .eq(KnowledgeBaseEntity::getEmbeddingModelId, modelId));
+            if (embeddingRefCount != null && embeddingRefCount > 0) {
+                throw new BusinessException("MODEL_CAPABILITY_IN_USE", "当前模型已被知识库作为向量模型使用，不能移除向量能力", HttpStatus.BAD_REQUEST);
+            }
+            Long vectorRefCount = chunkVectorRefMapper.selectCount(new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                    .eq(ChunkVectorRefEntity::getEmbeddingModelId, modelId));
+            if (vectorRefCount != null && vectorRefCount > 0) {
+                throw new BusinessException("MODEL_CAPABILITY_IN_USE", "当前模型已存在向量索引引用，不能移除向量能力", HttpStatus.BAD_REQUEST);
+            }
+        }
+        if (!hasChatCapability) {
+            Long chatRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
+                    .eq(KnowledgeBaseEntity::getChatModelId, modelId));
+            if (chatRefCount != null && chatRefCount > 0) {
+                throw new BusinessException("MODEL_CAPABILITY_IN_USE", "当前模型已被知识库作为对话模型使用，不能移除文本生成能力", HttpStatus.BAD_REQUEST);
+            }
+        }
+    }
+
+    private void validateDeleteReference(Long modelId, String modelName) {
+        Long kbRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
+                .and(wrapper -> wrapper.eq(KnowledgeBaseEntity::getEmbeddingModelId, modelId)
+                        .or()
+                        .eq(KnowledgeBaseEntity::getChatModelId, modelId)));
+        if (kbRefCount != null && kbRefCount > 0) {
+            throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已被知识库引用，不能删除", HttpStatus.BAD_REQUEST);
+        }
+
+        Long vectorRefCount = chunkVectorRefMapper.selectCount(new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                .eq(ChunkVectorRefEntity::getEmbeddingModelId, modelId));
+        if (vectorRefCount != null && vectorRefCount > 0) {
+            throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已存在向量索引引用，不能删除", HttpStatus.BAD_REQUEST);
+        }
+
+        Long messageRefCount = chatMessageMapper.selectCount(new LambdaQueryWrapper<ChatMessageEntity>()
+                .eq(ChatMessageEntity::getModelId, modelId));
+        if (messageRefCount != null && messageRefCount > 0) {
+            throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已存在历史对话记录引用，不能删除", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private EmbeddingModelDescriptor resolveDefaultEmbeddingModelDescriptor() {

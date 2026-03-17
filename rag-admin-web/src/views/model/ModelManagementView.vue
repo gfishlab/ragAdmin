@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import type {
   ModelCreateRequest,
   ModelDefinition,
@@ -8,14 +8,17 @@ import type {
   ModelProvider,
   ModelProviderCreateRequest,
   ModelProviderHealthCheck,
+  UpdateModelRequest,
 } from '@/types/model'
 import {
   createModel,
   createModelProvider,
+  deleteModel,
   healthCheckModel,
   healthCheckModelProvider,
   listModelProviders,
   listModels,
+  updateModel,
 } from '@/api/model'
 import { resolveErrorMessage } from '@/api/http'
 
@@ -30,6 +33,8 @@ const activeProviderHealthId = ref<number | null>(null)
 const modelLoading = ref(false)
 const modelSubmitting = ref(false)
 const modelDialogVisible = ref(false)
+const modelDialogMode = ref<'create' | 'edit'>('create')
+const editingModelId = ref<number | null>(null)
 const modelCheckingIds = ref<number[]>([])
 const models = ref<ModelDefinition[]>([])
 const modelHealthResult = ref<ModelHealthCheck | null>(null)
@@ -60,7 +65,7 @@ const modelForm = reactive<ModelCreateRequest>({
   providerId: null,
   modelCode: '',
   modelName: '',
-  capabilityTypes: [],
+  capabilityTypes: ['TEXT_GENERATION'],
   modelType: 'CHAT',
   maxTokens: null,
   temperatureDefault: 0.7,
@@ -89,6 +94,14 @@ const modelTypeOptions = [
 const modelCapabilityCreateOptions = capabilityOptions.filter((item) => item.value)
 
 const hasModelData = computed(() => models.value.length > 0)
+const modelDialogTitle = computed(() => (modelDialogMode.value === 'create' ? '新增模型定义' : '编辑模型定义'))
+const modelDialogConfirmText = computed(() => (modelDialogMode.value === 'create' ? '确认创建' : '确认保存'))
+const modelCapabilityHint = computed(() => {
+  if (modelForm.modelType === 'EMBEDDING') {
+    return '向量模型只允许保留“向量生成”能力。'
+  }
+  return '聊天模型只允许保留“文本生成”能力，像 deepseek-v3.2 这类模型不要勾选向量生成。'
+})
 
 function statusTagType(status: string): 'success' | 'info' | 'warning' | 'danger' {
   if (status === 'ENABLED' || status === 'UP' || status === 'SUCCESS') {
@@ -138,6 +151,20 @@ function providerNameById(providerId: number | null): string {
   return providers.value.find((item) => item.id === providerId)?.providerName ?? `#${providerId}`
 }
 
+function allowedCapabilityTypes(modelType: string): string[] {
+  return modelType === 'EMBEDDING' ? ['EMBEDDING'] : ['TEXT_GENERATION']
+}
+
+function normalizeCapabilityTypes(modelType: string, capabilityTypes: string[]): string[] {
+  const allowed = allowedCapabilityTypes(modelType)
+  const normalized = capabilityTypes.filter((item) => allowed.includes(item))
+  return normalized.length > 0 ? normalized : allowed
+}
+
+function capabilityDisabled(capability: string): boolean {
+  return !allowedCapabilityTypes(modelForm.modelType).includes(capability)
+}
+
 function resetProviderForm(): void {
   providerForm.providerCode = ''
   providerForm.providerName = ''
@@ -147,15 +174,54 @@ function resetProviderForm(): void {
 }
 
 function resetModelForm(): void {
+  editingModelId.value = null
+  modelDialogMode.value = 'create'
   modelForm.providerId = null
   modelForm.modelCode = ''
   modelForm.modelName = ''
-  modelForm.capabilityTypes = []
+  modelForm.capabilityTypes = ['TEXT_GENERATION']
   modelForm.modelType = 'CHAT'
   modelForm.maxTokens = null
   modelForm.temperatureDefault = 0.7
   modelForm.status = 'ENABLED'
 }
+
+function openCreateModelDialog(): void {
+  resetModelForm()
+  modelDialogVisible.value = true
+}
+
+function openEditModelDialog(model: ModelDefinition): void {
+  modelDialogMode.value = 'edit'
+  editingModelId.value = model.id
+  modelForm.providerId = model.providerId
+  modelForm.modelCode = model.modelCode
+  modelForm.modelName = model.modelName
+  modelForm.modelType = model.modelType
+  modelForm.capabilityTypes = normalizeCapabilityTypes(model.modelType, model.capabilityTypes)
+  modelForm.maxTokens = model.maxTokens ?? null
+  modelForm.temperatureDefault = model.temperatureDefault ?? 0.7
+  modelForm.status = model.status
+  modelDialogVisible.value = true
+}
+
+watch(
+  () => modelForm.modelType,
+  (modelType) => {
+    modelForm.capabilityTypes = normalizeCapabilityTypes(modelType, modelForm.capabilityTypes)
+  },
+  { immediate: true },
+)
+
+watch(
+  () => modelForm.capabilityTypes.join(','),
+  () => {
+    const normalized = normalizeCapabilityTypes(modelForm.modelType, modelForm.capabilityTypes)
+    if (normalized.join(',') !== modelForm.capabilityTypes.join(',')) {
+      modelForm.capabilityTypes = normalized
+    }
+  },
+)
 
 async function loadProviders(): Promise<void> {
   providerLoading.value = true
@@ -244,24 +310,66 @@ async function handleCreateProvider(): Promise<void> {
   }
 }
 
-async function handleCreateModel(): Promise<void> {
+function buildModelPayload(): ModelCreateRequest | UpdateModelRequest {
+  return {
+    ...modelForm,
+    modelCode: modelForm.modelCode.trim(),
+    modelName: modelForm.modelName.trim(),
+    capabilityTypes: normalizeCapabilityTypes(modelForm.modelType, modelForm.capabilityTypes),
+    maxTokens: modelForm.maxTokens || null,
+    temperatureDefault: modelForm.temperatureDefault ?? null,
+  }
+}
+
+async function handleSaveModel(): Promise<void> {
   modelSubmitting.value = true
   try {
-    await createModel({
-      ...modelForm,
-      modelCode: modelForm.modelCode.trim(),
-      modelName: modelForm.modelName.trim(),
-      maxTokens: modelForm.maxTokens || null,
-      temperatureDefault: modelForm.temperatureDefault ?? null,
-    })
+    const payload = buildModelPayload()
+    if (modelDialogMode.value === 'create') {
+      await createModel(payload)
+      ElMessage.success('模型创建成功')
+    } else if (editingModelId.value) {
+      await updateModel(editingModelId.value, payload)
+      ElMessage.success('模型配置已更新')
+    }
     modelDialogVisible.value = false
     resetModelForm()
     await loadModels()
-    ElMessage.success('模型创建成功')
   } catch (error) {
     ElMessage.error(resolveErrorMessage(error))
   } finally {
     modelSubmitting.value = false
+  }
+}
+
+async function handleDeleteModel(model: ModelDefinition): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `删除后无法恢复，确定删除模型“${model.modelName}”吗？`,
+      '删除模型',
+      {
+        confirmButtonText: '确认删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+      },
+    )
+  } catch {
+    return
+  }
+
+  try {
+    await deleteModel(model.id)
+    if (activeModelHealthId.value === model.id) {
+      activeModelHealthId.value = null
+      modelHealthResult.value = null
+    }
+    if (models.value.length === 1 && pagination.pageNo > 1) {
+      pagination.pageNo -= 1
+    }
+    await loadModels()
+    ElMessage.success('模型已删除')
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
   }
 }
 
@@ -300,13 +408,13 @@ onMounted(async () => {
       <div>
         <h1 class="page-title">模型管理</h1>
         <p class="page-subtitle">
-          当前页面用于集中管理模型提供方与模型定义，先支持列表、筛选、探活和新增，保证联调闭环最短。
+          当前页面集中管理模型提供方与模型定义，已支持列表、筛选、探活、新增、编辑和删除，避免错误模型能力配置继续流入联调链路。
         </p>
       </div>
       <div class="head-actions">
         <el-button @click="loadPageData">刷新页面</el-button>
         <el-button type="primary" @click="providerDialogVisible = true">新增提供方</el-button>
-        <el-button type="primary" plain @click="modelDialogVisible = true">新增模型</el-button>
+        <el-button type="primary" plain @click="openCreateModelDialog">新增模型</el-button>
       </div>
     </header>
 
@@ -323,8 +431,8 @@ onMounted(async () => {
       </article>
       <article class="summary-card soft-panel">
         <span>当前目标</span>
-        <strong>联调闭环</strong>
-        <p>先把提供方、模型和探活入口统一收敛到一个管理页。</p>
+        <strong>配置收口</strong>
+        <p>把模型新增、编辑、删除和探活统一收敛到一个管理页。</p>
       </article>
     </div>
 
@@ -405,7 +513,7 @@ onMounted(async () => {
       <div class="section-head">
         <div>
           <h2 class="section-title">模型定义</h2>
-          <p class="section-subtitle">支持按提供方、能力和状态筛选，优先保证探活与新增闭环。</p>
+          <p class="section-subtitle">支持按提供方、能力和状态筛选，并提供编辑、删除和探活能力。</p>
         </div>
       </div>
 
@@ -490,16 +598,20 @@ onMounted(async () => {
             <el-tag :type="statusTagType(row.status)">{{ row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="160" fixed="right">
+        <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button
-              link
-              type="primary"
-              :loading="modelChecking(row.id)"
-              @click="handleModelHealthCheck(row)"
-            >
-              探活
-            </el-button>
+            <div class="action-links">
+              <el-button link type="primary" @click="openEditModelDialog(row)">编辑</el-button>
+              <el-button
+                link
+                type="primary"
+                :loading="modelChecking(row.id)"
+                @click="handleModelHealthCheck(row)"
+              >
+                探活
+              </el-button>
+              <el-button link type="danger" @click="handleDeleteModel(row)">删除</el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -584,7 +696,7 @@ onMounted(async () => {
       </template>
     </el-dialog>
 
-    <el-dialog v-model="modelDialogVisible" title="新增模型定义" width="620px">
+    <el-dialog v-model="modelDialogVisible" :title="modelDialogTitle" width="620px" @closed="resetModelForm">
       <el-form label-position="top">
         <el-form-item label="提供方">
           <el-select v-model="modelForm.providerId" placeholder="请选择模型提供方">
@@ -597,7 +709,7 @@ onMounted(async () => {
           </el-select>
         </el-form-item>
         <el-form-item label="模型编码">
-          <el-input v-model="modelForm.modelCode" placeholder="例如 qwen-max / text-embedding-v3" />
+          <el-input v-model="modelForm.modelCode" placeholder="例如 qwen-max / text-embedding-v3 / deepseek-v3.2" />
         </el-form-item>
         <el-form-item label="模型名称">
           <el-input v-model="modelForm.modelName" placeholder="请输入模型展示名称" />
@@ -608,10 +720,12 @@ onMounted(async () => {
               v-for="item in modelCapabilityCreateOptions"
               :key="item.value"
               :label="item.value"
+              :disabled="capabilityDisabled(item.value)"
             >
               {{ item.label }}
             </el-checkbox>
           </el-checkbox-group>
+          <div class="capability-hint">{{ modelCapabilityHint }}</div>
         </el-form-item>
         <div class="form-grid">
           <el-form-item label="模型类型">
@@ -657,8 +771,8 @@ onMounted(async () => {
       <template #footer>
         <div class="dialog-footer">
           <el-button @click="modelDialogVisible = false">取消</el-button>
-          <el-button type="primary" :loading="modelSubmitting" @click="handleCreateModel">
-            确认创建
+          <el-button type="primary" :loading="modelSubmitting" @click="handleSaveModel">
+            {{ modelDialogConfirmText }}
           </el-button>
         </div>
       </template>
@@ -718,7 +832,8 @@ onMounted(async () => {
 .summary-card p,
 .section-subtitle,
 .health-message,
-.provider-tip {
+.provider-tip,
+.capability-hint {
   margin: 12px 0 0;
   color: #6d5948;
 }
@@ -761,7 +876,8 @@ onMounted(async () => {
   margin-top: 18px;
 }
 
-.capability-list {
+.capability-list,
+.action-links {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -813,7 +929,8 @@ onMounted(async () => {
   color: #8d4510;
 }
 
-.provider-tip {
+.provider-tip,
+.capability-hint {
   font-size: 13px;
 }
 

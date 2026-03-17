@@ -40,6 +40,17 @@ export interface ModelCreateRequest {
   status: string
 }
 
+export interface UpdateModelRequest {
+  providerId: number | null
+  modelCode: string
+  modelName: string
+  capabilityTypes: string[]
+  modelType: string
+  maxTokens?: number | null
+  temperatureDefault?: number | null
+  status: string
+}
+
 export interface ModelCapabilityHealthCheck {
   capabilityType: string
   status: string
