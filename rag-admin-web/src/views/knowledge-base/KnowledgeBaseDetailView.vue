@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import type { UploadFile, UploadFiles, UploadUserFile } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import { subscribeKnowledgeBaseDocumentEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import {
   createKnowledgeBaseDocument,
   deleteKnowledgeBaseDocument,
@@ -13,7 +14,9 @@ import {
   triggerDocumentParse,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
+import type { TaskRealtimeEvent } from '@/types/realtime'
 import { DOCUMENT_UPLOAD_ACCEPT, inferDocumentType, isOcrImageDocumentType, isPdfDocumentType } from '@/utils/document-upload'
+import { buildParseProgressState } from '@/utils/task-progress'
 import { DOCUMENT_PARSE_STATUS_OPTIONS, formatDocumentParseStatus, formatResourceStatus } from '@/utils/task'
 import type {
   CreateKnowledgeBaseDocumentRequest,
@@ -78,6 +81,9 @@ const uploadProgress = reactive({
 })
 const documentTableRef = ref<{ clearSelection?: () => void } | null>(null)
 let documentAutoRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
+let documentRealtimeRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
+let knowledgeBaseRealtimeStream: RealtimeStreamHandle | null = null
+const documentRealtimeEvents = reactive<Record<number, TaskRealtimeEvent>>({})
 
 const knowledgeBaseId = computed(() => Number(route.params.id))
 const hasDocuments = computed(() => documents.value.length > 0)
@@ -171,6 +177,54 @@ function clearDocumentAutoRefreshTimer(): void {
     window.clearTimeout(documentAutoRefreshTimer)
     documentAutoRefreshTimer = null
   }
+}
+
+function clearDocumentRealtimeRefreshTimer(): void {
+  if (documentRealtimeRefreshTimer !== null) {
+    window.clearTimeout(documentRealtimeRefreshTimer)
+    documentRealtimeRefreshTimer = null
+  }
+}
+
+function closeKnowledgeBaseRealtimeStream(): void {
+  knowledgeBaseRealtimeStream?.close()
+  knowledgeBaseRealtimeStream = null
+}
+
+function getDocumentRealtimeEvent(documentId: number): TaskRealtimeEvent | null {
+  return documentRealtimeEvents[documentId] ?? null
+}
+
+function progressStateOfDocument(document: KnowledgeBaseDocument) {
+  return buildParseProgressState(document.parseStatus, getDocumentRealtimeEvent(document.documentId))
+}
+
+function scheduleRealtimeDocumentRefresh(): void {
+  clearDocumentRealtimeRefreshTimer()
+  documentRealtimeRefreshTimer = window.setTimeout(async () => {
+    documentRealtimeRefreshTimer = null
+    await loadDocuments()
+  }, 300)
+}
+
+function handleKnowledgeBaseRealtimeEvent(event: TaskRealtimeEvent): void {
+  if (event.eventType === 'CONNECTED' || !event.documentId) {
+    return
+  }
+  documentRealtimeEvents[event.documentId] = event
+  if (event.terminal) {
+    scheduleRealtimeDocumentRefresh()
+  }
+}
+
+function connectKnowledgeBaseRealtimeStream(): void {
+  closeKnowledgeBaseRealtimeStream()
+  knowledgeBaseRealtimeStream = subscribeKnowledgeBaseDocumentEvents(knowledgeBaseId.value, {
+    onEvent: handleKnowledgeBaseRealtimeEvent,
+    onError(error) {
+      console.error('知识库文档实时订阅失败', error)
+    },
+  })
 }
 
 function canAutoRefreshDocuments(): boolean {
@@ -615,6 +669,7 @@ async function loadDocuments(): Promise<void> {
   documentLoading.value = true
   documentError.value = ''
   clearDocumentAutoRefreshTimer()
+  clearDocumentRealtimeRefreshTimer()
   try {
     const response = await listKnowledgeBaseDocuments(knowledgeBaseId.value, {
       keyword: documentFilters.keyword.trim() || undefined,
@@ -628,6 +683,17 @@ async function loadDocuments(): Promise<void> {
     })
     documents.value = response.list
     documentPagination.total = response.total
+    const activeDocumentIds = new Set(
+      response.list
+        .filter((item) => item.parseStatus === 'PENDING' || item.parseStatus === 'PROCESSING')
+        .map((item) => item.documentId),
+    )
+    Object.keys(documentRealtimeEvents).forEach((key) => {
+      const documentId = Number(key)
+      if (!activeDocumentIds.has(documentId)) {
+        delete documentRealtimeEvents[documentId]
+      }
+    })
   } catch (error) {
     documents.value = []
     documentPagination.total = 0
@@ -728,10 +794,15 @@ async function handleSizeChange(pageSize: number): Promise<void> {
 onMounted(async () => {
   await initialize()
   await consumeEntryFlags()
+  if (!detailError.value) {
+    connectKnowledgeBaseRealtimeStream()
+  }
 })
 
 onUnmounted(() => {
   clearDocumentAutoRefreshTimer()
+  clearDocumentRealtimeRefreshTimer()
+  closeKnowledgeBaseRealtimeStream()
 })
 </script>
 
@@ -878,7 +949,7 @@ onUnmounted(() => {
             :closable="false"
             show-icon
             class="parse-progress-alert"
-            title="存在待处理或处理中任务，列表会每 5 秒自动刷新一次。"
+            title="存在待处理或处理中任务，页面会实时同步解析进度。"
           >
             <template #default>
               <p class="capability-text">待处理表示已入队等待执行，处理中表示后台正在解析与向量化。</p>
@@ -944,9 +1015,21 @@ onUnmounted(() => {
             <el-table-column prop="documentId" label="文档编号" width="100" />
             <el-table-column prop="docName" label="文档名称" min-width="220" />
             <el-table-column prop="docType" label="类型" width="100" />
-            <el-table-column label="解析状态" width="130">
+            <el-table-column label="解析状态" width="180">
               <template #default="{ row }">
-                <el-tag :type="parseStatusType(row.parseStatus)">{{ formatDocumentParseStatus(row.parseStatus) }}</el-tag>
+                <div class="parse-progress-cell">
+                  <el-tag :type="parseStatusType(row.parseStatus)">{{ formatDocumentParseStatus(row.parseStatus) }}</el-tag>
+                  <el-progress
+                    v-if="progressStateOfDocument(row).active"
+                    :percentage="progressStateOfDocument(row).percent"
+                    :status="progressStateOfDocument(row).status"
+                    :stroke-width="6"
+                    :show-text="false"
+                  />
+                  <small v-if="progressStateOfDocument(row).active" class="parse-progress-text">
+                    {{ progressStateOfDocument(row).stageLabel }} · {{ progressStateOfDocument(row).percent }}%
+                  </small>
+                </div>
               </template>
             </el-table-column>
             <el-table-column label="启停" width="100">
@@ -1171,6 +1254,10 @@ onUnmounted(() => {
   margin-top: 6px;
 }
 
+.parse-progress-alert {
+  margin-top: 14px;
+}
+
 .filter-panel {
   margin-bottom: 18px;
   padding: 18px;
@@ -1196,6 +1283,17 @@ onUnmounted(() => {
   margin-right: auto;
   color: #7a6451;
   font-size: 13px;
+}
+
+.parse-progress-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.parse-progress-text {
+  color: #7a6451;
+  line-height: 1.4;
 }
 
 .overview-grid {

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { ElButton, ElEmpty, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import { subscribeTaskEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import { getTaskDetail } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
+import type { TaskRealtimeEvent } from '@/types/realtime'
 import type { TaskDetail } from '@/types/task'
+import { buildTaskProgressState } from '@/utils/task-progress'
 import {
   TASK_TYPE_DOCUMENT_PARSE,
   formatDocumentParseStatus,
@@ -20,8 +23,12 @@ const router = useRouter()
 const loading = ref(true)
 const loadError = ref('')
 const detail = ref<TaskDetail | null>(null)
+const realtimeEvent = ref<TaskRealtimeEvent | null>(null)
+let taskRealtimeStream: RealtimeStreamHandle | null = null
+let taskRealtimeRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const taskId = computed(() => Number(route.params.id))
+const progressState = computed(() => buildTaskProgressState(detail.value?.taskStatus, realtimeEvent.value))
 const linkedDocumentId = computed(() => {
   if (!detail.value?.documentId) {
     return null
@@ -103,6 +110,54 @@ function formatTime(value: string): string {
   })
 }
 
+function clearTaskRealtimeRefreshTimer(): void {
+  if (taskRealtimeRefreshTimer !== null) {
+    window.clearTimeout(taskRealtimeRefreshTimer)
+    taskRealtimeRefreshTimer = null
+  }
+}
+
+function closeTaskRealtimeStream(): void {
+  taskRealtimeStream?.close()
+  taskRealtimeStream = null
+}
+
+function scheduleTaskRealtimeRefresh(): void {
+  clearTaskRealtimeRefreshTimer()
+  taskRealtimeRefreshTimer = window.setTimeout(async () => {
+    taskRealtimeRefreshTimer = null
+    await loadDetail()
+  }, 300)
+}
+
+function handleTaskRealtimeEvent(event: TaskRealtimeEvent): void {
+  if (event.eventType === 'CONNECTED' || event.taskId !== taskId.value) {
+    return
+  }
+  realtimeEvent.value = event
+  if (detail.value) {
+    detail.value.taskStatus = event.taskStatus || detail.value.taskStatus
+    detail.value.documentParseStatus = event.parseStatus || detail.value.documentParseStatus
+    detail.value.updatedAt = event.occurredAt || detail.value.updatedAt
+    if (event.taskStatus === 'FAILED') {
+      detail.value.errorMessage = event.message || detail.value.errorMessage
+    }
+  }
+  if (event.eventType === 'STEP_COMPLETED' || event.terminal) {
+    scheduleTaskRealtimeRefresh()
+  }
+}
+
+function connectTaskRealtimeStream(): void {
+  closeTaskRealtimeStream()
+  taskRealtimeStream = subscribeTaskEvents({
+    onEvent: handleTaskRealtimeEvent,
+    onError(error) {
+      console.error('任务详情实时订阅失败', error)
+    },
+  })
+}
+
 async function loadDetail(): Promise<void> {
   loading.value = true
   loadError.value = ''
@@ -129,6 +184,12 @@ async function handleLinkedDocumentDetail(): Promise<void> {
 
 onMounted(async () => {
   await loadDetail()
+  connectTaskRealtimeStream()
+})
+
+onUnmounted(() => {
+  clearTaskRealtimeRefreshTimer()
+  closeTaskRealtimeStream()
 })
 </script>
 
@@ -181,6 +242,33 @@ onMounted(async () => {
           <strong>{{ detail.bizId ?? '暂无' }}</strong>
           <p>用于标识任务关联的业务对象。</p>
         </article>
+      </section>
+
+      <section class="detail-panel soft-panel">
+        <div class="section-head">
+          <div>
+            <h2>实时进度</h2>
+            <p>任务执行过程中会实时同步阶段变化，并在关键节点自动刷新任务详情。</p>
+          </div>
+        </div>
+
+        <div class="detail-matrix progress-matrix">
+          <article class="detail-item">
+            <span>当前阶段</span>
+            <strong>{{ progressState.stageLabel }}</strong>
+          </article>
+          <article class="detail-item">
+            <span>当前进度</span>
+            <strong>{{ progressState.percent }}%</strong>
+          </article>
+        </div>
+
+        <el-progress
+          :percentage="progressState.percent"
+          :status="progressState.status"
+          :stroke-width="10"
+        />
+        <p class="progress-message">{{ progressState.message }}</p>
       </section>
 
       <section class="detail-panel soft-panel">
@@ -447,6 +535,15 @@ onMounted(async () => {
   padding: 18px;
   border-radius: 18px;
   background: rgba(255, 250, 242, 0.72);
+}
+
+.progress-matrix {
+  margin-bottom: 18px;
+}
+
+.progress-message {
+  margin: 12px 0 0;
+  color: #6d5948;
 }
 
 .error-block {

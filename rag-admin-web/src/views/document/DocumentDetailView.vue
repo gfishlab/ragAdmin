@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox, ElSkeleton } from 'element-plus'
 import { useRoute, useRouter } from 'vue-router'
+import { subscribeDocumentEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import {
   activateDocumentVersion,
   createDocumentVersion,
@@ -11,6 +12,8 @@ import {
   listDocumentVersions,
 } from '@/api/knowledge-base'
 import { resolveErrorMessage } from '@/api/http'
+import type { TaskRealtimeEvent } from '@/types/realtime'
+import { buildParseProgressState } from '@/utils/task-progress'
 import { formatDocumentParseStatus, formatResourceStatus } from '@/utils/task'
 import type {
   CreateDocumentVersionRequest,
@@ -50,10 +53,14 @@ const chunkPagination = reactive({
   pageSize: 10,
   total: 0,
 })
+const realtimeEvent = ref<TaskRealtimeEvent | null>(null)
+let documentRealtimeStream: RealtimeStreamHandle | null = null
+let documentRealtimeRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const documentId = computed(() => Number(route.params.id))
 const hasVersions = computed(() => versions.value.length > 0)
 const hasChunks = computed(() => chunks.value.length > 0)
+const parseProgressState = computed(() => buildParseProgressState(detail.value?.parseStatus, realtimeEvent.value))
 
 function parseStatusType(status: string): 'success' | 'warning' | 'danger' | 'info' {
   if (status === 'SUCCESS') {
@@ -77,6 +84,46 @@ function formatTime(value: string | null | undefined): string {
     return value
   }
   return date.toLocaleString('zh-CN', { hour12: false })
+}
+
+function clearDocumentRealtimeRefreshTimer(): void {
+  if (documentRealtimeRefreshTimer !== null) {
+    window.clearTimeout(documentRealtimeRefreshTimer)
+    documentRealtimeRefreshTimer = null
+  }
+}
+
+function closeDocumentRealtimeStream(): void {
+  documentRealtimeStream?.close()
+  documentRealtimeStream = null
+}
+
+function scheduleDocumentRealtimeRefresh(): void {
+  clearDocumentRealtimeRefreshTimer()
+  documentRealtimeRefreshTimer = window.setTimeout(async () => {
+    documentRealtimeRefreshTimer = null
+    await initialize()
+  }, 300)
+}
+
+function handleDocumentRealtimeEvent(event: TaskRealtimeEvent): void {
+  if (event.eventType === 'CONNECTED') {
+    return
+  }
+  realtimeEvent.value = event
+  if (event.terminal) {
+    scheduleDocumentRealtimeRefresh()
+  }
+}
+
+function connectDocumentRealtimeStream(): void {
+  closeDocumentRealtimeStream()
+  documentRealtimeStream = subscribeDocumentEvents(documentId.value, {
+    onEvent: handleDocumentRealtimeEvent,
+    onError(error) {
+      console.error('文档实时订阅失败', error)
+    },
+  })
 }
 
 function resetVersionUploadState(): void {
@@ -343,6 +390,14 @@ async function handleChunkSizeChange(pageSize: number): Promise<void> {
 
 onMounted(async () => {
   await initialize()
+  if (!detailError.value) {
+    connectDocumentRealtimeStream()
+  }
+})
+
+onUnmounted(() => {
+  clearDocumentRealtimeRefreshTimer()
+  closeDocumentRealtimeStream()
 })
 </script>
 
@@ -395,6 +450,32 @@ onMounted(async () => {
           <strong>{{ detail.kbName || detail.kbId || '暂无' }}</strong>
           <p>文档当前所属的知识库上下文信息。</p>
         </article>
+      </section>
+
+      <section class="progress-panel soft-panel">
+        <div class="section-head">
+          <div>
+            <h2>解析进度</h2>
+            <p>后台异步执行时，页面会实时接收阶段更新；完成后自动刷新详情、版本和切片。</p>
+          </div>
+        </div>
+
+        <div class="progress-summary">
+          <article class="progress-card">
+            <span>当前阶段</span>
+            <strong>{{ parseProgressState.stageLabel }}</strong>
+            <p>{{ parseProgressState.message }}</p>
+          </article>
+          <article class="progress-card">
+            <span>当前进度</span>
+            <strong>{{ parseProgressState.percent }}%</strong>
+            <el-progress
+              :percentage="parseProgressState.percent"
+              :status="parseProgressState.status"
+              :stroke-width="10"
+            />
+          </article>
+        </div>
       </section>
 
       <section class="detail-panel soft-panel">
@@ -665,6 +746,7 @@ onMounted(async () => {
 .detail-loading,
 .detail-error,
 .detail-panel,
+.progress-panel,
 .version-panel {
   padding: 24px;
 }
@@ -762,6 +844,37 @@ onMounted(async () => {
   padding: 18px;
   border-radius: 18px;
   background: rgba(255, 250, 242, 0.72);
+}
+
+.progress-summary {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.progress-card {
+  padding: 18px;
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.72);
+}
+
+.progress-card span {
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+.progress-card strong {
+  display: block;
+  margin-top: 12px;
+  font-family: "Noto Serif SC", serif;
+  font-size: 28px;
+}
+
+.progress-card p {
+  margin: 12px 0 0;
+  color: #6d5948;
 }
 
 .storage-panel {
@@ -865,6 +978,7 @@ onMounted(async () => {
 
   .version-actions,
   .overview-grid,
+  .progress-summary,
   .detail-matrix,
   .storage-panel {
     grid-template-columns: 1fr;
@@ -879,6 +993,7 @@ onMounted(async () => {
   .detail-loading,
   .detail-error,
   .detail-panel,
+  .progress-panel,
   .version-panel,
   .chunk-panel {
     padding: 20px;

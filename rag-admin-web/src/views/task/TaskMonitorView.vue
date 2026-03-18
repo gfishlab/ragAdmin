@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { ElButton, ElEmpty, ElMessage, ElMessageBox } from 'element-plus'
 import { useRouter } from 'vue-router'
+import { subscribeTaskEvents, type RealtimeStreamHandle } from '@/api/realtime'
 import { listTasks, retryTask } from '@/api/task'
 import { resolveErrorMessage } from '@/api/http'
+import type { TaskRealtimeEvent } from '@/types/realtime'
 import type { TaskRecord } from '@/types/task'
+import { buildTaskProgressState } from '@/utils/task-progress'
 import { TASK_STATUS_OPTIONS, TASK_TYPE_OPTIONS, formatTaskStatus, formatTaskType } from '@/utils/task'
 
 const router = useRouter()
@@ -22,6 +25,9 @@ const query = reactive({
   taskStatus: '',
   bizId: '',
 })
+const realtimeEvents = reactive<Record<number, TaskRealtimeEvent>>({})
+let taskRealtimeStream: RealtimeStreamHandle | null = null
+let taskRealtimeRefreshTimer: ReturnType<typeof window.setTimeout> | null = null
 
 const hasData = computed(() => tasks.value.length > 0)
 
@@ -58,6 +64,56 @@ function formatTime(value: string): string {
   }
   return date.toLocaleString('zh-CN', {
     hour12: false,
+  })
+}
+
+function clearTaskRealtimeRefreshTimer(): void {
+  if (taskRealtimeRefreshTimer !== null) {
+    window.clearTimeout(taskRealtimeRefreshTimer)
+    taskRealtimeRefreshTimer = null
+  }
+}
+
+function closeTaskRealtimeStream(): void {
+  taskRealtimeStream?.close()
+  taskRealtimeStream = null
+}
+
+function taskProgressState(task: TaskRecord) {
+  return buildTaskProgressState(task.taskStatus, realtimeEvents[task.taskId])
+}
+
+function scheduleTaskRealtimeRefresh(): void {
+  clearTaskRealtimeRefreshTimer()
+  taskRealtimeRefreshTimer = window.setTimeout(async () => {
+    taskRealtimeRefreshTimer = null
+    await loadTasks()
+  }, 300)
+}
+
+function handleTaskRealtimeEvent(event: TaskRealtimeEvent): void {
+  if (event.eventType === 'CONNECTED' || !event.taskId) {
+    return
+  }
+  realtimeEvents[event.taskId] = event
+  const matchedTask = tasks.value.find((item) => item.taskId === event.taskId)
+  if (matchedTask) {
+    matchedTask.taskStatus = event.taskStatus || matchedTask.taskStatus
+    matchedTask.errorMessage = event.taskStatus === 'FAILED' ? (event.message || matchedTask.errorMessage) : matchedTask.errorMessage
+    matchedTask.updatedAt = event.occurredAt || matchedTask.updatedAt
+  }
+  if (event.terminal) {
+    scheduleTaskRealtimeRefresh()
+  }
+}
+
+function connectTaskRealtimeStream(): void {
+  closeTaskRealtimeStream()
+  taskRealtimeStream = subscribeTaskEvents({
+    onEvent: handleTaskRealtimeEvent,
+    onError(error) {
+      console.error('任务实时订阅失败', error)
+    },
   })
 }
 
@@ -160,6 +216,12 @@ async function handleDetail(taskId: number): Promise<void> {
 
 onMounted(async () => {
   await loadTasks()
+  connectTaskRealtimeStream()
+})
+
+onUnmounted(() => {
+  clearTaskRealtimeRefreshTimer()
+  closeTaskRealtimeStream()
 })
 </script>
 
@@ -225,6 +287,20 @@ onMounted(async () => {
           <el-table-column label="任务状态" width="120">
             <template #default="{ row }">
               <el-tag :type="taskStatusType(row.taskStatus)">{{ formatTaskStatus(row.taskStatus) }}</el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="执行进度" min-width="220">
+            <template #default="{ row }">
+              <div class="task-progress-cell">
+                <el-progress
+                  :percentage="taskProgressState(row).percent"
+                  :status="taskProgressState(row).status"
+                  :stroke-width="8"
+                />
+                <small class="task-progress-text">
+                  {{ taskProgressState(row).stageLabel }} · {{ taskProgressState(row).message }}
+                </small>
+              </div>
             </template>
           </el-table-column>
           <el-table-column label="文档名称" min-width="220">
@@ -316,6 +392,17 @@ onMounted(async () => {
   justify-content: flex-end;
   gap: 12px;
   margin-top: 18px;
+}
+
+.task-progress-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.task-progress-text {
+  color: #7a6451;
+  line-height: 1.5;
 }
 
 .table-error {

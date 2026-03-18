@@ -30,6 +30,7 @@ import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
+import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -68,6 +69,9 @@ public class DocumentService {
 
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
+
+    @Autowired
+    private TaskRealtimeEventService taskRealtimeEventService;
 
     @Transactional
     public DocumentResponse createDocument(Long kbId, CreateDocumentRequest request, Long operatorUserId) {
@@ -330,6 +334,7 @@ public class DocumentService {
         documentMapper.updateById(document);
         version.setParseStatus("PENDING");
         documentVersionMapper.updateById(version);
+        taskRealtimeEventService.publishTaskQueued(task, document);
 
         return task;
     }

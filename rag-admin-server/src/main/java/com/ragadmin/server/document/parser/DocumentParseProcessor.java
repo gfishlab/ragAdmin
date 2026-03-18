@@ -11,6 +11,7 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
+import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import com.ragadmin.server.document.support.ChunkVectorizationService;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
@@ -40,6 +41,7 @@ public class DocumentParseProcessor {
     private final TaskStepRecordMapper taskStepRecordMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
+    private final TaskRealtimeEventService taskRealtimeEventService;
     private final TransactionTemplate transactionTemplate;
 
     public DocumentParseProcessor(
@@ -51,6 +53,7 @@ public class DocumentParseProcessor {
             TaskStepRecordMapper taskStepRecordMapper,
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
+            TaskRealtimeEventService taskRealtimeEventService,
             PlatformTransactionManager transactionManager
     ) {
         this.documentParseTaskMapper = documentParseTaskMapper;
@@ -61,6 +64,7 @@ public class DocumentParseProcessor {
         this.taskStepRecordMapper = taskStepRecordMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
+        this.taskRealtimeEventService = taskRealtimeEventService;
         this.transactionTemplate = new TransactionTemplate(transactionManager);
     }
 
@@ -101,19 +105,26 @@ public class DocumentParseProcessor {
         }
 
         try {
+            taskRealtimeEventService.publishTaskStarted(context.task(), context.document());
             KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(context.document().getKbId());
 
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
+            taskRealtimeEventService.publishStepStarted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
             ParsedContent parsedContent = parseContent(context.document(), context.version());
             completeStep(extractStep);
+            taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
 
             TaskStepRecordEntity chunkStep = startStep(context.task().getId(), "PERSIST_CHUNKS", "切片入库");
+            taskRealtimeEventService.publishStepStarted(context.task(), context.document(), chunkStep.getStepCode(), chunkStep.getStepName());
             List<ChunkEntity> chunks = persistChunks(context, parsedContent.chunks());
             completeStep(chunkStep);
+            taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), chunkStep.getStepCode(), chunkStep.getStepName());
 
             TaskStepRecordEntity embeddingStep = startStep(context.task().getId(), "GENERATE_EMBEDDING", "生成向量");
+            taskRealtimeEventService.publishStepStarted(context.task(), context.document(), embeddingStep.getStepCode(), embeddingStep.getStepName());
             chunkVectorizationService.vectorize(knowledgeBase, chunks);
             completeStep(embeddingStep);
+            taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), embeddingStep.getStepCode(), embeddingStep.getStepName());
 
             markSuccess(context);
             log.info("文档解析任务执行成功，taskId={}, documentId={}, chunkCount={}",
@@ -221,9 +232,18 @@ public class DocumentParseProcessor {
             version.setParseFinishedAt(now);
             documentVersionMapper.updateById(version);
         });
+        taskRealtimeEventService.publishTaskSucceeded(context.task(), context.document());
     }
 
     protected void markFailed(Long taskId, Exception ex) {
+        TaskStepRecordEntity currentStep = taskStepRecordMapper.selectOne(new LambdaQueryWrapper<TaskStepRecordEntity>()
+                .eq(TaskStepRecordEntity::getTaskId, taskId)
+                .eq(TaskStepRecordEntity::getStepStatus, "RUNNING")
+                .orderByDesc(TaskStepRecordEntity::getId)
+                .last("LIMIT 1"));
+        final String currentStepCode = currentStep == null ? null : currentStep.getStepCode();
+        final String currentStepName = currentStep == null ? null : currentStep.getStepName();
+
         transactionTemplate.executeWithoutResult(status -> {
             DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
             if (task == null) {
@@ -260,6 +280,12 @@ public class DocumentParseProcessor {
                 taskStepRecordMapper.updateById(runningStep);
             }
         });
+        DocumentParseTaskEntity task = documentParseTaskMapper.selectById(taskId);
+        if (task == null) {
+            return;
+        }
+        DocumentEntity document = documentMapper.selectById(task.getDocumentId());
+        taskRealtimeEventService.publishTaskFailed(task, document, currentStepCode, currentStepName);
     }
 
     private ParsedContent parseContent(DocumentEntity document, DocumentVersionEntity version) throws Exception {
