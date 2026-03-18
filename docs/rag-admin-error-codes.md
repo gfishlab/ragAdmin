@@ -78,6 +78,7 @@
 | `CHAT_SESSION_NOT_FOUND` | 会话不存在 | 查询消息、问答、反馈时会话不属于当前用户或不存在 |
 | `CHAT_MESSAGE_NOT_FOUND` | 消息不存在 | 提交反馈时找不到目标消息 |
 | `CHAT_KB_MISMATCH` | 会话与知识库不匹配 | 会话所属知识库与请求参数不一致 |
+| `CHAT_SCENE_INVALID` | 会话场景不合法 | 通用会话错误绑定知识库，或传入非法场景值 |
 | `CHAT_PROVIDER_UNSUPPORTED` | 聊天提供方未实现 | 当前 provider 没有聊天客户端实现 |
 | `CHAT_FAILED` | 聊天调用失败 | Ollama 聊天返回为空或异常 |
 | `EMBEDDING_PROVIDER_UNSUPPORTED` | 向量提供方未实现 | 当前 provider 没有 embedding 客户端实现 |

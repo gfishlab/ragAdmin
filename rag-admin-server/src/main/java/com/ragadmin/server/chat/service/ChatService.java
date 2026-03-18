@@ -3,6 +3,7 @@ package com.ragadmin.server.chat.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
+import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatRequest;
@@ -78,20 +79,37 @@ public class ChatService {
     private ChunkMapper chunkMapper;
 
     public ChatSessionResponse createSession(CreateChatSessionRequest request, AuthenticatedUser user) {
-        knowledgeBaseService.requireById(request.getKbId());
+        String sceneType = normalizeSceneType(request.getSceneType());
+        if (ChatSceneTypes.GENERAL.equals(sceneType)) {
+            validateGeneralSceneCreateRequest(request);
+            ChatSessionEntity existingGeneralSession = chatSessionMapper.selectOne(new LambdaQueryWrapper<ChatSessionEntity>()
+                    .eq(ChatSessionEntity::getUserId, user.getUserId())
+                    .eq(ChatSessionEntity::getSceneType, ChatSceneTypes.GENERAL)
+                    .last("LIMIT 1"));
+            if (existingGeneralSession != null) {
+                return toSessionResponse(existingGeneralSession);
+            }
+        } else {
+            requireKnowledgeBaseId(request.getKbId());
+            knowledgeBaseService.requireById(request.getKbId());
+        }
+
         ChatSessionEntity session = new ChatSessionEntity();
-        session.setKbId(request.getKbId());
+        session.setKbId(ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType) ? request.getKbId() : null);
         session.setUserId(user.getUserId());
+        session.setSceneType(sceneType);
         session.setSessionName(request.getSessionName());
         session.setStatus("ENABLED");
         chatSessionMapper.insert(session);
         return toSessionResponse(session);
     }
 
-    public PageResponse<ChatSessionResponse> listSessions(Long kbId, AuthenticatedUser user, long pageNo, long pageSize) {
+    public PageResponse<ChatSessionResponse> listSessions(Long kbId, String sceneType, AuthenticatedUser user, long pageNo, long pageSize) {
+        String normalizedSceneType = normalizeOptionalSceneType(sceneType);
         Page<ChatSessionEntity> page = chatSessionMapper.selectPage(Page.of(pageNo, pageSize),
                 new LambdaQueryWrapper<ChatSessionEntity>()
                         .eq(ChatSessionEntity::getUserId, user.getUserId())
+                        .eq(StringUtils.hasText(normalizedSceneType), ChatSessionEntity::getSceneType, normalizedSceneType)
                         .eq(kbId != null, ChatSessionEntity::getKbId, kbId)
                         .orderByDesc(ChatSessionEntity::getId));
         return new PageResponse<>(page.getRecords().stream().map(this::toSessionResponse).toList(), pageNo, pageSize, page.getTotal());
@@ -136,13 +154,34 @@ public class ChatService {
     @Transactional
     public ChatResponse chat(Long sessionId, ChatRequest request, AuthenticatedUser user) {
         ChatSessionEntity session = requireSession(sessionId, user.getUserId());
-        if (!session.getKbId().equals(request.getKbId())) {
-            throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
-        }
+        String sceneType = normalizeSceneType(session.getSceneType());
 
-        KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(session.getKbId());
-        RetrievalService.RetrievalResult retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
-        var chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
+        RetrievalService.RetrievalResult retrievalResult;
+        ModelService.ChatModelDescriptor chatModel;
+        List<ChatModelClient.ChatMessage> promptMessages;
+        if (ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)) {
+            Long kbId = requireKnowledgeBaseId(session.getKbId());
+            if (!kbId.equals(request.getKbId())) {
+                throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
+            }
+            KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
+            retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
+            chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
+            promptMessages = List.of(
+                    new ChatModelClient.ChatMessage("system", buildKnowledgeBaseSystemPrompt()),
+                    new ChatModelClient.ChatMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))
+            );
+        } else {
+            if (request.getKbId() != null) {
+                throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许携带知识库标识", HttpStatus.BAD_REQUEST);
+            }
+            retrievalResult = new RetrievalService.RetrievalResult(List.of(), "");
+            chatModel = modelService.resolveChatModelDescriptor(null);
+            promptMessages = List.of(
+                    new ChatModelClient.ChatMessage("system", buildGeneralSystemPrompt()),
+                    new ChatModelClient.ChatMessage("user", request.getQuestion())
+            );
+        }
         List<ChatModelClient.ChatMessage> historyMessages = buildHistoryMessages(session.getId());
 
         Instant start = Instant.now();
@@ -150,10 +189,7 @@ public class ChatService {
                 chatModel.providerCode(),
                 chatModel.modelCode(),
                 buildConversationId(session),
-                List.of(
-                        new ChatModelClient.ChatMessage("system", buildSystemPrompt()),
-                        new ChatModelClient.ChatMessage("user", buildUserPrompt(request.getQuestion(), retrievalResult.context()))
-                ),
+                promptMessages,
                 historyMessages
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
@@ -241,14 +277,18 @@ public class ChatService {
     }
 
     private ChatSessionResponse toSessionResponse(ChatSessionEntity session) {
-        return new ChatSessionResponse(session.getId(), session.getKbId(), session.getSessionName(), session.getStatus());
+        return new ChatSessionResponse(session.getId(), session.getKbId(), normalizeSceneType(session.getSceneType()), session.getSessionName(), session.getStatus());
     }
 
-    private String buildSystemPrompt() {
+    private String buildKnowledgeBaseSystemPrompt() {
         return "你是企业知识库问答助手。只能基于提供的知识片段回答，无法确认时要明确说明。";
     }
 
-    private String buildUserPrompt(String question, String context) {
+    private String buildGeneralSystemPrompt() {
+        return "你是企业智能助手。优先给出直接、准确、可执行的回答；如果信息不充分，要明确说明你的判断边界。";
+    }
+
+    private String buildKnowledgeBaseUserPrompt(String question, String context) {
         if (context == null || context.isBlank()) {
             return "问题：\n" + question + "\n\n当前没有命中知识片段，请明确说明无法从知识库确认答案。";
         }
@@ -259,8 +299,12 @@ public class ChatService {
      * 会话记忆需要显式区分场景和知识库，避免首页通用会话、不同知识库会话之间互相污染。
      */
     private String buildConversationId(ChatSessionEntity session) {
+        String sceneType = normalizeSceneType(session.getSceneType());
+        if (ChatSceneTypes.GENERAL.equals(sceneType)) {
+            return "chat-scene-home-user-" + session.getUserId();
+        }
         return "chat-scene-kb-user-" + session.getUserId()
-                + "-kb-" + session.getKbId()
+                + "-kb-" + requireKnowledgeBaseId(session.getKbId())
                 + "-session-" + session.getId();
     }
 
@@ -284,6 +328,37 @@ public class ChatService {
             }
         }
         return messages;
+    }
+
+    private String normalizeSceneType(String sceneType) {
+        if (!StringUtils.hasText(sceneType)) {
+            return ChatSceneTypes.KNOWLEDGE_BASE;
+        }
+        String normalized = sceneType.trim().toUpperCase();
+        if (ChatSceneTypes.GENERAL.equals(normalized) || ChatSceneTypes.KNOWLEDGE_BASE.equals(normalized)) {
+            return normalized;
+        }
+        throw new BusinessException("CHAT_SCENE_INVALID", "会话场景不合法", HttpStatus.BAD_REQUEST);
+    }
+
+    private String normalizeOptionalSceneType(String sceneType) {
+        if (!StringUtils.hasText(sceneType)) {
+            return null;
+        }
+        return normalizeSceneType(sceneType);
+    }
+
+    private Long requireKnowledgeBaseId(Long kbId) {
+        if (kbId == null) {
+            throw new BusinessException("KB_NOT_FOUND", "知识库不存在", HttpStatus.BAD_REQUEST);
+        }
+        return kbId;
+    }
+
+    private void validateGeneralSceneCreateRequest(CreateChatSessionRequest request) {
+        if (request.getKbId() != null) {
+            throw new BusinessException("CHAT_SCENE_INVALID", "首页通用会话不允许绑定知识库", HttpStatus.BAD_REQUEST);
+        }
     }
 
     private Map<Long, String> resolveDocumentNames(List<Long> chunkIds) {

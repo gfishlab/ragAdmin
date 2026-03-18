@@ -265,8 +265,9 @@ CREATE INDEX IF NOT EXISTS idx_kb_chunk_vector_ref_collection_name ON kb_chunk_v
 
 CREATE TABLE IF NOT EXISTS chat_session (
     id                  BIGSERIAL PRIMARY KEY,
-    kb_id               BIGINT NOT NULL,
+    kb_id               BIGINT,
     user_id             BIGINT NOT NULL,
+    scene_type          VARCHAR(32) NOT NULL DEFAULT 'KNOWLEDGE_BASE',
     session_name        VARCHAR(200) NOT NULL,
     status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -276,6 +277,8 @@ CREATE TABLE IF NOT EXISTS chat_session (
 );
 
 CREATE INDEX IF NOT EXISTS idx_chat_session_kb_user ON chat_session (kb_id, user_id);
+CREATE INDEX IF NOT EXISTS idx_chat_session_user_scene ON chat_session (user_id, scene_type);
+CREATE UNIQUE INDEX IF NOT EXISTS uk_chat_session_general_user ON chat_session (user_id, scene_type) WHERE scene_type = 'GENERAL';
 
 CREATE TABLE IF NOT EXISTS chat_message (
     id                  BIGSERIAL PRIMARY KEY,

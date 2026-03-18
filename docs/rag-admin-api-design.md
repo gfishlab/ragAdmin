@@ -464,10 +464,17 @@
 
 ```json
 {
+  "sceneType": "KNOWLEDGE_BASE",
   "kbId": 1,
   "sessionName": "制度问答"
 }
 ```
+
+说明：
+
+- `sceneType=KNOWLEDGE_BASE` 时，`kbId` 必填
+- `sceneType=GENERAL` 时，`kbId` 必须为空
+- `sceneType` 不传时，默认按 `KNOWLEDGE_BASE` 处理，兼容历史接口
 
 ### 7.2 会话列表
 
@@ -476,6 +483,7 @@
 查询参数：
 
 - `kbId`
+- `sceneType`
 - `pageNo`
 - `pageSize`
 
@@ -493,6 +501,20 @@
 {
   "question": "公司年假规则是什么？",
   "kbId": 1,
+  "stream": false
+}
+```
+
+说明：
+
+- 知识库内会话必须携带匹配的 `kbId`
+- 首页通用会话不得携带 `kbId`
+
+首页通用会话示例：
+
+```json
+{
+  "question": "帮我总结一下今天待办",
   "stream": false
 }
 ```

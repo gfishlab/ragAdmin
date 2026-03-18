@@ -15,6 +15,7 @@ public class ChatSessionEntity {
     private Long id;
     private Long kbId;
     private Long userId;
+    private String sceneType;
     private String sessionName;
     private String status;
     private LocalDateTime createdAt;

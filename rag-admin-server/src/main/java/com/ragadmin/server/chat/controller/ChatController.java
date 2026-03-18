@@ -42,11 +42,12 @@ public class ChatController {
     @GetMapping("/sessions")
     public ApiResponse<PageResponse<ChatSessionResponse>> listSessions(
             @RequestParam(required = false) Long kbId,
+            @RequestParam(required = false) String sceneType,
             @RequestParam(defaultValue = "1") long pageNo,
             @RequestParam(defaultValue = "20") long pageSize,
             HttpServletRequest httpServletRequest
     ) {
-        return ApiResponse.success(chatService.listSessions(kbId, currentUser(httpServletRequest), pageNo, pageSize));
+        return ApiResponse.success(chatService.listSessions(kbId, sceneType, currentUser(httpServletRequest), pageNo, pageSize));
     }
 
     @GetMapping("/sessions/{sessionId}/messages")
