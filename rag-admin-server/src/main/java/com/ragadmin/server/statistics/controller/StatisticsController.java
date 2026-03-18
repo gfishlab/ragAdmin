@@ -3,10 +3,12 @@ package com.ragadmin.server.statistics.controller;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.statistics.dto.KnowledgeBaseChatStatisticsResponse;
 import com.ragadmin.server.statistics.dto.ModelCallStatisticsResponse;
+import com.ragadmin.server.statistics.dto.VectorIndexOverviewResponse;
 import com.ragadmin.server.statistics.service.StatisticsService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -27,5 +29,13 @@ public class StatisticsController {
     @GetMapping("/knowledge-bases/{kbId}/chat")
     public ApiResponse<KnowledgeBaseChatStatisticsResponse> knowledgeBaseChat(@PathVariable Long kbId) {
         return ApiResponse.success(statisticsService.knowledgeBaseChat(kbId));
+    }
+
+    @GetMapping("/vector-indexes")
+    public ApiResponse<List<VectorIndexOverviewResponse>> vectorIndexes(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status
+    ) {
+        return ApiResponse.success(statisticsService.vectorIndexes(keyword, status));
     }
 }

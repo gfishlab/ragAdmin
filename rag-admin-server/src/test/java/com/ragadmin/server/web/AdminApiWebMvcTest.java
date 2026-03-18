@@ -40,6 +40,9 @@ import com.ragadmin.server.task.dto.TaskDetailResponse;
 import com.ragadmin.server.task.dto.TaskRetryRecordResponse;
 import com.ragadmin.server.task.dto.TaskStepResponse;
 import com.ragadmin.server.task.service.TaskService;
+import com.ragadmin.server.statistics.controller.StatisticsController;
+import com.ragadmin.server.statistics.dto.VectorIndexOverviewResponse;
+import com.ragadmin.server.statistics.service.StatisticsService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -97,6 +100,9 @@ class AdminApiWebMvcTest {
     @Mock
     private ModelProviderService modelProviderService;
 
+    @Mock
+    private StatisticsService statisticsService;
+
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -131,6 +137,9 @@ class AdminApiWebMvcTest {
         ModelProviderController modelProviderController = new ModelProviderController();
         ReflectionTestUtils.setField(modelProviderController, "modelProviderService", modelProviderService);
 
+        StatisticsController statisticsController = new StatisticsController();
+        ReflectionTestUtils.setField(statisticsController, "statisticsService", statisticsService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -148,7 +157,8 @@ class AdminApiWebMvcTest {
                         fileController,
                         systemHealthController,
                         modelController,
-                        modelProviderController
+                        modelProviderController,
+                        statisticsController
                 )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
@@ -531,6 +541,36 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.providerId").value(1))
                 .andExpect(jsonPath("$.data.status").value("UP"));
+    }
+
+    @Test
+    void shouldReturnVectorIndexOverviewWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        VectorIndexOverviewResponse response = new VectorIndexOverviewResponse();
+        response.setKbId(21L);
+        response.setKbCode("demo-kb");
+        response.setKbName("演示知识库");
+        response.setKbStatus("ENABLED");
+        response.setEmbeddingModelSource("CUSTOM");
+        response.setEmbeddingModelCode("text-embedding-v3");
+        response.setEmbeddingModelName("text-embedding-v3");
+        response.setDocumentCount(6L);
+        response.setSuccessDocumentCount(5L);
+        response.setChunkCount(148L);
+        response.setVectorRefCount(148L);
+        response.setCollectionName("kb_21_emb_2_d_1024");
+        response.setEmbeddingDim(1024);
+        response.setMilvusStatus("UP");
+        response.setMilvusMessage("集合已加载，metricType=COSINE");
+        when(statisticsService.vectorIndexes(null, null)).thenReturn(List.of(response));
+
+        protectedMockMvc.perform(get("/api/admin/statistics/vector-indexes")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data[0].kbId").value(21))
+                .andExpect(jsonPath("$.data[0].collectionName").value("kb_21_emb_2_d_1024"))
+                .andExpect(jsonPath("$.data[0].milvusStatus").value("UP"));
     }
 
     @Test

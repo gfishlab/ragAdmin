@@ -90,6 +90,14 @@ const router = createRouter({
           },
         },
         {
+          path: 'vector-indexes',
+          name: 'vector-indexes',
+          component: () => import('@/views/statistics/VectorIndexOverviewView.vue'),
+          meta: {
+            title: '向量索引',
+          },
+        },
+        {
           path: 'tasks/:id',
           name: 'task-detail',
           component: () => import('@/views/task/TaskDetailView.vue'),

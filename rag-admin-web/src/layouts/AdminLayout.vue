@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { Collection, Connection, Histogram, List, SwitchButton } from '@element-plus/icons-vue'
+import { Collection, Connection, DataAnalysis, Histogram, List, SwitchButton } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
 
@@ -16,6 +16,7 @@ const menuItems = [
   { index: '/dashboard', label: '概览', icon: Histogram },
   { index: '/knowledge-bases', label: '知识库管理', icon: Collection },
   { index: '/models', label: '模型管理', icon: Connection },
+  { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis },
   { index: '/tasks', label: '任务监控', icon: List },
 ]
 

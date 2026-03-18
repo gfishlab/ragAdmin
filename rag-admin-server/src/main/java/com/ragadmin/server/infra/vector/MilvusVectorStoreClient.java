@@ -118,6 +118,35 @@ public class MilvusVectorStoreClient {
         }
     }
 
+    public CollectionDescription describeCollection(String collectionName) {
+        if (!milvusProperties.isEnabled()) {
+            return new CollectionDescription(collectionName, "DISABLED", null, null);
+        }
+        try {
+            Map<String, Object> response = restClient.post()
+                    .uri("/v2/vectordb/collections/describe")
+                    .body(Map.of("collectionName", collectionName))
+                    .retrieve()
+                    .body(Map.class);
+            if (!isSuccess(response)) {
+                throw new BusinessException("MILVUS_COLLECTION_DESCRIBE_FAILED", "Milvus 集合描述失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
+            }
+            Object data = response == null ? null : response.get("data");
+            if (!(data instanceof Map<?, ?> map)) {
+                throw new BusinessException("MILVUS_COLLECTION_DESCRIBE_FAILED", "Milvus 集合描述失败: 响应缺少 data", HttpStatus.BAD_GATEWAY);
+            }
+            String loadState = Objects.toString(map.get("load"), "");
+            Integer dimension = extractDimension(map.get("fields"));
+            String metricType = extractMetricType(map.get("indexes"));
+            return new CollectionDescription(collectionName, loadState, dimension, metricType);
+        } catch (Exception ex) {
+            if (ex instanceof BusinessException businessException) {
+                throw businessException;
+            }
+            throw new BusinessException("MILVUS_COLLECTION_DESCRIBE_FAILED", "Milvus 集合描述失败", HttpStatus.BAD_GATEWAY);
+        }
+    }
+
     private void upsertRaw(String collectionName, List<Map<String, Object>> data) {
         if (!milvusProperties.isEnabled()) {
             return;
@@ -168,6 +197,61 @@ public class MilvusVectorStoreClient {
         return 0D;
     }
 
+    private Integer extractDimension(Object fieldObject) {
+        if (!(fieldObject instanceof List<?> fields)) {
+            return null;
+        }
+        return fields.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .filter(field -> "vector".equals(Objects.toString(field.get("name"), null)))
+                .findFirst()
+                .map(field -> extractIntegerFromParams(field.get("params"), "dim"))
+                .orElse(null);
+    }
+
+    private String extractMetricType(Object indexObject) {
+        if (!(indexObject instanceof List<?> indexes) || indexes.isEmpty()) {
+            return null;
+        }
+        Object first = indexes.getFirst();
+        if (!(first instanceof Map<?, ?> map)) {
+            return null;
+        }
+        return Objects.toString(map.get("metricType"), null);
+    }
+
+    private Integer extractIntegerFromParams(Object paramsObject, String key) {
+        if (!(paramsObject instanceof List<?> params)) {
+            return null;
+        }
+        return params.stream()
+                .filter(Map.class::isInstance)
+                .map(Map.class::cast)
+                .filter(item -> key.equals(Objects.toString(item.get("key"), null)))
+                .findFirst()
+                .map(item -> {
+                    Object value = item.get("value");
+                    if (value instanceof Number number) {
+                        return number.intValue();
+                    }
+                    try {
+                        return value == null ? null : Integer.parseInt(String.valueOf(value));
+                    } catch (NumberFormatException ex) {
+                        return null;
+                    }
+                })
+                .orElse(null);
+    }
+
     public record SearchResult(String vectorId, double score) {
+    }
+
+    public record CollectionDescription(
+            String collectionName,
+            String loadState,
+            Integer dimension,
+            String metricType
+    ) {
     }
 }
