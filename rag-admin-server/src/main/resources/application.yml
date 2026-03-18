@@ -3,6 +3,13 @@ spring:
     name: rag-admin-server
   profiles:
     default: local
+  ai:
+    chat:
+      memory:
+        repository:
+          jdbc:
+            # schema 统一交给 Flyway，避免与启动初始化重复建表。
+            initialize-schema: never
   jackson:
     default-property-inclusion: non_null
   flyway:
@@ -69,6 +76,9 @@ rag:
     max-context-chunks: 5
     max-context-chars: 4000
     reference-snippet-chars: 200
+  chat:
+    memory:
+      max-messages: 20
   document:
     parse:
       max-concurrency: 4

@@ -24,7 +24,7 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
@@ -34,7 +34,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
@@ -67,7 +69,7 @@ public class ChatService {
     private ModelService modelService;
 
     @Autowired
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Autowired
     private DocumentMapper documentMapper;
@@ -141,15 +143,18 @@ public class ChatService {
         KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(session.getKbId());
         RetrievalService.RetrievalResult retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
         var chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
-        ChatModelClient chatClient = chatClientRegistry.getClient(chatModel.providerCode());
+        List<ChatModelClient.ChatMessage> historyMessages = buildHistoryMessages(session.getId());
 
         Instant start = Instant.now();
-        ChatModelClient.ChatCompletionResult completion = chatClient.chat(
+        ChatModelClient.ChatCompletionResult completion = conversationChatClient.chat(
+                chatModel.providerCode(),
                 chatModel.modelCode(),
+                buildConversationId(session),
                 List.of(
                         new ChatModelClient.ChatMessage("system", buildSystemPrompt()),
                         new ChatModelClient.ChatMessage("user", buildUserPrompt(request.getQuestion(), retrievalResult.context()))
-                )
+                ),
+                historyMessages
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
 
@@ -248,6 +253,35 @@ public class ChatService {
             return "问题：\n" + question + "\n\n当前没有命中知识片段，请明确说明无法从知识库确认答案。";
         }
         return "知识片段：\n" + context + "\n\n问题：\n" + question + "\n\n请基于知识片段回答，并尽量简洁。";
+    }
+
+    /**
+     * 会话记忆需要同时包含用户维度和会话维度，避免同一用户多会话串上下文。
+     */
+    private String buildConversationId(ChatSessionEntity session) {
+        return "chat-user-" + session.getUserId() + "-session-" + session.getId();
+    }
+
+    /**
+     * 旧会话首次切到 Spring AI memory 时，按历史问答补种 USER / ASSISTANT 消息。
+     */
+    private List<ChatModelClient.ChatMessage> buildHistoryMessages(Long sessionId) {
+        List<ChatMessageEntity> history = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
+                .eq(ChatMessageEntity::getSessionId, sessionId)
+                .orderByAsc(ChatMessageEntity::getId));
+        if (history.isEmpty()) {
+            return List.of();
+        }
+        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(history.size() * 2);
+        for (ChatMessageEntity item : history) {
+            if (StringUtils.hasText(item.getQuestionText())) {
+                messages.add(new ChatModelClient.ChatMessage("user", item.getQuestionText()));
+            }
+            if (StringUtils.hasText(item.getAnswerText())) {
+                messages.add(new ChatModelClient.ChatMessage("assistant", item.getAnswerText()));
+            }
+        }
+        return messages;
     }
 
     private Map<Long, String> resolveDocumentNames(List<Long> chunkIds) {

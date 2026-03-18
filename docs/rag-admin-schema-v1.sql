@@ -322,6 +322,16 @@ CREATE TABLE IF NOT EXISTS chat_feedback (
     CONSTRAINT fk_chat_feedback_user FOREIGN KEY (user_id) REFERENCES sys_user (id)
 );
 
+CREATE TABLE IF NOT EXISTS spring_ai_chat_memory (
+    conversation_id VARCHAR(128) NOT NULL,
+    content         TEXT NOT NULL,
+    type            VARCHAR(10) NOT NULL CHECK (type IN ('USER', 'ASSISTANT', 'SYSTEM', 'TOOL')),
+    "timestamp"     TIMESTAMP NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_spring_ai_chat_memory_conversation_id_timestamp
+    ON spring_ai_chat_memory (conversation_id, "timestamp");
+
 CREATE TABLE IF NOT EXISTS job_task_record (
     id                  BIGSERIAL PRIMARY KEY,
     task_type           VARCHAR(64) NOT NULL,

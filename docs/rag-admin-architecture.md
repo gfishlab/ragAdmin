@@ -413,6 +413,7 @@ flowchart TB
 |------|------|
 | `chat_session` | 会话表 |
 | `chat_message` | 消息表 |
+| `spring_ai_chat_memory` | Spring AI 会话记忆表 |
 | `chat_answer_reference` | 回答引用切片 |
 | `chat_feedback` | 用户反馈 |
 
