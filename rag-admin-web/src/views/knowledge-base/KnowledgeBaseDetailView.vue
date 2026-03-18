@@ -824,7 +824,7 @@ onUnmounted(() => {
 
     <template v-else-if="knowledgeBase">
       <header class="detail-head">
-        <div>
+        <div class="detail-head-main">
           <p class="detail-eyebrow">知识库详情</p>
           <h1 class="page-title">{{ knowledgeBase.kbName }}</h1>
           <p class="page-subtitle">
@@ -832,8 +832,8 @@ onUnmounted(() => {
           </p>
         </div>
         <div class="head-actions">
-          <el-button @click="loadDetail">刷新详情</el-button>
           <el-button type="primary" plain @click="handleOpenUploadDialog">上传文档</el-button>
+          <el-button @click="loadDetail">刷新详情</el-button>
           <el-button @click="handleBack">返回列表</el-button>
           <el-button type="primary" @click="handleEdit">编辑知识库</el-button>
         </div>
@@ -841,19 +841,28 @@ onUnmounted(() => {
 
       <section class="overview-grid">
         <article class="overview-card soft-panel">
-          <span>知识库编码</span>
-          <strong>{{ knowledgeBase.kbCode }}</strong>
-          <p>用于接口、路由和后台治理中的稳定标识。</p>
+          <div class="overview-card-head">
+            <span>知识库编码</span>
+            <el-tag size="small" effect="plain" type="info">核心标识</el-tag>
+          </div>
+          <strong class="overview-card-value">{{ knowledgeBase.kbCode }}</strong>
+          <p>用于接口、路由和治理关联。</p>
         </article>
         <article class="overview-card soft-panel">
-          <span>聊天模型</span>
-          <strong>{{ modelLabel(knowledgeBase.chatModelName) }}</strong>
-          <p>未显式绑定时由平台默认聊天模型兜底。</p>
+          <div class="overview-card-head">
+            <span>聊天模型</span>
+            <el-tag size="small" effect="plain" type="warning">问答生成</el-tag>
+          </div>
+          <strong class="overview-card-value">{{ modelLabel(knowledgeBase.chatModelName) }}</strong>
+          <p>未显式绑定时走平台默认模型。</p>
         </article>
         <article class="overview-card soft-panel">
-          <span>向量模型</span>
-          <strong>{{ modelLabel(knowledgeBase.embeddingModelName) }}</strong>
-          <p>向量构建链路使用的模型配置。</p>
+          <div class="overview-card-head">
+            <span>向量模型</span>
+            <el-tag size="small" effect="plain" type="success">检索构建</el-tag>
+          </div>
+          <strong class="overview-card-value">{{ modelLabel(knowledgeBase.embeddingModelName) }}</strong>
+          <p>用于文本切片向量化和检索。</p>
         </article>
       </section>
 
@@ -861,28 +870,32 @@ onUnmounted(() => {
         <div class="section-head">
           <div>
             <h2>知识库配置</h2>
-            <p>当前详情页已聚焦知识库配置、文档列表、上传接入和解析触发。</p>
+            <p>这里保留当前知识库的关键运行参数，避免首屏信息过重。</p>
           </div>
         </div>
 
         <div class="detail-matrix">
           <article class="detail-item">
             <span>知识库编号</span>
-            <strong>{{ knowledgeBase.id }}</strong>
+            <strong class="detail-item-value">{{ knowledgeBase.id }}</strong>
           </article>
           <article class="detail-item">
             <span>状态</span>
-            <el-tag :type="statusType(knowledgeBase.status)">{{ formatResourceStatus(knowledgeBase.status) }}</el-tag>
+            <div class="detail-item-content">
+              <el-tag :type="statusType(knowledgeBase.status)">{{ formatResourceStatus(knowledgeBase.status) }}</el-tag>
+            </div>
           </article>
           <article class="detail-item">
             <span>检索数量</span>
-            <strong>{{ knowledgeBase.retrieveTopK }}</strong>
+            <strong class="detail-item-value">{{ knowledgeBase.retrieveTopK }}</strong>
           </article>
           <article class="detail-item">
             <span>重排开关</span>
-            <el-tag :type="knowledgeBase.rerankEnabled ? 'warning' : 'info'">
-              {{ knowledgeBase.rerankEnabled ? '开启' : '关闭' }}
-            </el-tag>
+            <div class="detail-item-content">
+              <el-tag :type="knowledgeBase.rerankEnabled ? 'warning' : 'info'">
+                {{ knowledgeBase.rerankEnabled ? '开启' : '关闭' }}
+              </el-tag>
+            </div>
           </article>
         </div>
       </section>
@@ -1210,25 +1223,31 @@ onUnmounted(() => {
 .detail-page {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .detail-loading,
 .detail-error,
 .detail-panel,
 .document-panel {
-  padding: 24px;
+  padding: 22px;
 }
 
 .detail-head {
   display: flex;
   justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  gap: 18px;
+  align-items: flex-end;
+  padding-bottom: 6px;
+}
+
+.detail-head-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .detail-eyebrow {
-  margin: 0 0 8px;
+  margin: 0 0 6px;
   color: #9b7755;
   font-size: 12px;
   letter-spacing: 0.22em;
@@ -1237,7 +1256,14 @@ onUnmounted(() => {
 
 .head-actions {
   display: flex;
-  gap: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 18px;
+  background: rgba(255, 250, 242, 0.78);
+  box-shadow: inset 0 0 0 1px rgba(201, 168, 129, 0.12);
 }
 
 .capability-alert {
@@ -1319,11 +1345,19 @@ onUnmounted(() => {
 .overview-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
+  gap: 14px;
 }
 
 .overview-card {
-  padding: 22px;
+  padding: 16px 18px;
+  min-height: 0;
+}
+
+.overview-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .overview-card span,
@@ -1334,17 +1368,22 @@ onUnmounted(() => {
   text-transform: uppercase;
 }
 
-.overview-card strong,
-.detail-item strong {
+.overview-card-value,
+.detail-item-value {
   display: block;
-  margin-top: 12px;
+  margin-top: 10px;
   font-family: "Noto Serif SC", serif;
-  font-size: 28px;
+  font-size: 22px;
+  line-height: 1.25;
+  color: #2f241d;
+  word-break: break-word;
 }
 
 .overview-card p {
-  margin: 12px 0 0;
+  margin: 8px 0 0;
   color: #6d5948;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .section-head {
@@ -1352,30 +1391,40 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 16px;
   align-items: flex-start;
-  margin-bottom: 18px;
+  margin-bottom: 14px;
 }
 
 .section-head h2 {
   margin: 0;
   font-family: "Noto Serif SC", serif;
-  font-size: 24px;
+  font-size: 22px;
 }
 
 .section-head p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #6d5948;
+  font-size: 13px;
+  line-height: 1.6;
 }
 
 .detail-matrix {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 18px;
+  gap: 12px;
 }
 
 .detail-item {
-  padding: 18px;
-  border-radius: 18px;
+  padding: 14px 16px;
+  border-radius: 16px;
   background: rgba(255, 250, 242, 0.72);
+  min-height: 0;
+}
+
+.detail-item-content {
+  display: flex;
+  align-items: center;
+  min-height: 34px;
+  margin-top: 10px;
 }
 
 .document-error {
@@ -1529,26 +1578,50 @@ onUnmounted(() => {
   gap: 12px;
 }
 
+@media (max-width: 1200px) {
+  .overview-grid,
+  .detail-matrix {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 960px) {
+  .detail-loading,
+  .detail-error,
+  .detail-panel,
+  .document-panel {
+    padding: 18px;
+  }
+
   .detail-head,
-  .section-head {
+  .section-head,
+  .filter-toolbar {
     flex-direction: column;
   }
 
   .head-actions {
     width: 100%;
+    justify-content: flex-start;
   }
 
   .filter-grid,
-  .overview-grid,
-  .detail-matrix,
   .upload-meta,
   .upload-progress {
     grid-template-columns: 1fr;
   }
+
+  .filter-toolbar-right {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 720px) {
+  .overview-grid,
+  .detail-matrix {
+    grid-template-columns: 1fr;
+  }
+
   .detail-loading,
   .detail-error,
   .detail-panel,
@@ -1557,7 +1630,6 @@ onUnmounted(() => {
   }
 
   .head-actions,
-  .filter-toolbar,
   .filter-toolbar-right,
   .filter-actions,
   .dialog-actions,
