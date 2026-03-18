@@ -893,10 +893,6 @@ onUnmounted(() => {
             <h2>知识库文档</h2>
             <p>知识库创建后默认没有文档，需要先上传原始文件；上传成功后可自动进入解析队列。</p>
           </div>
-          <div class="document-actions">
-            <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
-            <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
-          </div>
         </div>
 
         <el-alert
@@ -955,33 +951,41 @@ onUnmounted(() => {
               <p class="capability-text">待处理表示已入队等待执行，处理中表示后台正在解析与向量化。</p>
             </template>
           </el-alert>
-          <div class="filter-actions">
-            <span v-if="hasSelectedDocuments" class="selection-summary">
-              已选 {{ selectedDocumentCount }} 个文档
-              <template v-if="selectedNonRetryableDocumentCount > 0">
-                ，本次可解析 {{ selectedRetryableDocumentCount }} 个，自动跳过 {{ selectedNonRetryableDocumentCount }} 个成功或处理中
-              </template>
-            </span>
-            <el-button
-              type="primary"
-              plain
-              :disabled="!hasSelectedDocuments || selectedRetryableDocumentCount === 0"
-              :loading="batchRetrySubmitting"
-              @click="handleBatchRetryParse"
-            >
-              批量解析
-            </el-button>
-            <el-button
-              type="danger"
-              plain
-              :disabled="!hasSelectedDocuments"
-              :loading="batchDeleteSubmitting"
-              @click="handleBatchDeleteDocuments"
-            >
-              批量删除
-            </el-button>
-            <el-button @click="handleResetDocuments">重置</el-button>
-            <el-button type="primary" @click="handleSearchDocuments">查询</el-button>
+          <div class="filter-toolbar">
+            <div class="filter-toolbar-left">
+              <span v-if="hasSelectedDocuments" class="selection-summary">
+                已选 {{ selectedDocumentCount }} 个文档
+                <template v-if="selectedNonRetryableDocumentCount > 0">
+                  ，本次可解析 {{ selectedRetryableDocumentCount }} 个，自动跳过 {{ selectedNonRetryableDocumentCount }} 个成功或处理中
+                </template>
+              </span>
+              <div class="filter-actions">
+                <el-button
+                  type="primary"
+                  plain
+                  :disabled="!hasSelectedDocuments || selectedRetryableDocumentCount === 0"
+                  :loading="batchRetrySubmitting"
+                  @click="handleBatchRetryParse"
+                >
+                  批量解析
+                </el-button>
+                <el-button
+                  type="danger"
+                  plain
+                  :disabled="!hasSelectedDocuments"
+                  :loading="batchDeleteSubmitting"
+                  @click="handleBatchDeleteDocuments"
+                >
+                  批量删除
+                </el-button>
+                <el-button @click="handleResetDocuments">重置</el-button>
+                <el-button type="primary" @click="handleSearchDocuments">查询</el-button>
+              </div>
+            </div>
+            <div class="filter-toolbar-right">
+              <el-button :loading="documentLoading" @click="handleRetryDocuments">刷新文档列表</el-button>
+              <el-button type="primary" @click="handleOpenUploadDialog">上传文档</el-button>
+            </div>
           </div>
         </section>
 
@@ -1236,11 +1240,6 @@ onUnmounted(() => {
   gap: 12px;
 }
 
-.document-actions {
-  display: flex;
-  gap: 12px;
-}
-
 .capability-alert {
   margin-bottom: 18px;
 }
@@ -1271,16 +1270,37 @@ onUnmounted(() => {
   gap: 16px;
 }
 
-.filter-actions {
+.filter-toolbar {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.filter-toolbar-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.filter-toolbar-right {
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
-  margin-top: 16px;
+}
+
+.filter-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
 }
 
 .selection-summary {
-  margin-right: auto;
   color: #7a6451;
   font-size: 13px;
 }
@@ -1537,7 +1557,8 @@ onUnmounted(() => {
   }
 
   .head-actions,
-  .document-actions,
+  .filter-toolbar,
+  .filter-toolbar-right,
   .filter-actions,
   .dialog-actions,
   .error-actions,
@@ -1546,12 +1567,19 @@ onUnmounted(() => {
     flex-direction: column;
   }
 
+  .filter-toolbar-left,
+  .filter-toolbar-right,
+  .filter-actions {
+    width: 100%;
+    align-items: stretch;
+  }
+
   .upload-option {
     align-items: flex-start;
   }
 
   .selection-summary {
-    margin-right: 0;
+    width: 100%;
   }
 }
 </style>
