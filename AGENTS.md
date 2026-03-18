@@ -78,6 +78,12 @@
 - Retrieval Orchestrator
 - Admin Governance
 
+后端目录结构补充约束：
+- `rag-admin-server` 顶层目录必须优先按业务域拆分，不得回退到全局 `controller/service/mapper/entity/dto` 平铺结构
+- 域内默认允许 `controller`、`dto`、`entity`、`mapper`、`service` 五类子包，只有在存在明确专项职责时才新增 `parser`、`support`、`config` 等子包
+- 外部依赖适配必须优先下沉到 `infra`
+- 详细规则见 `docs/rag-admin-backend-package-structure.md`
+
 ## 开发原则
 
 默认遵循以下原则：
