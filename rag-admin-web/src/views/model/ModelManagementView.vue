@@ -82,26 +82,24 @@ const providerStatusOptions = [
 const providerCreateStatusOptions = providerStatusOptions.filter((item) => item.value)
 
 const capabilityOptions = [
-  { label: '全部能力', value: '' },
-  { label: '文本生成', value: 'TEXT_GENERATION' },
-  { label: '向量生成', value: 'EMBEDDING' },
+  { label: '全部用途', value: '' },
+  { label: '聊天', value: 'TEXT_GENERATION' },
+  { label: '向量化', value: 'EMBEDDING' },
 ]
 
 const modelTypeOptions = [
-  { label: '聊天模型', value: 'CHAT' },
-  { label: '向量模型', value: 'EMBEDDING' },
+  { label: '聊天', value: 'CHAT' },
+  { label: '向量化', value: 'EMBEDDING' },
 ]
-
-const modelCapabilityCreateOptions = capabilityOptions.filter((item) => item.value)
 
 const hasModelData = computed(() => models.value.length > 0)
 const modelDialogTitle = computed(() => (modelDialogMode.value === 'create' ? '新增模型定义' : '编辑模型定义'))
 const modelDialogConfirmText = computed(() => (modelDialogMode.value === 'create' ? '确认创建' : '确认保存'))
-const modelCapabilityHint = computed(() => {
+const modelPurposeHint = computed(() => {
   if (modelForm.modelType === 'EMBEDDING') {
-    return '向量模型只允许保留“向量生成”能力。'
+    return '上传 doc/pdf/png/md 后，系统会先解析或 OCR，再切片并调用这类模型生成向量并写入知识库索引，不用于对话生成。'
   }
-  return '聊天模型只允许保留“文本生成”能力，像 deepseek-v3.2 这类模型不要勾选向量生成。'
+  return '用于对话和回答生成，不参与文档向量化。像 deepseek-v3.2 这类模型通常配置为聊天用途。'
 })
 
 function statusTagType(status: string): 'success' | 'info' | 'warning' | 'danger' {
@@ -127,22 +125,12 @@ function modelChecking(modelId: number): boolean {
 
 function capabilityLabel(capability: string): string {
   if (capability === 'TEXT_GENERATION') {
-    return '文本生成'
+    return '聊天'
   }
   if (capability === 'EMBEDDING') {
-    return '向量生成'
+    return '向量化'
   }
   return capability
-}
-
-function modelTypeLabel(modelType: string): string {
-  if (modelType === 'CHAT') {
-    return '聊天模型'
-  }
-  if (modelType === 'EMBEDDING') {
-    return '向量模型'
-  }
-  return modelType
 }
 
 function providerNameById(providerId: number | null): string {
@@ -156,14 +144,11 @@ function allowedCapabilityTypes(modelType: string): string[] {
   return modelType === 'EMBEDDING' ? ['EMBEDDING'] : ['TEXT_GENERATION']
 }
 
+// 前端只暴露“模型用途”，实际提交给后端的 capabilityTypes 仍按用途自动派生。
 function normalizeCapabilityTypes(modelType: string, capabilityTypes: string[]): string[] {
   const allowed = allowedCapabilityTypes(modelType)
   const normalized = capabilityTypes.filter((item) => allowed.includes(item))
   return normalized.length > 0 ? normalized : allowed
-}
-
-function capabilityDisabled(capability: string): boolean {
-  return !allowedCapabilityTypes(modelForm.modelType).includes(capability)
 }
 
 function resetProviderForm(): void {
@@ -212,16 +197,6 @@ watch(
     modelForm.capabilityTypes = normalizeCapabilityTypes(modelType, modelForm.capabilityTypes)
   },
   { immediate: true },
-)
-
-watch(
-  () => modelForm.capabilityTypes.join(','),
-  () => {
-    const normalized = normalizeCapabilityTypes(modelForm.modelType, modelForm.capabilityTypes)
-    if (normalized.join(',') !== modelForm.capabilityTypes.join(',')) {
-      modelForm.capabilityTypes = normalized
-    }
-  },
 )
 
 async function loadProviders(): Promise<void> {
@@ -423,7 +398,9 @@ onMounted(async () => {
       <div class="section-head">
         <div>
           <h2 class="section-title">模型定义</h2>
-          <p class="section-subtitle">支持按提供方、能力和状态筛选，并提供新增、编辑、删除和探活能力。</p>
+          <p class="section-subtitle">
+            聊天模型用于问答生成，向量模型用于文档切片向量化与检索。页面按模型用途和状态筛选，并提供新增、编辑、删除和探活能力。
+          </p>
         </div>
       </div>
 
@@ -438,7 +415,7 @@ onMounted(async () => {
             />
           </el-select>
 
-          <el-select v-model="modelQuery.capabilityType" placeholder="能力类型" clearable>
+          <el-select v-model="modelQuery.capabilityType" placeholder="模型用途" clearable>
             <el-option
               v-for="item in capabilityOptions"
               :key="item.value"
@@ -475,7 +452,7 @@ onMounted(async () => {
             {{ row.providerName || row.providerCode || '未知' }}
           </template>
         </el-table-column>
-        <el-table-column label="能力类型" min-width="200">
+        <el-table-column label="模型用途" min-width="200">
           <template #default="{ row }">
             <div class="capability-list">
               <el-tag
@@ -486,11 +463,6 @@ onMounted(async () => {
                 {{ capabilityLabel(capability) }}
               </el-tag>
             </div>
-          </template>
-        </el-table-column>
-        <el-table-column label="模型类型" width="120">
-          <template #default="{ row }">
-            {{ modelTypeLabel(row.modelType) }}
           </template>
         </el-table-column>
         <el-table-column label="最大令牌数" width="120">
@@ -697,21 +669,8 @@ onMounted(async () => {
         <el-form-item label="模型名称">
           <el-input v-model="modelForm.modelName" placeholder="请输入模型展示名称" />
         </el-form-item>
-        <el-form-item label="能力类型">
-          <el-checkbox-group v-model="modelForm.capabilityTypes">
-            <el-checkbox
-              v-for="item in modelCapabilityCreateOptions"
-              :key="item.value"
-              :label="item.value"
-              :disabled="capabilityDisabled(item.value)"
-            >
-              {{ item.label }}
-            </el-checkbox>
-          </el-checkbox-group>
-          <div class="capability-hint">{{ modelCapabilityHint }}</div>
-        </el-form-item>
         <div class="form-grid">
-          <el-form-item label="模型类型">
+          <el-form-item label="模型用途">
             <el-select v-model="modelForm.modelType">
               <el-option
                 v-for="item in modelTypeOptions"
@@ -720,6 +679,7 @@ onMounted(async () => {
                 :value="item.value"
               />
             </el-select>
+            <div class="capability-hint">{{ modelPurposeHint }}</div>
           </el-form-item>
           <el-form-item label="状态">
             <el-select v-model="modelForm.status">
