@@ -282,9 +282,9 @@ CREATE TABLE IF NOT EXISTS chat_session (
 
 CREATE INDEX IF NOT EXISTS idx_chat_session_kb_user ON chat_session (kb_id, user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_session_user_terminal_scene ON chat_session (user_id, terminal_type, scene_type);
-CREATE UNIQUE INDEX IF NOT EXISTS uk_chat_session_general_user_terminal
+CREATE UNIQUE INDEX IF NOT EXISTS uk_chat_session_admin_general_user_terminal
     ON chat_session (user_id, terminal_type, scene_type)
-    WHERE scene_type = 'GENERAL';
+    WHERE scene_type = 'GENERAL' AND terminal_type = 'ADMIN';
 
 CREATE TABLE IF NOT EXISTS chat_session_kb_rel (
     id                  BIGSERIAL PRIMARY KEY,

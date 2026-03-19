@@ -54,6 +54,15 @@ const streaming = ref(false)
 let streamHandle: ChatStreamHandle | null = null
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
+const sessionPanelTitle = computed(() => {
+  return isKnowledgeBaseScene.value ? '知识库会话' : '首页会话'
+})
+const sessionPanelHint = computed(() => {
+  return isKnowledgeBaseScene.value ? '切换同一知识库内的历史上下文' : '切换首页里的独立对话线程'
+})
+const sessionEmptyText = computed(() => {
+  return isKnowledgeBaseScene.value ? '当前知识库还没有聊天会话' : '还没有首页会话，发送第一条问题后会自动创建'
+})
 
 const selectedKnowledgeBaseNames = computed<string[]>(() => {
   return selectedKbIds.value.flatMap((id) => {
@@ -353,7 +362,7 @@ function handleRetryPendingExchange(): void {
 }
 
 function handleStartNewSession(): void {
-  if (!isKnowledgeBaseScene.value || streaming.value) {
+  if (streaming.value) {
     return
   }
   activeSessionId.value = null
@@ -436,12 +445,13 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section class="conversation-grid" :class="{ 'has-session-list': isKnowledgeBaseScene }">
-      <aside v-if="isKnowledgeBaseScene" class="session-list-card app-shell-panel">
+    <section class="conversation-grid has-session-list">
+      <aside class="session-list-card app-shell-panel">
         <div class="session-list-head">
           <div>
-            <p>知识库会话</p>
+            <p>{{ sessionPanelTitle }}</p>
             <strong>{{ sessions.length }} 个</strong>
+            <span class="session-list-subtitle">{{ sessionPanelHint }}</span>
           </div>
           <el-button text :icon="Plus" :disabled="streaming" @click="handleStartNewSession">新会话</el-button>
         </div>
@@ -456,10 +466,16 @@ onUnmounted(() => {
             @click="handleSelectSession(session)"
           >
             <strong>{{ session.sessionName }}</strong>
-            <span>{{ session.selectedKbIds.length }} 个知识库参与检索</span>
+            <span>
+              {{
+                session.selectedKbIds.length > 0
+                  ? `${session.selectedKbIds.length} 个知识库参与检索`
+                  : '纯模型上下文'
+              }}
+            </span>
           </button>
           <div v-if="!sessionLoading && sessions.length === 0" class="session-placeholder">
-            当前知识库还没有聊天会话
+            {{ sessionEmptyText }}
           </div>
         </div>
       </aside>
@@ -568,13 +584,7 @@ onUnmounted(() => {
           <div class="composer-actions">
             <p v-if="loadingError" class="composer-error">{{ loadingError }}</p>
             <div class="composer-action-buttons">
-              <el-button
-                v-if="!isKnowledgeBaseScene"
-                plain
-                :icon="ChatDotRound"
-                :disabled="streaming"
-                @click="handleClearView"
-              >
+              <el-button plain :icon="ChatDotRound" :disabled="streaming" @click="handleClearView">
                 清空视图
               </el-button>
               <el-button
@@ -726,6 +736,14 @@ onUnmounted(() => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
+}
+
+.session-list-subtitle {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
 }
 
 .session-list {

@@ -98,19 +98,6 @@ public class AppChatService {
         String sceneType = normalizeAppSceneType(request.getSceneType(), request.getKbId());
         List<Long> selectedKbIds = normalizeSelectedKnowledgeBaseIds(sceneType, request.getKbId(), request.getSelectedKbIds());
 
-        if (ChatSceneTypes.GENERAL.equals(sceneType)) {
-            ChatSessionEntity existingGeneralSession = chatSessionMapper.selectOne(new LambdaQueryWrapper<ChatSessionEntity>()
-                    .eq(ChatSessionEntity::getUserId, user.getUserId())
-                    .eq(ChatSessionEntity::getTerminalType, ChatTerminalTypes.APP)
-                    .eq(ChatSessionEntity::getSceneType, ChatSceneTypes.GENERAL)
-                    .last("LIMIT 1"));
-            if (existingGeneralSession != null) {
-                refreshSessionPreferences(existingGeneralSession, request.getChatModelId(), request.getWebSearchEnabled());
-                replaceSessionKnowledgeBaseRelations(existingGeneralSession.getId(), selectedKbIds);
-                return toSessionResponse(existingGeneralSession, selectedKbIds);
-            }
-        }
-
         ChatSessionEntity session = new ChatSessionEntity();
         session.setKbId(ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType) ? requireKnowledgeBaseId(request.getKbId()) : null);
         session.setUserId(user.getUserId());
