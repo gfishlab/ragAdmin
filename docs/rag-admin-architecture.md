@@ -38,7 +38,8 @@
 - 前端管理台：`TypeScript + Vue 3`
 - 前端问答端：`TypeScript + Vue 3`
 - 关系型数据库：`PostgreSQL 16`
-- Redis：首期即接入，承担会话控制、热点缓存、限流、防重复提交、任务去重与分布式锁能力
+- 认证与授权：`sa-token`
+- Redis：首期即接入，承担 `sa-token` 登录态、在线会话热数据、热点缓存、限流、防重复提交、任务去重与分布式锁能力
 - 向量检索：
   - 首期优先 `pgvector`
   - 文档规模和检索复杂度上来后，再评估 `Milvus`
@@ -134,6 +135,7 @@ flowchart LR
 
 建议最小隔离维度：
 
+- `login_type`：`admin` / `app`
 - `terminal_type`：`ADMIN` / `APP`
 - `scene_type`：`GENERAL` / `KNOWLEDGE_BASE`
 - `session_id`：同一终端、同一场景下的独立会话主键
@@ -243,9 +245,11 @@ flowchart LR
 
 职责：
 
+- 基于 `sa-token` 的登录态管理、角色权限校验与注解鉴权
 - 用户、角色、菜单、数据权限
 - 知识库访问权限
 - 模型调用权限
+- 按 `userId` 的在线状态治理与强制下线
 - 操作审计和会话审计
 
 建议最少角色：
@@ -457,6 +461,7 @@ flowchart TB
 
 其中建议重点补充以下字段与关系：
 
+- 认证登录态、在线状态、踢下线标记等热数据不在 PostgreSQL 建事实表，统一由 `sa-token + Redis` 承担
 - `chat_session.terminal_type`：区分后台管理端与问答前台
 - `chat_session.scene_type`：区分首页通用会话与知识库内会话
 - `chat_session.model_id`：保存当前会话默认聊天模型
@@ -479,7 +484,7 @@ flowchart TB
 
 范围：
 
-- 用户登录和基础权限
+- 基于 `sa-token + Redis` 的用户登录和基础权限
 - 知识库管理
 - 文档上传到 MinIO
 - 文档解析、切片、向量化、入库

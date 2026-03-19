@@ -81,7 +81,10 @@
 
 - 登录成功后返回 `accessToken` 与 `refreshToken`
 - 管理台与问答前台请求头统一使用 `Authorization: Bearer <token>`
-- 首期建议使用 JWT + Redis 会话控制
+- 后端认证与授权统一基于 `sa-token`
+- 登录态、在线会话热数据与强制下线标记统一存储在 Redis
+- 前后台登录态按 `loginType=admin/app` 隔离
+- 个人问答会话历史与消息事实数据必须持久化到 PostgreSQL，不与登录态热数据混存
 
 ### 2.5 状态字段建议
 
@@ -120,7 +123,8 @@
       "id": 1,
       "username": "admin",
       "displayName": "系统管理员",
-      "roles": ["ADMIN"]
+      "roles": ["ADMIN"],
+      "permissions": ["DASHBOARD_VIEW", "USER_MANAGE"]
     }
   }
 }
@@ -130,6 +134,12 @@
 
 - `GET /api/admin/auth/me`
 - `GET /api/app/auth/me`
+
+响应体补充约定：
+
+- 后台 `GET /api/admin/auth/me` 必须返回 `roles + permissions`
+- 前台 `GET /api/app/auth/me` 至少返回用户基本信息与角色信息
+- 后台前端的菜单、路由和关键高风险按钮统一基于 `permissions` 渲染
 
 ### 3.3 刷新 Token
 
@@ -179,6 +189,51 @@
   "roleCodes": ["KB_ADMIN"]
 }
 ```
+
+### 3.8 在线用户会话列表
+
+- `GET /api/admin/user-sessions`
+
+查询参数：
+
+- `keyword`
+- `roleCode`
+- `onlineScope`
+- `pageNo`
+- `pageSize`
+
+说明：
+
+- 返回用户维度的在线会话概览
+- 首期不返回设备、浏览器或单 Token 维度明细
+
+### 3.9 在线用户会话详情
+
+- `GET /api/admin/user-sessions/{userId}`
+
+说明：
+
+- 返回指定用户在 `admin`、`app` 两个登录域的在线状态
+- 同时返回最近登录时间与最近活跃时间
+
+### 3.10 强制用户下线
+
+- `POST /api/admin/user-sessions/{userId}/kickout`
+
+请求体：
+
+```json
+{
+  "scope": "all",
+  "reason": "管理员手动下线"
+}
+```
+
+说明：
+
+- `scope` 支持：`admin`、`app`、`all`
+- 首期只支持按 `userId` 维度强制下线，不做设备粒度治理
+- 强制下线操作必须写入审计日志
 
 ## 4. 模型管理接口
 
@@ -757,6 +812,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 说明：
 
 - `bizType` 典型值包括：`AUTH`、`KNOWLEDGE_BASE`、`DOCUMENT`、`TASK`、`CHAT`、`CHAT_FEEDBACK`、`MODEL`、`AUDIT`、`SYSTEM`
+- 用户强制下线与在线会话治理建议归类为 `AUTH`
 - 问答反馈提交会单独归类为 `CHAT_FEEDBACK`，便于后台治理侧筛选
 
 ### 8.2 模型调用统计
