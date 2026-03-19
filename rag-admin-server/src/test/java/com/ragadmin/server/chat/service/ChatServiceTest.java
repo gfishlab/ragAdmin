@@ -13,10 +13,9 @@ import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.entity.ChunkEntity;
-import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ChatClientRegistry;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
@@ -35,6 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
 import static org.mockito.Mockito.never;
@@ -66,13 +66,16 @@ class ChatServiceTest {
     private ModelService modelService;
 
     @Mock
-    private ChatClientRegistry chatClientRegistry;
+    private ConversationChatClient conversationChatClient;
 
     @Mock
     private DocumentMapper documentMapper;
 
     @Mock
     private ChunkMapper chunkMapper;
+
+    @Mock
+    private ChatExchangePersistenceService chatExchangePersistenceService;
 
     @InjectMocks
     private ChatService chatService;
@@ -150,56 +153,50 @@ class ChatServiceTest {
                 "Ollama"
         );
 
-        ChatModelClient chatClient = new ChatModelClient() {
-            @Override
-            public boolean supports(String providerCode) {
-                return true;
-            }
-
-            @Override
-            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-                return new ChatCompletionResult("制度要求按时提交周报。", 120, 30);
-            }
-        };
-
-        DocumentEntity document = new DocumentEntity();
-        document.setId(701L);
-        document.setDocName("员工制度.md");
-
         when(chatSessionMapper.selectById(31L)).thenReturn(session);
         when(knowledgeBaseService.requireById(401L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "请总结制度要点")).thenReturn(retrievalResult);
         when(modelService.resolveChatModelDescriptor(501L)).thenReturn(modelDescriptor);
-        when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
-        when(documentMapper.selectBatchIds(List.of(701L))).thenReturn(List.of(document));
-        when(retrievalService.toReferenceResponses(eq(List.of(retrievedChunk)), any()))
-                .thenReturn(List.of(new com.ragadmin.server.chat.dto.ChatReferenceResponse(
+        when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("制度要求按时提交周报。", 120, 30));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(100L),
+                eq("请总结制度要点"),
+                eq("制度要求按时提交周报。"),
+                eq(801L),
+                eq(120),
+                eq(30),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new ChatResponse(
+                901L,
+                "制度要求按时提交周报。",
+                List.of(new com.ragadmin.server.chat.dto.ChatReferenceResponse(
                         701L,
                         "员工制度.md",
                         601L,
                         1,
                         0.91D,
                         "制度要求员工按时提交周报。"
-                )));
+                )),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 30)
+        ));
 
         ChatResponse response = chatService.chat(31L, request, user(100L));
 
-        ArgumentCaptor<ChatMessageEntity> messageCaptor = ArgumentCaptor.forClass(ChatMessageEntity.class);
-        verify(chatMessageMapper).insert(messageCaptor.capture());
-        ChatMessageEntity insertedMessage = messageCaptor.getValue();
-        assertEquals(31L, insertedMessage.getSessionId());
-        assertEquals(100L, insertedMessage.getUserId());
-        assertEquals("RAG", insertedMessage.getMessageType());
-        assertEquals("请总结制度要点", insertedMessage.getQuestionText());
-        assertEquals("制度要求按时提交周报。", insertedMessage.getAnswerText());
-        assertEquals(801L, insertedMessage.getModelId());
-
-        ArgumentCaptor<ChatAnswerReferenceEntity> refCaptor = ArgumentCaptor.forClass(ChatAnswerReferenceEntity.class);
-        verify(chatAnswerReferenceMapper).insert(refCaptor.capture());
-        ChatAnswerReferenceEntity insertedRef = refCaptor.getValue();
-        assertEquals(601L, insertedRef.getChunkId());
-        assertEquals(1, insertedRef.getRankNo());
-        assertNotNull(insertedRef.getScore());
+        verify(conversationChatClient).chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any());
+        verify(chatExchangePersistenceService).persistExchange(
+                eq(session),
+                eq(100L),
+                eq("请总结制度要点"),
+                eq("制度要求按时提交周报。"),
+                eq(801L),
+                eq(120),
+                eq(30),
+                anyInt(),
+                eq(retrievalResult)
+        );
 
         assertEquals("制度要求按时提交周报。", response.answer());
         assertEquals(1, response.references().size());
@@ -234,29 +231,44 @@ class ChatServiceTest {
                 "Ollama"
         );
 
-        ChatModelClient chatClient = new ChatModelClient() {
-            @Override
-            public boolean supports(String providerCode) {
-                return true;
-            }
-
-            @Override
-            public ChatCompletionResult chat(String modelCode, List<ChatMessage> messages) {
-                return new ChatCompletionResult("当前无法从知识库确认答案。", 64, 18);
-            }
-        };
-
         when(chatSessionMapper.selectById(32L)).thenReturn(session);
         when(knowledgeBaseService.requireById(402L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "没有命中时应该怎么回答")).thenReturn(retrievalResult);
         when(modelService.resolveChatModelDescriptor(502L)).thenReturn(modelDescriptor);
-        when(chatClientRegistry.getClient("OLLAMA")).thenReturn(chatClient);
-        when(retrievalService.toReferenceResponses(eq(List.of()), any())).thenReturn(List.of());
+        when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
+                .thenReturn(new ChatModelClient.ChatCompletionResult("当前无法从知识库确认答案。", 64, 18));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(100L),
+                eq("没有命中时应该怎么回答"),
+                eq("当前无法从知识库确认答案。"),
+                eq(802L),
+                eq(64),
+                eq(18),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new ChatResponse(
+                902L,
+                "当前无法从知识库确认答案。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18)
+        ));
 
         ChatResponse response = chatService.chat(32L, request, user(100L));
 
         verify(documentMapper, never()).selectBatchIds(any());
         verify(chatAnswerReferenceMapper, never()).insert(isA(ChatAnswerReferenceEntity.class));
+        verify(chatExchangePersistenceService).persistExchange(
+                eq(session),
+                eq(100L),
+                eq("没有命中时应该怎么回答"),
+                eq("当前无法从知识库确认答案。"),
+                eq(802L),
+                eq(64),
+                eq(18),
+                anyInt(),
+                eq(retrievalResult)
+        );
         assertEquals("当前无法从知识库确认答案。", response.answer());
         assertEquals(0, response.references().size());
         assertEquals(64, response.usage().promptTokens());

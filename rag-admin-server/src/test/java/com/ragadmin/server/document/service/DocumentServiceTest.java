@@ -12,6 +12,7 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -44,6 +45,9 @@ class DocumentServiceTest {
 
     @Mock
     private KnowledgeBaseService knowledgeBaseService;
+
+    @Mock
+    private TaskRealtimeEventService taskRealtimeEventService;
 
     @InjectMocks
     private DocumentService documentService;
@@ -179,6 +183,7 @@ class DocumentServiceTest {
 
         verify(documentMapper).updateById(document);
         verify(documentVersionMapper).updateById(version);
+        verify(taskRealtimeEventService).publishTaskQueued(insertedTask, document);
         assertEquals("PENDING", document.getParseStatus());
         assertEquals("PENDING", version.getParseStatus());
     }
