@@ -61,9 +61,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -150,7 +148,6 @@ class AdminApiWebMvcTest {
 
         UserController userController = new UserController();
         ReflectionTestUtils.setField(userController, "userAdminService", userAdminService);
-        ReflectionTestUtils.setField(userController, "authService", authService);
 
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
@@ -650,24 +647,6 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.list[0].username").value("app-user"))
                 .andExpect(jsonPath("$.data.list[0].roles[0]").value("APP_USER"));
-
-        verify(authService).assertAnyRole(1L, List.of("ADMIN"), "当前账号未开通用户管理权限");
-    }
-
-    @Test
-    void shouldRejectUsersWhenCurrentRoleHasNoPermission() throws Exception {
-        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
-        doThrow(new com.ragadmin.server.common.exception.BusinessException(
-                "FORBIDDEN",
-                "当前账号未开通用户管理权限",
-                org.springframework.http.HttpStatus.FORBIDDEN
-        )).when(authService).assertAnyRole(eq(1L), anyList(), eq("当前账号未开通用户管理权限"));
-
-        protectedMockMvc.perform(get("/api/admin/users")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
-                .andExpect(jsonPath("$.message").value("当前账号未开通用户管理权限"));
     }
 
     private AuthenticatedUser authenticatedUser() {

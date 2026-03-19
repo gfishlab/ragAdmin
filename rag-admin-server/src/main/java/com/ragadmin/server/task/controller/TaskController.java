@@ -1,5 +1,7 @@
 package com.ragadmin.server.task.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
@@ -16,12 +18,14 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/tasks")
+@SaCheckLogin(type = "admin")
 public class TaskController {
 
     @Autowired
     private TaskService taskService;
 
     @GetMapping
+    @SaCheckPermission("TASK_VIEW")
     public ApiResponse<PageResponse<TaskListItemResponse>> list(
             @RequestParam(required = false) String taskType,
             @RequestParam(required = false) String taskStatus,
@@ -33,6 +37,7 @@ public class TaskController {
     }
 
     @GetMapping("/summary")
+    @SaCheckPermission("TASK_VIEW")
     public ApiResponse<TaskSummaryResponse> summary(
             @RequestParam(required = false) String taskType,
             @RequestParam(required = false) Long bizId
@@ -41,11 +46,13 @@ public class TaskController {
     }
 
     @GetMapping("/{taskId}")
+    @SaCheckPermission("TASK_VIEW")
     public ApiResponse<TaskDetailResponse> detail(@PathVariable Long taskId) {
         return ApiResponse.success(taskService.detail(taskId));
     }
 
     @PostMapping("/{taskId}/retry")
+    @SaCheckPermission("TASK_OPERATE")
     public ApiResponse<TaskDetailResponse> retry(@PathVariable Long taskId) {
         return ApiResponse.success(taskService.retry(taskId));
     }

@@ -1,5 +1,7 @@
 package com.ragadmin.server.model.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
@@ -21,6 +23,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/models")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("MODEL_MANAGE")
 public class ModelController {
 
     @Autowired

@@ -1,5 +1,7 @@
 package com.ragadmin.server.document.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.document.dto.DocumentUploadCapabilityResponse;
 import com.ragadmin.server.document.dto.UploadUrlRequest;
@@ -15,6 +17,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin/files")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("KB_MANAGE")
 public class FileController {
 
     @Autowired

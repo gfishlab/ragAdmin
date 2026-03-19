@@ -1,5 +1,7 @@
 package com.ragadmin.server.chat.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
@@ -30,6 +32,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/chat")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("CHAT_CONSOLE_ACCESS")
 public class ChatController {
 
     @Autowired

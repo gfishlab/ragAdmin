@@ -1,5 +1,7 @@
 package com.ragadmin.server.document.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.common.model.ApiResponse;
@@ -28,6 +30,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/admin")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("KB_MANAGE")
 public class DocumentController {
 
     @Autowired

@@ -1,5 +1,7 @@
 package com.ragadmin.server.model.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.model.dto.CreateModelProviderRequest;
 import com.ragadmin.server.model.dto.ModelProviderHealthCheckResponse;
@@ -18,6 +20,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/model-providers")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("MODEL_MANAGE")
 public class ModelProviderController {
 
     @Autowired

@@ -1,5 +1,7 @@
 package com.ragadmin.server.audit.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.audit.dto.AuditLogResponse;
 import com.ragadmin.server.audit.service.AuditLogService;
 import com.ragadmin.server.common.model.ApiResponse;
@@ -15,6 +17,8 @@ import java.time.LocalDateTime;
 
 @RestController
 @RequestMapping("/api/admin/audit-logs")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("AUDIT_VIEW")
 public class AuditLogController {
 
     @Autowired

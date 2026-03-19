@@ -1,5 +1,7 @@
 package com.ragadmin.server.statistics.controller;
 
+import cn.dev33.satoken.annotation.SaCheckLogin;
+import cn.dev33.satoken.annotation.SaCheckPermission;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.statistics.dto.KnowledgeBaseChatStatisticsResponse;
 import com.ragadmin.server.statistics.dto.ModelCallStatisticsResponse;
@@ -16,6 +18,8 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/admin/statistics")
+@SaCheckLogin(type = "admin")
+@SaCheckPermission("STATISTICS_VIEW")
 public class StatisticsController {
 
     @Autowired
