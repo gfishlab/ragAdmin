@@ -2,6 +2,7 @@ package com.ragadmin.server.auth.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.ragadmin.server.audit.config.AuditLogInterceptor;
 import com.ragadmin.server.auth.dto.KickoutUserSessionRequest;
 import com.ragadmin.server.auth.dto.UserSessionDetailResponse;
 import com.ragadmin.server.auth.dto.UserSessionListItemResponse;
@@ -54,6 +55,7 @@ public class UserSessionController {
             @Valid @RequestBody KickoutUserSessionRequest request,
             HttpServletRequest httpServletRequest
     ) {
+        httpServletRequest.setAttribute(AuditLogInterceptor.SKIP_DEFAULT_AUDIT_LOG_ATTRIBUTE, Boolean.TRUE);
         userSessionAdminService.kickout(requireAuthenticatedUser(httpServletRequest), userId, request);
         return ApiResponse.success(null);
     }

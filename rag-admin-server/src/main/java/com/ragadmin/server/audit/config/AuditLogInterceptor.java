@@ -17,6 +17,7 @@ import java.util.regex.Pattern;
 @Component
 public class AuditLogInterceptor implements HandlerInterceptor {
 
+    public static final String SKIP_DEFAULT_AUDIT_LOG_ATTRIBUTE = "SKIP_DEFAULT_AUDIT_LOG";
     private static final Pattern FIRST_NUMBER = Pattern.compile("/(\\d+)(?:/|$)");
 
     private final AuditLogService auditLogService;
@@ -28,6 +29,9 @@ public class AuditLogInterceptor implements HandlerInterceptor {
     @Override
     public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
         if (!request.getRequestURI().startsWith("/api/")) {
+            return;
+        }
+        if (Boolean.TRUE.equals(request.getAttribute(SKIP_DEFAULT_AUDIT_LOG_ATTRIBUTE))) {
             return;
         }
 
