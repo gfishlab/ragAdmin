@@ -26,7 +26,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ApiResponse<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
-        return ApiResponse.success(authService.login(request));
+        return ApiResponse.success(authService.loginForAdminPortal(request));
     }
 
     @PostMapping("/refresh")

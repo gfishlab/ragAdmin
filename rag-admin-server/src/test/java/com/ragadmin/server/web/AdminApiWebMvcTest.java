@@ -2,12 +2,15 @@ package com.ragadmin.server.web;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ragadmin.server.auth.controller.AuthController;
+import com.ragadmin.server.auth.controller.UserController;
 import com.ragadmin.server.auth.dto.CurrentUserResponse;
 import com.ragadmin.server.auth.dto.LoginResponse;
 import com.ragadmin.server.auth.dto.RefreshTokenResponse;
+import com.ragadmin.server.auth.dto.UserListItemResponse;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthInterceptor;
 import com.ragadmin.server.auth.service.AuthService;
+import com.ragadmin.server.auth.service.UserAdminService;
 import com.ragadmin.server.chat.controller.ChatController;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
@@ -58,7 +61,9 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -103,6 +108,9 @@ class AdminApiWebMvcTest {
     @Mock
     private StatisticsService statisticsService;
 
+    @Mock
+    private UserAdminService userAdminService;
+
     private MockMvc publicMockMvc;
     private MockMvc protectedMockMvc;
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -140,6 +148,10 @@ class AdminApiWebMvcTest {
         StatisticsController statisticsController = new StatisticsController();
         ReflectionTestUtils.setField(statisticsController, "statisticsService", statisticsService);
 
+        UserController userController = new UserController();
+        ReflectionTestUtils.setField(userController, "userAdminService", userAdminService);
+        ReflectionTestUtils.setField(userController, "authService", authService);
+
         GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler();
 
         AuthInterceptor authInterceptor = new AuthInterceptor();
@@ -158,7 +170,8 @@ class AdminApiWebMvcTest {
                         systemHealthController,
                         modelController,
                         modelProviderController,
-                        statisticsController
+                        statisticsController,
+                        userController
                 )
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
@@ -180,7 +193,7 @@ class AdminApiWebMvcTest {
                 .setRefreshExpiresIn(604800)
                 .setUser(currentUser);
 
-        when(authService.login(any())).thenReturn(response);
+        when(authService.loginForAdminPortal(any())).thenReturn(response);
 
         publicMockMvc.perform(post("/api/admin/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -613,6 +626,48 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data").doesNotExist());
 
         verify(documentService).delete(31L);
+    }
+
+    @Test
+    void shouldReturnUsersWhenAdminHasPermission() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        when(userAdminService.list(null, null, 1L, 20L)).thenReturn(new PageResponse<>(
+                List.of(new UserListItemResponse()
+                        .setId(2L)
+                        .setUsername("app-user")
+                        .setDisplayName("前台用户")
+                        .setMobile("13900000000")
+                        .setStatus("ENABLED")
+                        .setRoles(List.of("APP_USER"))),
+                1,
+                20,
+                1
+        ));
+
+        protectedMockMvc.perform(get("/api/admin/users")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value("OK"))
+                .andExpect(jsonPath("$.data.list[0].username").value("app-user"))
+                .andExpect(jsonPath("$.data.list[0].roles[0]").value("APP_USER"));
+
+        verify(authService).assertAnyRole(1L, List.of("ADMIN"), "当前账号未开通用户管理权限");
+    }
+
+    @Test
+    void shouldRejectUsersWhenCurrentRoleHasNoPermission() throws Exception {
+        when(authService.authenticateAccessToken("access-token")).thenReturn(authenticatedUser());
+        doThrow(new com.ragadmin.server.common.exception.BusinessException(
+                "FORBIDDEN",
+                "当前账号未开通用户管理权限",
+                org.springframework.http.HttpStatus.FORBIDDEN
+        )).when(authService).assertAnyRole(eq(1L), anyList(), eq("当前账号未开通用户管理权限"));
+
+        protectedMockMvc.perform(get("/api/admin/users")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("FORBIDDEN"))
+                .andExpect(jsonPath("$.message").value("当前账号未开通用户管理权限"));
     }
 
     private AuthenticatedUser authenticatedUser() {

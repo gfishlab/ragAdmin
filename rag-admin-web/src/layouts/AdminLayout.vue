@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets } from '@element-plus/icons-vue'
+import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
 
@@ -11,16 +11,23 @@ const router = useRouter()
 const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
+const canManageUsers = computed(() => authStore.currentUser?.roles.includes('ADMIN') ?? false)
 
-const menuItems = [
-  { index: '/dashboard', label: '概览', icon: Histogram },
-  { index: '/chat', label: '智能问答', icon: ChatDotRound },
-  { index: '/knowledge-bases', label: '知识库管理', icon: Collection },
-  { index: '/models', label: '模型管理', icon: Connection },
-  { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis },
-  { index: '/tasks', label: '任务监控', icon: List },
-  { index: '/audit-logs', label: '审计日志', icon: Tickets },
-]
+const menuItems = computed(() => {
+  const items = [
+    { index: '/dashboard', label: '概览', icon: Histogram },
+    { index: '/chat', label: '智能问答', icon: ChatDotRound },
+    { index: '/knowledge-bases', label: '知识库管理', icon: Collection },
+    { index: '/models', label: '模型管理', icon: Connection },
+    { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis },
+    { index: '/tasks', label: '任务监控', icon: List },
+    { index: '/audit-logs', label: '审计日志', icon: Tickets },
+  ]
+  if (canManageUsers.value) {
+    items.splice(4, 0, { index: '/users', label: '用户管理', icon: User })
+  }
+  return items
+})
 
 async function handleLogout(): Promise<void> {
   try {

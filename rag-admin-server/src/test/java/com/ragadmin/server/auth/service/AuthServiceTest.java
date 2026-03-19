@@ -104,7 +104,7 @@ class AuthServiceTest {
         when(sysRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("ADMIN"));
         when(authUserStructMapper.toCurrentUserResponse(user, List.of("ADMIN"))).thenReturn(currentUser);
 
-        LoginResponse response = authService.login(request);
+        LoginResponse response = authService.loginForAdminPortal(request);
 
         assertEquals("access-token", response.getAccessToken());
         assertEquals("refresh-token", response.getRefreshToken());
@@ -192,5 +192,105 @@ class AuthServiceTest {
                 "rag:auth:session:session-3",
                 "rag:auth:refresh:session-3"
         ));
+    }
+
+    @Test
+    void shouldAllowAdminRoleToLoginAppPortal() {
+        LoginRequest request = new LoginRequest();
+        request.setLoginId("admin");
+        request.setPassword("Admin@123456");
+
+        SysUserEntity user = new SysUserEntity();
+        user.setId(1L);
+        user.setUsername("admin");
+        user.setPasswordHash("hashed-password");
+        user.setStatus("ENABLED");
+        user.setDeleted(Boolean.FALSE);
+
+        CurrentUserResponse currentUser = new CurrentUserResponse()
+                .setId(1L)
+                .setUsername("admin")
+                .setDisplayName("系统管理员")
+                .setRoles(List.of("ADMIN"));
+
+        when(sysUserMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("Admin@123456", "hashed-password")).thenReturn(true);
+        when(tokenService.generateAccessToken(eq(1L), eq("admin"), any())).thenReturn("access-token");
+        when(tokenService.generateRefreshToken(eq(1L), eq("admin"), any())).thenReturn("refresh-token");
+        when(stringRedisTemplate.opsForValue()).thenReturn(valueOperations);
+        when(sysRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("ADMIN"));
+        when(authUserStructMapper.toCurrentUserResponse(user, List.of("ADMIN"))).thenReturn(currentUser);
+
+        LoginResponse response = authService.loginForAppPortal(request);
+
+        assertEquals("admin", response.getUser().getUsername());
+        assertTrue(response.getUser().getRoles().contains("ADMIN"));
+    }
+
+    @Test
+    void shouldRejectAdminPortalLoginWhenUserHasOnlyAppRole() {
+        LoginRequest request = new LoginRequest();
+        request.setLoginId("app-user");
+        request.setPassword("App@123456");
+
+        SysUserEntity user = new SysUserEntity();
+        user.setId(2L);
+        user.setUsername("app-user");
+        user.setPasswordHash("hashed-password");
+        user.setStatus("ENABLED");
+        user.setDeleted(Boolean.FALSE);
+
+        when(sysUserMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("App@123456", "hashed-password")).thenReturn(true);
+        when(sysRoleMapper.selectRoleCodesByUserId(2L)).thenReturn(List.of("APP_USER"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.loginForAdminPortal(request)
+        );
+
+        assertEquals("FORBIDDEN", exception.getCode());
+        assertTrue(exception.getMessage().contains("后台管理权限"));
+        verify(tokenService, never()).generateAccessToken(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectAppPortalLoginWhenUserHasNoAllowedRole() {
+        LoginRequest request = new LoginRequest();
+        request.setLoginId("plain-user");
+        request.setPassword("User@123456");
+
+        SysUserEntity user = new SysUserEntity();
+        user.setId(3L);
+        user.setUsername("plain-user");
+        user.setPasswordHash("hashed-password");
+        user.setStatus("ENABLED");
+        user.setDeleted(Boolean.FALSE);
+
+        when(sysUserMapper.selectOne(any())).thenReturn(user);
+        when(passwordEncoder.matches("User@123456", "hashed-password")).thenReturn(true);
+        when(sysRoleMapper.selectRoleCodesByUserId(3L)).thenReturn(List.of("USER"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.loginForAppPortal(request)
+        );
+
+        assertEquals("FORBIDDEN", exception.getCode());
+        assertTrue(exception.getMessage().contains("问答前台权限"));
+        verify(tokenService, never()).generateAccessToken(any(), any(), any());
+    }
+
+    @Test
+    void shouldRejectRoleAssertionWhenUserHasNoAllowedRole() {
+        when(sysRoleMapper.selectRoleCodesByUserId(2L)).thenReturn(List.of("APP_USER"));
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> authService.assertAnyRole(2L, List.of("ADMIN"), "当前账号未开通用户管理权限")
+        );
+
+        assertEquals("FORBIDDEN", exception.getCode());
+        assertTrue(exception.getMessage().contains("用户管理权限"));
     }
 }

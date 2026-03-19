@@ -22,6 +22,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
@@ -29,6 +30,8 @@ import java.util.UUID;
 public class AuthService {
 
     public static final String REQUEST_ATTRIBUTE = "AUTHENTICATED_USER";
+    private static final List<String> ADMIN_PORTAL_ROLE_CODES = List.of("ADMIN", "KB_ADMIN", "AUDITOR");
+    private static final List<String> APP_PORTAL_ROLE_CODES = List.of("APP_USER", "ADMIN", "KB_ADMIN", "AUDITOR");
 
     @Resource
     private SysUserMapper sysUserMapper;
@@ -51,13 +54,32 @@ public class AuthService {
     @Resource
     private AuthUserStructMapper authUserStructMapper;
 
-    public LoginResponse login(LoginRequest request) {
+    public LoginResponse loginForAdminPortal(LoginRequest request) {
+        return loginWithRoleBoundary(request, ADMIN_PORTAL_ROLE_CODES, "当前账号未开通后台管理权限");
+    }
+
+    public LoginResponse loginForAppPortal(LoginRequest request) {
+        return loginWithRoleBoundary(request, APP_PORTAL_ROLE_CODES, "当前账号未开通问答前台权限");
+    }
+
+    public void assertAnyRole(Long userId, List<String> allowedRoleCodes, String message) {
+        List<String> userRoleCodes = loadRoleCodes(userId);
+        if (!hasAnyRole(userRoleCodes, allowedRoleCodes)) {
+            throw forbidden(message);
+        }
+    }
+
+    private LoginResponse loginWithRoleBoundary(LoginRequest request, List<String> allowedRoleCodes, String forbiddenMessage) {
         SysUserEntity user = findByLoginId(request.getLoginId());
         if (user == null || Boolean.TRUE.equals(user.getDeleted()) || !"ENABLED".equals(user.getStatus())) {
             throw unauthorized("用户名或密码错误");
         }
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
             throw unauthorized("用户名或密码错误");
+        }
+        List<String> roleCodes = loadRoleCodes(user.getId());
+        if (!hasAnyRole(roleCodes, allowedRoleCodes)) {
+            throw forbidden(forbiddenMessage);
         }
 
         String sessionId = UUID.randomUUID().toString();
@@ -70,7 +92,7 @@ public class AuthService {
                 .setRefreshToken(refreshToken)
                 .setExpiresIn(authProperties.getAccessTokenTtlSeconds())
                 .setRefreshExpiresIn(authProperties.getRefreshTokenTtlSeconds())
-                .setUser(buildCurrentUser(user));
+                .setUser(buildCurrentUser(user, roleCodes));
     }
 
     public RefreshTokenResponse refresh(String refreshToken) {
@@ -129,7 +151,20 @@ public class AuthService {
     }
 
     private CurrentUserResponse buildCurrentUser(SysUserEntity user) {
-        return authUserStructMapper.toCurrentUserResponse(user, sysRoleMapper.selectRoleCodesByUserId(user.getId()));
+        return buildCurrentUser(user, loadRoleCodes(user.getId()));
+    }
+
+    private CurrentUserResponse buildCurrentUser(SysUserEntity user, List<String> roleCodes) {
+        return authUserStructMapper.toCurrentUserResponse(user, roleCodes);
+    }
+
+    private List<String> loadRoleCodes(Long userId) {
+        List<String> roleCodes = sysRoleMapper.selectRoleCodesByUserId(userId);
+        return roleCodes == null ? Collections.emptyList() : roleCodes;
+    }
+
+    private boolean hasAnyRole(List<String> userRoleCodes, List<String> allowedRoleCodes) {
+        return userRoleCodes.stream().anyMatch(allowedRoleCodes::contains);
     }
 
     private AuthClaims parseToken(String token, AuthTokenType expectedType) {
@@ -169,5 +204,9 @@ public class AuthService {
 
     private BusinessException unauthorized(String message) {
         return new BusinessException("UNAUTHORIZED", message, HttpStatus.UNAUTHORIZED);
+    }
+
+    private BusinessException forbidden(String message) {
+        return new BusinessException("FORBIDDEN", message, HttpStatus.FORBIDDEN);
     }
 }

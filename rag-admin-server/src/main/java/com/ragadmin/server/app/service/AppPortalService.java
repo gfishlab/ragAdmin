@@ -27,7 +27,7 @@ public class AppPortalService {
     private ModelService modelService;
 
     public LoginResponse login(LoginRequest request) {
-        return authService.login(request);
+        return authService.loginForAppPortal(request);
     }
 
     public RefreshTokenResponse refresh(String refreshToken) {

@@ -58,6 +58,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'users',
+          name: 'users',
+          component: () => import('@/views/user/UserManagementView.vue'),
+          meta: {
+            title: '用户管理',
+            requiredRoles: ['ADMIN'],
+          },
+        },
+        {
           path: 'knowledge-bases/create',
           name: 'knowledge-base-create',
           component: () => import('@/views/knowledge-base/KnowledgeBaseCreateView.vue'),
@@ -126,6 +135,13 @@ const router = createRouter({
   ],
 })
 
+function hasAnyRole(userRoles: string[] | undefined, requiredRoles: string[] | undefined): boolean {
+  if (!requiredRoles || requiredRoles.length === 0) {
+    return true
+  }
+  return (userRoles ?? []).some((role) => requiredRoles.includes(role))
+}
+
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
   const isPublic = Boolean(to.meta.public)
@@ -153,6 +169,13 @@ router.beforeEach(async (to) => {
         },
       }
     }
+  }
+
+  const requiredRoles = Array.isArray(to.meta.requiredRoles)
+    ? (to.meta.requiredRoles as string[])
+    : []
+  if (!isPublic && requiredRoles.length > 0 && !hasAnyRole(authStore.currentUser?.roles, requiredRoles)) {
+    return '/dashboard'
   }
 
   return true
