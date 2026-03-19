@@ -55,6 +55,7 @@ const loadingError = ref('')
 const streaming = ref(false)
 const sessionActionLoadingId = ref<number | null>(null)
 const feedbackSubmittingMessageIds = ref<number[]>([])
+const expandedReferenceMessageIds = ref<number[]>([])
 
 let streamHandle: ChatStreamHandle | null = null
 
@@ -110,6 +111,10 @@ function resetPreferenceInputs(): void {
   selectedKbIds.value = normalizeSelectedKbIds([])
   selectedModelId.value = undefined
   webSearchEnabled.value = false
+}
+
+function resetConversationViewState(): void {
+  expandedReferenceMessageIds.value = []
 }
 
 function applySessionPreferences(session: ChatSession | null): void {
@@ -176,6 +181,7 @@ async function loadPortalOptions(): Promise<void> {
 async function loadMessages(sessionId: number): Promise<void> {
   messageLoading.value = true
   loadingError.value = ''
+  resetConversationViewState()
   try {
     messages.value = await listChatMessages(sessionId)
   } catch (error) {
@@ -228,6 +234,7 @@ async function initialize(): Promise<void> {
   closeStream()
   messages.value = []
   pendingExchange.value = null
+  resetConversationViewState()
   await loadPortalOptions()
   await loadSessions()
 }
@@ -239,6 +246,7 @@ async function handleSelectSession(session: ChatSession): Promise<void> {
   activeSessionId.value = session.id
   messages.value = []
   pendingExchange.value = null
+  resetConversationViewState()
   applySessionPreferences(session)
   await loadMessages(session.id)
 }
@@ -373,16 +381,30 @@ function handleStartNewSession(): void {
   activeSessionId.value = null
   messages.value = []
   pendingExchange.value = null
+  resetConversationViewState()
   resetPreferenceInputs()
 }
 
 function handleClearView(): void {
   messages.value = []
   pendingExchange.value = null
+  resetConversationViewState()
 }
 
 function isFeedbackSubmitting(messageId: number): boolean {
   return feedbackSubmittingMessageIds.value.includes(messageId)
+}
+
+function isReferenceExpanded(messageId: number): boolean {
+  return expandedReferenceMessageIds.value.includes(messageId)
+}
+
+function toggleReferencePanel(messageId: number): void {
+  if (isReferenceExpanded(messageId)) {
+    expandedReferenceMessageIds.value = expandedReferenceMessageIds.value.filter((id) => id !== messageId)
+    return
+  }
+  expandedReferenceMessageIds.value = [...expandedReferenceMessageIds.value, messageId]
 }
 
 async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbackType): Promise<void> {
@@ -639,20 +661,16 @@ onUnmounted(() => {
               <article class="message-bubble message-bubble-assistant">
                 <span class="message-role">助手</span>
                 <p>{{ message.answerText || '模型没有返回内容' }}</p>
-                <div v-if="message.references.length > 0" class="reference-block">
-                  <div
-                    v-for="reference in message.references"
-                    :key="`${message.id}-${reference.chunkId}`"
-                    class="reference-item"
-                  >
-                    <div class="reference-head">
-                      <strong>{{ reference.documentName || '未命名文档' }}</strong>
-                      <span>相似度 {{ reference.score.toFixed(2) }}</span>
-                    </div>
-                    <p>{{ reference.contentSnippet }}</p>
-                  </div>
-                </div>
                 <div class="assistant-actions">
+                  <button
+                    v-if="message.references.length > 0"
+                    type="button"
+                    class="assistant-action assistant-reference-toggle"
+                    @click="toggleReferencePanel(message.id)"
+                  >
+                    <span>{{ isReferenceExpanded(message.id) ? '收起引用' : '查看引用' }}</span>
+                    <strong>{{ message.references.length }}</strong>
+                  </button>
                   <div class="assistant-feedback">
                     <el-button
                       text
@@ -672,6 +690,22 @@ onUnmounted(() => {
                     >
                       待改进
                     </el-button>
+                  </div>
+                </div>
+                <div
+                  v-if="message.references.length > 0 && isReferenceExpanded(message.id)"
+                  class="reference-block"
+                >
+                  <div
+                    v-for="reference in message.references"
+                    :key="`${message.id}-${reference.chunkId}`"
+                    class="reference-item"
+                  >
+                    <div class="reference-head">
+                      <strong>{{ reference.documentName || '未命名文档' }}</strong>
+                      <span>相似度 {{ reference.score.toFixed(2) }}</span>
+                    </div>
+                    <p>{{ reference.contentSnippet }}</p>
                   </div>
                 </div>
                 <p v-if="message.feedbackType" class="feedback-hint">
@@ -1107,8 +1141,49 @@ onUnmounted(() => {
 
 .assistant-actions {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 12px;
+}
+
+.assistant-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid rgba(157, 91, 47, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.92);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
+}
+
+.assistant-action strong {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(157, 91, 47, 0.12);
+  color: var(--brand-strong);
+  font-size: 12px;
+}
+
+.assistant-action:hover {
+  border-color: rgba(157, 91, 47, 0.3);
+  color: var(--brand-strong);
+  background: rgba(255, 247, 238, 0.96);
+}
+
+.assistant-reference-toggle {
+  font-size: 12px;
 }
 
 .assistant-feedback {
@@ -1129,6 +1204,10 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
+.message-usage {
+  margin-top: 12px;
+}
+
 .pending-error {
   margin-top: 12px;
   color: #b04d35;
@@ -1146,6 +1225,7 @@ onUnmounted(() => {
 .composer-head {
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   justify-content: space-between;
   gap: 12px;
 }
