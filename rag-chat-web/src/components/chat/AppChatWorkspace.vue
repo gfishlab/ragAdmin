@@ -8,6 +8,7 @@ import {
   listChatMessages,
   listChatSessions,
   resolveChatStreamError,
+  submitChatFeedback,
   streamChatMessage,
   type ChatStreamHandle,
   updateChatSession,
@@ -16,7 +17,7 @@ import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
 import KnowledgeBaseSelector from '@/components/chat/KnowledgeBaseSelector.vue'
 import ModelSelector from '@/components/chat/ModelSelector.vue'
-import type { ChatExchange, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
+import type { ChatExchange, ChatFeedbackType, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
 import type { KnowledgeBaseSummary } from '@/types/knowledge-base'
 import type { ModelSummary } from '@/types/model'
 
@@ -53,6 +54,7 @@ const pendingExchange = ref<PendingExchange | null>(null)
 const loadingError = ref('')
 const streaming = ref(false)
 const sessionActionLoadingId = ref<number | null>(null)
+const feedbackSubmittingMessageIds = ref<number[]>([])
 
 let streamHandle: ChatStreamHandle | null = null
 
@@ -379,6 +381,29 @@ function handleClearView(): void {
   pendingExchange.value = null
 }
 
+function isFeedbackSubmitting(messageId: number): boolean {
+  return feedbackSubmittingMessageIds.value.includes(messageId)
+}
+
+async function handleSubmitFeedback(messageId: number, feedbackType: ChatFeedbackType): Promise<void> {
+  const targetMessage = messages.value.find((item) => item.id === messageId)
+  if (!targetMessage || isFeedbackSubmitting(messageId) || targetMessage.feedbackType === feedbackType) {
+    return
+  }
+
+  feedbackSubmittingMessageIds.value = [...feedbackSubmittingMessageIds.value, messageId]
+  try {
+    await submitChatFeedback(messageId, { feedbackType })
+    targetMessage.feedbackType = feedbackType
+    targetMessage.feedbackComment = null
+    ElMessage.success(feedbackType === 'LIKE' ? '已记录为有帮助' : '已记录为待改进')
+  } catch (error) {
+    ElMessage.error(resolveChatStreamError(error))
+  } finally {
+    feedbackSubmittingMessageIds.value = feedbackSubmittingMessageIds.value.filter((id) => id !== messageId)
+  }
+}
+
 async function handleRenameSession(session: ChatSession): Promise<void> {
   if (streaming.value || sessionActionLoadingId.value !== null) {
     return
@@ -627,6 +652,31 @@ onUnmounted(() => {
                     <p>{{ reference.contentSnippet }}</p>
                   </div>
                 </div>
+                <div class="assistant-actions">
+                  <div class="assistant-feedback">
+                    <el-button
+                      text
+                      size="small"
+                      :type="message.feedbackType === 'LIKE' ? 'primary' : undefined"
+                      :disabled="isFeedbackSubmitting(message.id)"
+                      @click="handleSubmitFeedback(message.id, 'LIKE')"
+                    >
+                      有帮助
+                    </el-button>
+                    <el-button
+                      text
+                      size="small"
+                      :type="message.feedbackType === 'DISLIKE' ? 'danger' : undefined"
+                      :disabled="isFeedbackSubmitting(message.id)"
+                      @click="handleSubmitFeedback(message.id, 'DISLIKE')"
+                    >
+                      待改进
+                    </el-button>
+                  </div>
+                </div>
+                <p v-if="message.feedbackType" class="feedback-hint">
+                  {{ message.feedbackType === 'LIKE' ? '你已标记这条回答有帮助。' : '你已标记这条回答需要改进。' }}
+                </p>
                 <div v-if="message.usage" class="message-usage">
                   Prompt {{ message.usage.promptTokens ?? 0 }} · Completion {{ message.usage.completionTokens ?? 0 }}
                 </div>
@@ -1055,8 +1105,28 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
+.assistant-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+
+.assistant-feedback {
+  display: inline-flex;
+  gap: 6px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgba(243, 234, 222, 0.82);
+}
+
+.feedback-hint,
 .message-usage {
   margin-top: 12px;
+}
+
+.feedback-hint {
+  color: var(--text-muted);
+  font-size: 12px;
 }
 
 .pending-error {
