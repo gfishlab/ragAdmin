@@ -121,7 +121,7 @@ class SpringAiConversationMemoryManagerTest {
         assertEquals("第一问", request.messages().getFirst().content());
 
         ArgumentCaptor<ChatSessionMemorySummaryEntity> summaryCaptor = ArgumentCaptor.forClass(ChatSessionMemorySummaryEntity.class);
-        verify(chatSessionMemorySummaryMapper).insert((ChatSessionMemorySummaryEntity) summaryCaptor.capture());
+        verify(chatSessionMemorySummaryMapper).insert(summaryCaptor.capture());
         ChatSessionMemorySummaryEntity summaryEntity = summaryCaptor.getValue();
         assertEquals(502L, summaryEntity.getSessionId());
         assertEquals(conversationId, summaryEntity.getConversationId());
@@ -137,6 +137,104 @@ class SpringAiConversationMemoryManagerTest {
         assertEquals(4, recentMessages.size());
         assertEquals("第二问", recentMessages.get(0).getText());
         assertEquals("第三答", recentMessages.get(3).getText());
+        verify(redisShortTermChatMemoryStore).save(eq(conversationId), same(storedMemory));
+        verify(conversationSummaryLockManager).unlock(lockToken);
+    }
+
+    @Test
+    void shouldOnlySummarizeIncrementalColdMessagesWhenExistingSummaryPresent() {
+        String conversationId = buildConversationId(104L, 1004L, 504L);
+        ConversationSummaryLockManager.LockToken lockToken =
+                new ConversationSummaryLockManager.LockToken("lock-key", "owner-token");
+        RedisShortTermChatMemoryStore.StoredConversationMemory storedMemory =
+                new RedisShortTermChatMemoryStore.StoredConversationMemory("新摘要", List.of(), 16, "2026-03-20T12:10:00Z");
+        ChatSessionMemorySummaryEntity existing = existingSummary(88L, 504L, conversationId, "旧摘要", 2, 4, 2L, 2L);
+
+        when(conversationSummaryLockManager.tryLock(conversationId)).thenReturn(Optional.of(lockToken));
+        when(conversationSummaryLockManager.unlock(lockToken)).thenReturn(true);
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(
+                exchange(1L, 504L, "第一问", "第一答"),
+                exchange(2L, 504L, "第二问", "第二答"),
+                exchange(3L, 504L, "第三问", "第三答"),
+                exchange(4L, 504L, "第四问", "第四答"),
+                exchange(5L, 504L, "第五问", "第五答")
+        ));
+        when(chatSessionMemorySummaryMapper.selectOne(any())).thenReturn(existing);
+        when(chatSessionMapper.selectById(504L)).thenReturn(session(104L, 1004L, 504L));
+        when(modelService.resolveChatModelDescriptor(104L)).thenReturn(
+                new ModelService.ChatModelDescriptor(104L, "qwen-plus", "BAILIAN", "百炼")
+        );
+        when(conversationSummaryGenerator.generate(any())).thenReturn(
+                new ConversationSummaryResult("新摘要", ConversationSummarySource.MODEL, 3)
+        );
+        when(redisShortTermChatMemoryStore.build(eq("新摘要"), anyList())).thenReturn(storedMemory);
+
+        conversationMemoryManager.refresh(conversationId);
+
+        ArgumentCaptor<ConversationSummaryRequest> requestCaptor = ArgumentCaptor.forClass(ConversationSummaryRequest.class);
+        verify(conversationSummaryGenerator).generate(requestCaptor.capture());
+        ConversationSummaryRequest request = requestCaptor.getValue();
+        assertEquals(3, request.messages().size());
+        assertEquals("system", request.messages().get(0).role());
+        assertEquals(true, request.messages().get(0).content().contains("旧摘要"));
+        assertEquals("第三问", request.messages().get(1).content());
+        assertEquals("第三答", request.messages().get(2).content());
+
+        ArgumentCaptor<ChatSessionMemorySummaryEntity> summaryCaptor = ArgumentCaptor.forClass(ChatSessionMemorySummaryEntity.class);
+        verify(chatSessionMemorySummaryMapper).updateById(summaryCaptor.capture());
+        ChatSessionMemorySummaryEntity summaryEntity = summaryCaptor.getValue();
+        assertEquals(504L, summaryEntity.getSessionId());
+        assertEquals(conversationId, summaryEntity.getConversationId());
+        assertEquals("新摘要", summaryEntity.getSummaryText());
+        assertEquals(5, summaryEntity.getCompressedMessageCount());
+        assertEquals(3L, summaryEntity.getCompressedUntilMessageId());
+        assertEquals(3L, summaryEntity.getLastSourceMessageId());
+        assertEquals(3, summaryEntity.getSummaryVersion());
+
+        ArgumentCaptor<List<Message>> recentMessagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisShortTermChatMemoryStore).build(eq("新摘要"), recentMessagesCaptor.capture());
+        List<Message> recentMessages = recentMessagesCaptor.getValue();
+        assertEquals(4, recentMessages.size());
+        assertEquals("第四问", recentMessages.get(0).getText());
+        assertEquals("第五答", recentMessages.get(3).getText());
+        verify(redisShortTermChatMemoryStore).save(eq(conversationId), same(storedMemory));
+        verify(conversationSummaryLockManager).unlock(lockToken);
+    }
+
+    @Test
+    void shouldReuseExistingSummaryWhenNoIncrementalMessagesNeedCompression() {
+        String conversationId = buildConversationId(105L, 1005L, 505L);
+        ConversationSummaryLockManager.LockToken lockToken =
+                new ConversationSummaryLockManager.LockToken("lock-key", "owner-token");
+        RedisShortTermChatMemoryStore.StoredConversationMemory storedMemory =
+                new RedisShortTermChatMemoryStore.StoredConversationMemory("旧摘要", List.of(), 14, "2026-03-20T12:20:00Z");
+        ChatSessionMemorySummaryEntity existing = existingSummary(89L, 505L, conversationId, "旧摘要", 2, 3, 3L, 3L);
+
+        when(conversationSummaryLockManager.tryLock(conversationId)).thenReturn(Optional.of(lockToken));
+        when(conversationSummaryLockManager.unlock(lockToken)).thenReturn(true);
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(
+                exchange(1L, 505L, "第一问", "第一答"),
+                exchange(2L, 505L, "第二问", "第二答"),
+                exchange(3L, 505L, "第三问", "第三答"),
+                exchange(4L, 505L, "第四问", "第四答"),
+                exchange(5L, 505L, "第五问", "第五答")
+        ));
+        when(chatSessionMemorySummaryMapper.selectOne(any())).thenReturn(existing);
+        when(redisShortTermChatMemoryStore.build(eq("旧摘要"), anyList())).thenReturn(storedMemory);
+
+        conversationMemoryManager.refresh(conversationId);
+
+        verify(conversationSummaryGenerator, never()).generate(any());
+        verify(chatSessionMapper, never()).selectById(any());
+        verify(chatSessionMemorySummaryMapper, never()).insert(any(ChatSessionMemorySummaryEntity.class));
+        verify(chatSessionMemorySummaryMapper, never()).updateById(any(ChatSessionMemorySummaryEntity.class));
+
+        ArgumentCaptor<List<Message>> recentMessagesCaptor = ArgumentCaptor.forClass(List.class);
+        verify(redisShortTermChatMemoryStore).build(eq("旧摘要"), recentMessagesCaptor.capture());
+        List<Message> recentMessages = recentMessagesCaptor.getValue();
+        assertEquals(4, recentMessages.size());
+        assertEquals("第四问", recentMessages.get(0).getText());
+        assertEquals("第五答", recentMessages.get(3).getText());
         verify(redisShortTermChatMemoryStore).save(eq(conversationId), same(storedMemory));
         verify(conversationSummaryLockManager).unlock(lockToken);
     }
@@ -178,6 +276,28 @@ class SpringAiConversationMemoryManagerTest {
         entity.setSessionId(sessionId);
         entity.setQuestionText(question);
         entity.setAnswerText(answer);
+        return entity;
+    }
+
+    private ChatSessionMemorySummaryEntity existingSummary(
+            Long id,
+            Long sessionId,
+            String conversationId,
+            String summaryText,
+            Integer summaryVersion,
+            Integer compressedMessageCount,
+            Long compressedUntilMessageId,
+            Long lastSourceMessageId
+    ) {
+        ChatSessionMemorySummaryEntity entity = new ChatSessionMemorySummaryEntity();
+        entity.setId(id);
+        entity.setSessionId(sessionId);
+        entity.setConversationId(conversationId);
+        entity.setSummaryText(summaryText);
+        entity.setSummaryVersion(summaryVersion);
+        entity.setCompressedMessageCount(compressedMessageCount);
+        entity.setCompressedUntilMessageId(compressedUntilMessageId);
+        entity.setLastSourceMessageId(lastSourceMessageId);
         return entity;
     }
 }

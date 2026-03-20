@@ -29,6 +29,11 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
 
     private static final Logger log = LoggerFactory.getLogger(SpringAiConversationMemoryManager.class);
 
+    private static final String SUMMARY_CONTEXT_PROMPT = """
+            以下是此前已经压缩过的会话摘要，请保留其中关键事实、约束、待办和结论，
+            再结合后续新增对话输出一份更新后的完整摘要：
+            """;
+
     @Autowired
     private ChatMemory chatMemory;
 
@@ -102,30 +107,42 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
             return;
         }
 
-        List<ChatMessageEntity> olderExchanges = buildOlderExchanges(exchanges);
-        String summaryText = buildSummaryText(conversationId, sessionId, olderExchanges);
-        upsertSummary(sessionId, conversationId, summaryText, olderExchanges);
+        ChatSessionMemorySummaryEntity existing = loadExistingSummary(conversationId);
+        List<ChatMessageEntity> incrementalExchanges = buildIncrementalCompressibleExchanges(exchanges, existing);
+        String summaryText = existing == null ? null : existing.getSummaryText();
+
+        if (!incrementalExchanges.isEmpty()) {
+            String refreshedSummaryText = buildSummaryText(conversationId, sessionId, summaryText, incrementalExchanges);
+            if (StringUtils.hasText(refreshedSummaryText)) {
+                summaryText = refreshedSummaryText;
+                upsertSummary(sessionId, conversationId, existing, summaryText, incrementalExchanges);
+            } else {
+                log.debug("会话摘要刷新未生成有效摘要，沿用已有摘要，conversationId={}, sessionId={}", conversationId, sessionId);
+            }
+        }
+
         redisShortTermChatMemoryStore.save(
                 conversationId,
                 redisShortTermChatMemoryStore.build(summaryText, buildRecentMessages(exchanges))
         );
     }
 
-    private void upsertSummary(
-            Long sessionId,
-            String conversationId,
-            String summaryText,
-            List<ChatMessageEntity> olderExchanges
-    ) {
-        ChatSessionMemorySummaryEntity existing = chatSessionMemorySummaryMapper.selectOne(
+    private ChatSessionMemorySummaryEntity loadExistingSummary(String conversationId) {
+        return chatSessionMemorySummaryMapper.selectOne(
                 new LambdaQueryWrapper<ChatSessionMemorySummaryEntity>()
                         .eq(ChatSessionMemorySummaryEntity::getConversationId, conversationId)
                         .last("LIMIT 1")
         );
-        if (!StringUtils.hasText(summaryText)) {
-            if (existing != null) {
-                chatSessionMemorySummaryMapper.deleteById(existing.getId());
-            }
+    }
+
+    private void upsertSummary(
+            Long sessionId,
+            String conversationId,
+            ChatSessionMemorySummaryEntity existing,
+            String summaryText,
+            List<ChatMessageEntity> incrementalExchanges
+    ) {
+        if (!StringUtils.hasText(summaryText) || incrementalExchanges.isEmpty()) {
             return;
         }
 
@@ -133,31 +150,48 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         entity.setSessionId(sessionId);
         entity.setConversationId(conversationId);
         entity.setSummaryText(summaryText);
-        entity.setCompressedMessageCount(olderExchanges.size());
-        entity.setCompressedUntilMessageId(resolveCompressedUntilMessageId(olderExchanges));
-        entity.setLastSourceMessageId(resolveLastSourceMessageId(olderExchanges));
+        entity.setCompressedMessageCount(resolveCompressedMessageCount(existing, incrementalExchanges));
+        entity.setCompressedUntilMessageId(resolveCompressedUntilMessageId(incrementalExchanges));
+        entity.setLastSourceMessageId(resolveLastSourceMessageId(incrementalExchanges));
         entity.setUpdatedAt(LocalDateTime.now());
         if (existing == null) {
             entity.setSummaryVersion(1);
             chatSessionMemorySummaryMapper.insert(entity);
             return;
         }
-        entity.setSummaryVersion(Math.max(1, entity.getSummaryVersion()) + 1);
+        entity.setSummaryVersion(resolveNextSummaryVersion(existing));
         chatSessionMemorySummaryMapper.updateById(entity);
     }
 
-    private Long resolveCompressedUntilMessageId(List<ChatMessageEntity> olderExchanges) {
-        if (olderExchanges.isEmpty()) {
-            return null;
-        }
-        return olderExchanges.get(olderExchanges.size() - 1).getId();
+    private int resolveCompressedMessageCount(
+            ChatSessionMemorySummaryEntity existing,
+            List<ChatMessageEntity> incrementalExchanges
+    ) {
+        int existingCount = existing == null || existing.getCompressedMessageCount() == null
+                ? 0
+                : Math.max(0, existing.getCompressedMessageCount());
+        return existingCount + incrementalExchanges.size();
     }
 
-    private Long resolveLastSourceMessageId(List<ChatMessageEntity> olderExchanges) {
-        if (olderExchanges.isEmpty()) {
+    private int resolveNextSummaryVersion(ChatSessionMemorySummaryEntity existing) {
+        int currentVersion = existing == null || existing.getSummaryVersion() == null
+                ? 1
+                : Math.max(1, existing.getSummaryVersion());
+        return currentVersion + 1;
+    }
+
+    private Long resolveCompressedUntilMessageId(List<ChatMessageEntity> incrementalExchanges) {
+        if (incrementalExchanges.isEmpty()) {
             return null;
         }
-        return olderExchanges.get(olderExchanges.size() - 1).getId();
+        return incrementalExchanges.get(incrementalExchanges.size() - 1).getId();
+    }
+
+    private Long resolveLastSourceMessageId(List<ChatMessageEntity> incrementalExchanges) {
+        if (incrementalExchanges.isEmpty()) {
+            return null;
+        }
+        return incrementalExchanges.get(incrementalExchanges.size() - 1).getId();
     }
 
     private List<Message> buildRecentMessages(List<ChatMessageEntity> exchanges) {
@@ -177,7 +211,27 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         return messages;
     }
 
-    private List<ChatMessageEntity> buildOlderExchanges(List<ChatMessageEntity> exchanges) {
+    private List<ChatMessageEntity> buildIncrementalCompressibleExchanges(
+            List<ChatMessageEntity> exchanges,
+            ChatSessionMemorySummaryEntity existing
+    ) {
+        List<ChatMessageEntity> compressibleExchanges = buildCompressibleExchanges(exchanges);
+        if (compressibleExchanges.isEmpty()) {
+            return List.of();
+        }
+
+        Long compressedUntilMessageId = existing == null ? null : existing.getCompressedUntilMessageId();
+        if (compressedUntilMessageId == null) {
+            return compressibleExchanges;
+        }
+
+        // 只压缩上次摘要游标之后、且已经落到冷窗口中的新增消息。
+        return compressibleExchanges.stream()
+                .filter(exchange -> exchange.getId() != null && exchange.getId() > compressedUntilMessageId)
+                .toList();
+    }
+
+    private List<ChatMessageEntity> buildCompressibleExchanges(List<ChatMessageEntity> exchanges) {
         int keepRounds = Math.max(1, chatMemoryProperties.getShortTermRounds());
         if (exchanges.size() <= keepRounds) {
             return List.of();
@@ -185,8 +239,13 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         return new ArrayList<>(exchanges.subList(0, exchanges.size() - keepRounds));
     }
 
-    private String buildSummaryText(String conversationId, Long sessionId, List<ChatMessageEntity> olderExchanges) {
-        if (olderExchanges.isEmpty()) {
+    private String buildSummaryText(
+            String conversationId,
+            Long sessionId,
+            String existingSummaryText,
+            List<ChatMessageEntity> incrementalExchanges
+    ) {
+        if (incrementalExchanges.isEmpty()) {
             return null;
         }
         ModelService.ChatModelDescriptor chatModelDescriptor = resolveSummaryModel(sessionId, conversationId);
@@ -194,7 +253,7 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
                 conversationId,
                 chatModelDescriptor == null ? null : chatModelDescriptor.providerCode(),
                 chatModelDescriptor == null ? null : chatModelDescriptor.modelCode(),
-                buildSummaryMessages(olderExchanges),
+                buildSummaryMessages(existingSummaryText, incrementalExchanges),
                 chatMemoryProperties.getSummaryMaxLength()
         ));
         return result == null ? null : result.summaryText();
@@ -211,8 +270,17 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         }
     }
 
-    private List<ChatModelClient.ChatMessage> buildSummaryMessages(List<ChatMessageEntity> exchanges) {
-        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(exchanges.size() * 2);
+    private List<ChatModelClient.ChatMessage> buildSummaryMessages(
+            String existingSummaryText,
+            List<ChatMessageEntity> exchanges
+    ) {
+        List<ChatModelClient.ChatMessage> messages = new ArrayList<>(exchanges.size() * 2 + 1);
+        if (StringUtils.hasText(existingSummaryText)) {
+            messages.add(new ChatModelClient.ChatMessage(
+                    "system",
+                    SUMMARY_CONTEXT_PROMPT + "\n" + existingSummaryText
+            ));
+        }
         for (ChatMessageEntity exchange : exchanges) {
             if (StringUtils.hasText(exchange.getQuestionText())) {
                 messages.add(new ChatModelClient.ChatMessage("user", exchange.getQuestionText()));
