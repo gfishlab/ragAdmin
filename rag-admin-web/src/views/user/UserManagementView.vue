@@ -26,6 +26,7 @@ interface KickoutTarget {
   id: number
   username: string
   displayName: string
+  roles: string[]
 }
 
 const router = useRouter()
@@ -124,6 +125,12 @@ const sessionDrawerTitle = computed(() => {
   return `${sessionDetail.value.displayName || sessionDetail.value.username} 的在线会话`
 })
 const kickoutTargetName = computed(() => kickoutTarget.value?.displayName || kickoutTarget.value?.username || '')
+const currentSessionKickoutDisabledReason = computed(() => {
+  if (!sessionDetail.value) {
+    return ''
+  }
+  return resolveKickoutDisabledReason(sessionDetail.value.userId, sessionDetail.value.roles)
+})
 const sessionOnlineDisabled = computed(() => {
   return !sessionDetail.value || (!sessionDetail.value.adminOnline && !sessionDetail.value.appOnline)
 })
@@ -162,6 +169,16 @@ function accessScopes(roles: string[]): string[] {
     scopes.push('后台管理')
   }
   return scopes
+}
+
+function resolveKickoutDisabledReason(userId: number, roles: string[]): string {
+  if (userId === authStore.currentUser?.id) {
+    return '当前登录管理员不能强制下线自己'
+  }
+  if (roles.includes('ADMIN')) {
+    return '系统管理员不允许被强制下线'
+  }
+  return ''
 }
 
 function normalizeOptionalValue(value: string): string | null {
@@ -396,6 +413,11 @@ function resetSessionDrawer(): void {
 }
 
 function openKickoutDialog(target: KickoutTarget, scope: UserSessionScope = 'all'): void {
+  const disabledReason = resolveKickoutDisabledReason(target.id, target.roles)
+  if (disabledReason) {
+    ElMessage.warning(disabledReason)
+    return
+  }
   kickoutTarget.value = target
   kickoutForm.scope = scope
   kickoutForm.reason = '管理员手动下线'
@@ -411,6 +433,7 @@ function openKickoutDialogForCurrentSession(scope: UserSessionScope = 'all'): vo
       id: sessionDetail.value.userId,
       username: sessionDetail.value.username,
       displayName: sessionDetail.value.displayName,
+      roles: [...sessionDetail.value.roles],
     },
     scope,
   )
@@ -424,6 +447,11 @@ function resetKickoutDialog(): void {
 
 async function handleKickout(): Promise<void> {
   if (!kickoutTarget.value) {
+    return
+  }
+  const disabledReason = resolveKickoutDisabledReason(kickoutTarget.value.id, kickoutTarget.value.roles)
+  if (disabledReason) {
+    ElMessage.warning(disabledReason)
     return
   }
   const reason = kickoutForm.reason.trim()
@@ -740,6 +768,9 @@ onMounted(async () => {
               当前平台在线用户：<strong>{{ sessionSummary.allOnline }}</strong>
               <span>当前查看对象支持前后台分域下线。</span>
             </p>
+            <p v-if="currentSessionKickoutDisabledReason" class="session-guard-text">
+              {{ currentSessionKickoutDisabledReason }}
+            </p>
           </template>
           <p v-else-if="sessionDetailError" class="error-text">{{ sessionDetailError }}</p>
         </section>
@@ -769,7 +800,7 @@ onMounted(async () => {
               <el-button
                 type="warning"
                 plain
-                :disabled="!sessionDetail.adminOnline"
+                :disabled="!sessionDetail.adminOnline || Boolean(currentSessionKickoutDisabledReason)"
                 @click="openKickoutDialogForCurrentSession('admin')"
               >
                 强制下线
@@ -801,7 +832,7 @@ onMounted(async () => {
               <el-button
                 type="warning"
                 plain
-                :disabled="!sessionDetail.appOnline"
+                :disabled="!sessionDetail.appOnline || Boolean(currentSessionKickoutDisabledReason)"
                 @click="openKickoutDialogForCurrentSession('app')"
               >
                 强制下线
@@ -813,7 +844,7 @@ onMounted(async () => {
         <div v-if="sessionDetail" class="session-drawer-footer">
           <el-button
             type="danger"
-            :disabled="sessionOnlineDisabled"
+            :disabled="sessionOnlineDisabled || Boolean(currentSessionKickoutDisabledReason)"
             @click="openKickoutDialogForCurrentSession('all')"
           >
             全部下线
@@ -1079,6 +1110,12 @@ onMounted(async () => {
 .session-summary-text {
   margin: 14px 0 0;
   color: #6d5948;
+  line-height: 1.7;
+}
+
+.session-guard-text {
+  margin: 14px 0 0;
+  color: #b04d18;
   line-height: 1.7;
 }
 

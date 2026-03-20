@@ -9,6 +9,7 @@ import com.ragadmin.server.auth.entity.SysUserEntity;
 import com.ragadmin.server.auth.mapper.SysRoleMapper;
 import com.ragadmin.server.auth.mapper.SysUserMapper;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
+import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -23,6 +24,7 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.never;
@@ -131,5 +133,61 @@ class UserSessionAdminServiceTest {
         assertEquals("AUTH", entity.getBizType());
         assertEquals(2L, entity.getBizId());
         assertTrue(entity.getRequestPayload().contains("\"scope\":\"admin\""));
+    }
+
+    @Test
+    void shouldRejectKickoutWhenTargetIsAdmin() {
+        SysUserEntity user = new SysUserEntity();
+        user.setId(3L);
+        user.setUsername("root-admin");
+        user.setDeleted(Boolean.FALSE);
+
+        when(sysUserMapper.selectById(3L)).thenReturn(user);
+        when(sysRoleMapper.selectRoleCodesByUserId(3L)).thenReturn(List.of("ADMIN"));
+
+        AuthenticatedUser operator = new AuthenticatedUser()
+                .setUserId(1L)
+                .setUsername("admin");
+        KickoutUserSessionRequest request = new KickoutUserSessionRequest();
+        request.setScope("all");
+        request.setReason("管理员手动下线");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userSessionAdminService.kickout(operator, 3L, request)
+        );
+
+        assertEquals("FORBIDDEN", exception.getCode());
+        assertTrue(exception.getMessage().contains("系统管理员"));
+        verify(saTokenLoginService, never()).kickout(any(), any());
+        verify(auditLogService, never()).save(any());
+    }
+
+    @Test
+    void shouldRejectKickoutWhenOperatorTargetsSelf() {
+        SysUserEntity user = new SysUserEntity();
+        user.setId(1L);
+        user.setUsername("admin");
+        user.setDeleted(Boolean.FALSE);
+
+        when(sysUserMapper.selectById(1L)).thenReturn(user);
+        when(sysRoleMapper.selectRoleCodesByUserId(1L)).thenReturn(List.of("KB_ADMIN"));
+
+        AuthenticatedUser operator = new AuthenticatedUser()
+                .setUserId(1L)
+                .setUsername("admin");
+        KickoutUserSessionRequest request = new KickoutUserSessionRequest();
+        request.setScope("admin");
+        request.setReason("管理员手动下线");
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> userSessionAdminService.kickout(operator, 1L, request)
+        );
+
+        assertEquals("FORBIDDEN", exception.getCode());
+        assertTrue(exception.getMessage().contains("不能强制下线自己"));
+        verify(saTokenLoginService, never()).kickout(any(), any());
+        verify(auditLogService, never()).save(any());
     }
 }

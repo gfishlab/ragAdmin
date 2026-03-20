@@ -97,6 +97,8 @@ public class UserSessionAdminService {
 
     public void kickout(AuthenticatedUser operator, Long targetUserId, KickoutUserSessionRequest request) {
         requireUser(targetUserId);
+        List<String> roleCodes = loadRoleCodes(targetUserId);
+        validateKickoutBoundary(operator, targetUserId, roleCodes);
         String normalizedScope = normalizeKickoutScope(request.getScope());
 
         // 踢人下线时必须同步清理 refresh token 映射，避免旧 refresh token 换出新的 access token。
@@ -160,6 +162,18 @@ public class UserSessionAdminService {
     private void revokeRefreshSessions(Long userId, String loginType) {
         saTokenLoginService.getTokenValueListByLoginId(userId, loginType)
                 .forEach(authService::revokeRefreshSessionByAccessToken);
+    }
+
+    /**
+     * 强制下线属于高风险治理动作，这里显式卡住“系统管理员不可被踢”和“当前操作人不可自踢”两条业务边界。
+     */
+    private void validateKickoutBoundary(AuthenticatedUser operator, Long targetUserId, List<String> roleCodes) {
+        if (operator != null && targetUserId.equals(operator.getUserId())) {
+            throw forbidden("当前登录管理员不能强制下线自己");
+        }
+        if (roleCodes.contains("ADMIN")) {
+            throw forbidden("系统管理员不允许被强制下线");
+        }
     }
 
     private AuditLogEntity buildKickoutAuditLog(
@@ -271,6 +285,10 @@ public class UserSessionAdminService {
 
     private BusinessException badRequest(String message) {
         return new BusinessException("BAD_REQUEST", message, HttpStatus.BAD_REQUEST);
+    }
+
+    private BusinessException forbidden(String message) {
+        return new BusinessException("FORBIDDEN", message, HttpStatus.FORBIDDEN);
     }
 
     private record UserSessionSnapshot(
