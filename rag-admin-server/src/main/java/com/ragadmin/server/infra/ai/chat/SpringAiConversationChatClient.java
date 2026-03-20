@@ -6,12 +6,15 @@ import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
+import org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -22,6 +25,9 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
 
     @Autowired
     private ChatMemory chatMemory;
+
+    @Autowired
+    private ChatClientAdvisorProperties chatClientAdvisorProperties;
 
     @Override
     public ChatModelClient.ChatCompletionResult chat(
@@ -42,11 +48,10 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         seedConversationMemoryIfNecessary(conversationId, historyMessages);
 
         var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
-        ChatClient chatClient = ChatClient.create(chatModel);
+        ChatClient chatClient = buildChatClient(chatModel);
         var response = chatClient.prompt()
                 .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
                 .advisors(spec -> spec
-                        .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                         .param(ChatMemory.CONVERSATION_ID, conversationId))
                 .call()
                 .chatResponse();
@@ -71,14 +76,33 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         seedConversationMemoryIfNecessary(conversationId, historyMessages);
 
         var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
-        ChatClient chatClient = ChatClient.create(chatModel);
+        ChatClient chatClient = buildChatClient(chatModel);
         return chatClient.prompt()
                 .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
                 .advisors(spec -> spec
-                        .advisors(MessageChatMemoryAdvisor.builder(chatMemory).build())
                         .param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
                 .chatResponse();
+    }
+
+    ChatClient buildChatClient(org.springframework.ai.chat.model.ChatModel chatModel) {
+        return ChatClient.builder(chatModel)
+                .defaultAdvisors(buildDefaultAdvisors())
+                .build();
+    }
+
+    List<Advisor> buildDefaultAdvisors() {
+        List<Advisor> advisors = new ArrayList<>();
+        advisors.add(MessageChatMemoryAdvisor.builder(chatMemory).build());
+
+        if (chatClientAdvisorProperties.isSimpleLoggerAdvisorEnabled()) {
+            // 放在 memory advisor 之后，确保日志里看到的是已经注入会话记忆后的最终请求。
+            advisors.add(SimpleLoggerAdvisor.builder()
+                    .order(Advisor.DEFAULT_CHAT_MEMORY_PRECEDENCE_ORDER + 10)
+                    .build());
+        }
+
+        return List.copyOf(advisors);
     }
 
     private void seedConversationMemoryIfNecessary(

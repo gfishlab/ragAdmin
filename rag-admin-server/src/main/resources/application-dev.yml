@@ -29,6 +29,9 @@ rag:
     callback-token: rag-admin-internal-callback-token
   ai:
     default-provider: BAILIAN
+    chat:
+      client:
+        simple-logger-advisor-enabled: true
     bailian:
       enabled: true
       base-url: https://dashscope.aliyuncs.com
@@ -55,3 +58,7 @@ rag:
       base-url: http://127.0.0.1:19530
       token: root:Milvus
       enabled: true
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG

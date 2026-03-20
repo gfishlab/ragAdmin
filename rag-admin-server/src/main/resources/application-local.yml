@@ -29,6 +29,9 @@ rag:
     callback-token: rag-admin-internal-callback-token
   ai:
     default-provider: BAILIAN
+    chat:
+      client:
+        simple-logger-advisor-enabled: true
     bailian:
       enabled: true
       base-url: https://dashscope.aliyuncs.com
@@ -62,3 +65,7 @@ rag:
       data-path: .ocr-data/tessdata
       language: chi_sim+eng
       max-pdf-pages: 5
+
+logging:
+  level:
+    org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor: DEBUG

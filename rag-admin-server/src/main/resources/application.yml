@@ -63,6 +63,9 @@ rag:
   ai:
     # 主配置仅保留跨环境共享基线，具体地址和敏感值放到 profile 或本地私有文件。
     default-provider: BAILIAN
+    chat:
+      client:
+        simple-logger-advisor-enabled: false
     bailian:
       enabled: true
       api-key:
