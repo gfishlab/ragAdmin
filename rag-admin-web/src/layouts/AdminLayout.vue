@@ -5,28 +5,26 @@ import { ElMessage } from 'element-plus'
 import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
+import { hasPermission } from '@/utils/permission'
 
 const route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
 
 const activeMenu = computed(() => route.path)
-const canManageUsers = computed(() => authStore.currentUser?.roles.includes('ADMIN') ?? false)
 
 const menuItems = computed(() => {
   const items = [
-    { index: '/dashboard', label: '概览', icon: Histogram },
-    { index: '/chat', label: '智能问答', icon: ChatDotRound },
-    { index: '/knowledge-bases', label: '知识库管理', icon: Collection },
-    { index: '/models', label: '模型管理', icon: Connection },
-    { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis },
-    { index: '/tasks', label: '任务监控', icon: List },
-    { index: '/audit-logs', label: '审计日志', icon: Tickets },
+    { index: '/dashboard', label: '概览', icon: Histogram, permission: 'DASHBOARD_VIEW' },
+    { index: '/chat', label: '智能问答', icon: ChatDotRound, permission: 'CHAT_CONSOLE_ACCESS' },
+    { index: '/knowledge-bases', label: '知识库管理', icon: Collection, permission: 'KB_MANAGE' },
+    { index: '/models', label: '模型管理', icon: Connection, permission: 'MODEL_MANAGE' },
+    { index: '/users', label: '用户管理', icon: User, permission: 'USER_MANAGE' },
+    { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis, permission: 'STATISTICS_VIEW' },
+    { index: '/tasks', label: '任务监控', icon: List, permission: 'TASK_VIEW' },
+    { index: '/audit-logs', label: '审计日志', icon: Tickets, permission: 'AUDIT_VIEW' },
   ]
-  if (canManageUsers.value) {
-    items.splice(4, 0, { index: '/users', label: '用户管理', icon: User })
-  }
-  return items
+  return items.filter((item) => hasPermission(authStore.currentUser, item.permission))
 })
 
 async function handleLogout(): Promise<void> {

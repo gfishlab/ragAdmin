@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import AdminLayout from '@/layouts/AdminLayout.vue'
 import { useAuthStore } from '@/stores/auth'
+import { hasAnyPermission } from '@/utils/permission'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -31,6 +32,7 @@ const router = createRouter({
           component: () => import('@/views/dashboard/DashboardView.vue'),
           meta: {
             title: '概览',
+            requiredPermissions: ['DASHBOARD_VIEW'],
           },
         },
         {
@@ -39,6 +41,7 @@ const router = createRouter({
           component: () => import('@/views/chat/GeneralChatView.vue'),
           meta: {
             title: '智能问答',
+            requiredPermissions: ['CHAT_CONSOLE_ACCESS'],
           },
         },
         {
@@ -47,6 +50,7 @@ const router = createRouter({
           component: () => import('@/views/knowledge-base/KnowledgeBaseListView.vue'),
           meta: {
             title: '知识库管理',
+            requiredPermissions: ['KB_MANAGE'],
           },
         },
         {
@@ -55,6 +59,7 @@ const router = createRouter({
           component: () => import('@/views/model/ModelManagementView.vue'),
           meta: {
             title: '模型管理',
+            requiredPermissions: ['MODEL_MANAGE'],
           },
         },
         {
@@ -63,7 +68,7 @@ const router = createRouter({
           component: () => import('@/views/user/UserManagementView.vue'),
           meta: {
             title: '用户管理',
-            requiredRoles: ['ADMIN'],
+            requiredPermissions: ['USER_MANAGE'],
           },
         },
         {
@@ -72,6 +77,7 @@ const router = createRouter({
           component: () => import('@/views/knowledge-base/KnowledgeBaseCreateView.vue'),
           meta: {
             title: '新建知识库',
+            requiredPermissions: ['KB_MANAGE'],
           },
         },
         {
@@ -80,6 +86,7 @@ const router = createRouter({
           component: () => import('@/views/knowledge-base/KnowledgeBaseEditView.vue'),
           meta: {
             title: '编辑知识库',
+            requiredPermissions: ['KB_MANAGE'],
           },
         },
         {
@@ -88,6 +95,7 @@ const router = createRouter({
           component: () => import('@/views/knowledge-base/KnowledgeBaseDetailView.vue'),
           meta: {
             title: '知识库详情',
+            requiredPermissions: ['KB_MANAGE'],
           },
         },
         {
@@ -96,6 +104,7 @@ const router = createRouter({
           component: () => import('@/views/document/DocumentDetailView.vue'),
           meta: {
             title: '文档详情',
+            requiredPermissions: ['KB_MANAGE'],
           },
         },
         {
@@ -104,6 +113,7 @@ const router = createRouter({
           component: () => import('@/views/task/TaskMonitorView.vue'),
           meta: {
             title: '任务监控',
+            requiredPermissions: ['TASK_VIEW'],
           },
         },
         {
@@ -112,6 +122,7 @@ const router = createRouter({
           component: () => import('@/views/audit/AuditLogView.vue'),
           meta: {
             title: '审计日志',
+            requiredPermissions: ['AUDIT_VIEW'],
           },
         },
         {
@@ -120,6 +131,7 @@ const router = createRouter({
           component: () => import('@/views/statistics/VectorIndexOverviewView.vue'),
           meta: {
             title: '向量索引',
+            requiredPermissions: ['STATISTICS_VIEW'],
           },
         },
         {
@@ -128,19 +140,13 @@ const router = createRouter({
           component: () => import('@/views/task/TaskDetailView.vue'),
           meta: {
             title: '任务详情',
+            requiredPermissions: ['TASK_VIEW'],
           },
         },
       ],
     },
   ],
 })
-
-function hasAnyRole(userRoles: string[] | undefined, requiredRoles: string[] | undefined): boolean {
-  if (!requiredRoles || requiredRoles.length === 0) {
-    return true
-  }
-  return (userRoles ?? []).some((role) => requiredRoles.includes(role))
-}
 
 router.beforeEach(async (to) => {
   const authStore = useAuthStore()
@@ -171,10 +177,10 @@ router.beforeEach(async (to) => {
     }
   }
 
-  const requiredRoles = Array.isArray(to.meta.requiredRoles)
-    ? (to.meta.requiredRoles as string[])
+  const requiredPermissions = Array.isArray(to.meta.requiredPermissions)
+    ? (to.meta.requiredPermissions as string[])
     : []
-  if (!isPublic && requiredRoles.length > 0 && !hasAnyRole(authStore.currentUser?.roles, requiredRoles)) {
+  if (!isPublic && requiredPermissions.length > 0 && !hasAnyPermission(authStore.currentUser, requiredPermissions)) {
     return '/dashboard'
   }
 

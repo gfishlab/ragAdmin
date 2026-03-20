@@ -1,8 +1,12 @@
 <script setup lang="ts">
+import { computed } from 'vue'
 import { ChatDotRound, Collection, Connection, List, Plus, Tickets } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '@/stores/auth'
+import { hasPermission } from '@/utils/permission'
 
 const router = useRouter()
+const authStore = useAuthStore()
 
 const quickEntries = [
   {
@@ -14,6 +18,7 @@ const quickEntries = [
     path: '/chat',
     icon: ChatDotRound,
     accent: 'is-primary',
+    permission: 'CHAT_CONSOLE_ACCESS',
   },
   {
     key: 'knowledge-bases',
@@ -24,6 +29,7 @@ const quickEntries = [
     path: '/knowledge-bases',
     icon: Collection,
     accent: 'is-light',
+    permission: 'KB_MANAGE',
   },
   {
     key: 'knowledge-base-create',
@@ -34,6 +40,7 @@ const quickEntries = [
     path: '/knowledge-bases/create',
     icon: Plus,
     accent: 'is-warm',
+    permission: 'KB_MANAGE',
   },
   {
     key: 'models',
@@ -44,6 +51,7 @@ const quickEntries = [
     path: '/models',
     icon: Connection,
     accent: 'is-light',
+    permission: 'MODEL_MANAGE',
   },
   {
     key: 'tasks',
@@ -54,6 +62,7 @@ const quickEntries = [
     path: '/tasks',
     icon: List,
     accent: 'is-light',
+    permission: 'TASK_VIEW',
   },
   {
     key: 'audit-logs',
@@ -64,8 +73,13 @@ const quickEntries = [
     path: '/audit-logs',
     icon: Tickets,
     accent: 'is-light',
+    permission: 'AUDIT_VIEW',
   },
 ]
+
+const visibleEntries = computed(() => {
+  return quickEntries.filter((entry) => hasPermission(authStore.currentUser, entry.permission))
+})
 
 async function goTo(path: string): Promise<void> {
   await router.push(path)
@@ -86,7 +100,7 @@ async function goTo(path: string): Promise<void> {
 
     <section class="entry-grid">
       <button
-        v-for="entry in quickEntries"
+        v-for="entry in visibleEntries"
         :key="entry.key"
         type="button"
         class="entry-card soft-panel"

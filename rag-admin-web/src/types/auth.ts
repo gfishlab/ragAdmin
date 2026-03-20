@@ -4,6 +4,7 @@ export interface CurrentUser {
   displayName: string
   mobile?: string
   roles: string[]
+  permissions: string[]
 }
 
 export interface LoginRequest {

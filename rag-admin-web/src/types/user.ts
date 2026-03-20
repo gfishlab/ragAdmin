@@ -36,3 +36,46 @@ export interface UpdateUserRequest {
 export interface AssignUserRolesRequest {
   roleCodes: string[]
 }
+
+export type UserSessionScope = 'admin' | 'app' | 'all'
+
+export interface UserSessionListQuery {
+  pageNo: number
+  pageSize: number
+  keyword?: string
+  roleCode?: string
+  onlineScope?: UserSessionScope
+}
+
+export interface UserSessionListItem {
+  userId: number
+  username: string
+  displayName: string
+  mobile?: string | null
+  status: string
+  roles: string[]
+  adminOnline: boolean
+  appOnline: boolean
+  lastLoginAt?: string | null
+  lastActiveAt?: string | null
+}
+
+export interface UserSessionDetail {
+  userId: number
+  username: string
+  displayName: string
+  mobile?: string | null
+  status: string
+  roles: string[]
+  adminOnline: boolean
+  appOnline: boolean
+  adminLastLoginAt?: string | null
+  adminLastActiveAt?: string | null
+  appLastLoginAt?: string | null
+  appLastActiveAt?: string | null
+}
+
+export interface KickoutUserSessionRequest {
+  scope: UserSessionScope
+  reason: string
+}

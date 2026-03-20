@@ -1,18 +1,35 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useRouter } from 'vue-router'
 import {
   assignUserRoles,
   createUser,
+  getUserSessionDetail,
+  kickoutUserSession,
+  listUserSessions,
   listUsers,
   updateUser,
 } from '@/api/user'
 import { resolveErrorMessage } from '@/api/http'
+import { useAuthStore } from '@/stores/auth'
 import type {
   CreateUserRequest,
+  KickoutUserSessionRequest,
   UpdateUserRequest,
   UserListItem,
+  UserSessionDetail,
+  UserSessionScope,
 } from '@/types/user'
+
+interface KickoutTarget {
+  id: number
+  username: string
+  displayName: string
+}
+
+const router = useRouter()
+const authStore = useAuthStore()
 
 const ROLE_OPTIONS = [
   { value: 'APP_USER', label: '问答前台用户', description: '可登录聊天前台，适合普通组织成员。' },
@@ -68,6 +85,23 @@ const roleForm = reactive({
 const hasData = computed(() => rows.value.length > 0)
 const dialogTitle = computed(() => (userDialogMode.value === 'create' ? '新增用户' : '编辑用户'))
 const dialogConfirmText = computed(() => (userDialogMode.value === 'create' ? '确认创建' : '确认保存'))
+const sessionSummaryLoading = ref(false)
+const sessionDetailLoading = ref(false)
+const sessionDetailError = ref('')
+const sessionDrawerVisible = ref(false)
+const sessionDetail = ref<UserSessionDetail | null>(null)
+const kickoutDialogVisible = ref(false)
+const kickoutSubmitting = ref(false)
+const kickoutTarget = ref<KickoutTarget | null>(null)
+const kickoutForm = reactive<KickoutUserSessionRequest>({
+  scope: 'all',
+  reason: '管理员手动下线',
+})
+const sessionSummary = reactive({
+  allOnline: 0,
+  adminOnline: 0,
+  appOnline: 0,
+})
 const currentPageSummary = computed(() => {
   return rows.value.reduce(
     (result, item) => {
@@ -75,25 +109,31 @@ const currentPageSummary = computed(() => {
       if (item.status === 'ENABLED') {
         result.enabled += 1
       }
-      if (item.roles.includes('APP_USER') || item.roles.some((role) => ['ADMIN', 'KB_ADMIN', 'AUDITOR'].includes(role))) {
-        result.appAccess += 1
-      }
-      if (item.roles.some((role) => ['ADMIN', 'KB_ADMIN', 'AUDITOR'].includes(role))) {
-        result.adminAccess += 1
-      }
       return result
     },
     {
       total: 0,
       enabled: 0,
-      appAccess: 0,
-      adminAccess: 0,
     },
   )
+})
+const sessionDrawerTitle = computed(() => {
+  if (!sessionDetail.value) {
+    return '在线会话详情'
+  }
+  return `${sessionDetail.value.displayName || sessionDetail.value.username} 的在线会话`
+})
+const kickoutTargetName = computed(() => kickoutTarget.value?.displayName || kickoutTarget.value?.username || '')
+const sessionOnlineDisabled = computed(() => {
+  return !sessionDetail.value || (!sessionDetail.value.adminOnline && !sessionDetail.value.appOnline)
 })
 
 function statusTagType(status: string): 'success' | 'info' {
   return status === 'ENABLED' ? 'success' : 'info'
+}
+
+function sessionTagType(online: boolean): 'success' | 'info' {
+  return online ? 'success' : 'info'
 }
 
 function roleTagType(roleCode: string): 'primary' | 'success' | 'warning' | 'info' {
@@ -127,6 +167,25 @@ function accessScopes(roles: string[]): string[] {
 function normalizeOptionalValue(value: string): string | null {
   const normalized = value.trim()
   return normalized ? normalized : null
+}
+
+function formatDateTime(value?: string | null): string {
+  if (!value) {
+    return '暂无记录'
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  }).format(parsed)
 }
 
 function resetUserForm(): void {
@@ -208,6 +267,39 @@ async function loadData(): Promise<void> {
   }
 }
 
+async function loadSessionSummary(): Promise<void> {
+  sessionSummaryLoading.value = true
+  try {
+    const [all, admin, app] = await Promise.all([
+      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'all' }),
+      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'admin' }),
+      listUserSessions({ pageNo: 1, pageSize: 1, onlineScope: 'app' }),
+    ])
+    sessionSummary.allOnline = all.total
+    sessionSummary.adminOnline = admin.total
+    sessionSummary.appOnline = app.total
+  } catch {
+    sessionSummary.allOnline = 0
+    sessionSummary.adminOnline = 0
+    sessionSummary.appOnline = 0
+  } finally {
+    sessionSummaryLoading.value = false
+  }
+}
+
+async function loadSessionDetail(userId: number): Promise<void> {
+  sessionDetailLoading.value = true
+  sessionDetailError.value = ''
+  try {
+    sessionDetail.value = await getUserSessionDetail(userId)
+  } catch (error) {
+    sessionDetail.value = null
+    sessionDetailError.value = resolveErrorMessage(error)
+  } finally {
+    sessionDetailLoading.value = false
+  }
+}
+
 async function handleSearch(): Promise<void> {
   pagination.pageNo = 1
   await loadData()
@@ -221,7 +313,7 @@ async function handleReset(): Promise<void> {
 }
 
 async function handleRefresh(): Promise<void> {
-  await loadData()
+  await Promise.all([loadData(), loadSessionSummary()])
 }
 
 async function handleCurrentChange(pageNo: number): Promise<void> {
@@ -282,6 +374,9 @@ async function handleSaveRoles(): Promise<void> {
     currentRoleTarget.value = null
     ElMessage.success('用户角色已更新')
     await loadData()
+    if (sessionDrawerVisible.value && sessionDetail.value) {
+      await loadSessionDetail(sessionDetail.value.userId)
+    }
   } catch (error) {
     ElMessage.error(resolveErrorMessage(error))
   } finally {
@@ -289,9 +384,86 @@ async function handleSaveRoles(): Promise<void> {
   }
 }
 
+async function openSessionDrawer(user: UserListItem): Promise<void> {
+  sessionDrawerVisible.value = true
+  await loadSessionDetail(user.id)
+}
+
+function resetSessionDrawer(): void {
+  sessionDetail.value = null
+  sessionDetailError.value = ''
+  sessionDetailLoading.value = false
+}
+
+function openKickoutDialog(target: KickoutTarget, scope: UserSessionScope = 'all'): void {
+  kickoutTarget.value = target
+  kickoutForm.scope = scope
+  kickoutForm.reason = '管理员手动下线'
+  kickoutDialogVisible.value = true
+}
+
+function openKickoutDialogForCurrentSession(scope: UserSessionScope = 'all'): void {
+  if (!sessionDetail.value) {
+    return
+  }
+  openKickoutDialog(
+    {
+      id: sessionDetail.value.userId,
+      username: sessionDetail.value.username,
+      displayName: sessionDetail.value.displayName,
+    },
+    scope,
+  )
+}
+
+function resetKickoutDialog(): void {
+  kickoutTarget.value = null
+  kickoutForm.scope = 'all'
+  kickoutForm.reason = '管理员手动下线'
+}
+
+async function handleKickout(): Promise<void> {
+  if (!kickoutTarget.value) {
+    return
+  }
+  const reason = kickoutForm.reason.trim()
+  if (!reason) {
+    ElMessage.warning('请填写强制下线原因')
+    return
+  }
+
+  kickoutSubmitting.value = true
+  try {
+    await kickoutUserSession(kickoutTarget.value.id, {
+      scope: kickoutForm.scope,
+      reason,
+    })
+    kickoutDialogVisible.value = false
+    ElMessage.success('强制下线已执行')
+
+    const isSelfAdminKickout = kickoutTarget.value.id === authStore.currentUser?.id
+      && ['admin', 'all'].includes(kickoutForm.scope)
+
+    await loadSessionSummary()
+    if (sessionDrawerVisible.value && sessionDetail.value?.userId === kickoutTarget.value.id) {
+      await loadSessionDetail(kickoutTarget.value.id)
+    }
+
+    if (isSelfAdminKickout) {
+      authStore.clearSession()
+      await router.replace('/login')
+      return
+    }
+  } catch (error) {
+    ElMessage.error(resolveErrorMessage(error))
+  } finally {
+    kickoutSubmitting.value = false
+  }
+}
+
 onMounted(async () => {
   resetUserForm()
-  await loadData()
+  await Promise.all([loadData(), loadSessionSummary()])
 })
 </script>
 
@@ -322,15 +494,15 @@ onMounted(async () => {
         <strong>{{ currentPageSummary.enabled }}</strong>
         <p>可以参与登录鉴权的已启用账号</p>
       </article>
-      <article class="summary-card soft-panel is-primary">
-        <span>前台白名单</span>
-        <strong>{{ currentPageSummary.appAccess }}</strong>
-        <p>具备聊天前台登录能力的账号数</p>
+      <article class="summary-card soft-panel is-primary" v-loading="sessionSummaryLoading">
+        <span>前台在线</span>
+        <strong>{{ sessionSummary.appOnline }}</strong>
+        <p>按 userId 去重的聊天前台在线用户数</p>
       </article>
-      <article class="summary-card soft-panel is-warm">
-        <span>后台治理</span>
-        <strong>{{ currentPageSummary.adminAccess }}</strong>
-        <p>具备后台管理入口权限的账号数</p>
+      <article class="summary-card soft-panel is-warm" v-loading="sessionSummaryLoading">
+        <span>后台在线</span>
+        <strong>{{ sessionSummary.adminOnline }}</strong>
+        <p>按 userId 去重的后台治理在线用户数</p>
       </article>
     </section>
 
@@ -416,11 +588,12 @@ onMounted(async () => {
             </div>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" width="280" fixed="right">
           <template #default="{ row }">
             <div class="action-links">
               <el-button link type="primary" @click="openEditDialog(row)">编辑</el-button>
               <el-button link type="primary" @click="openRoleDialog(row)">配置角色</el-button>
+              <el-button link type="primary" @click="openSessionDrawer(row)">会话详情</el-button>
             </div>
           </template>
         </el-table-column>
@@ -528,6 +701,163 @@ onMounted(async () => {
           <el-button @click="roleDialogVisible = false">取消</el-button>
           <el-button type="primary" :loading="roleSubmitting" @click="handleSaveRoles">
             保存角色
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <el-drawer
+      v-model="sessionDrawerVisible"
+      :title="sessionDrawerTitle"
+      size="560px"
+      @closed="resetSessionDrawer"
+    >
+      <div class="session-drawer">
+        <section class="session-summary-card soft-panel" v-loading="sessionDetailLoading">
+          <template v-if="sessionDetail">
+            <div class="session-summary-head">
+              <div>
+                <p class="user-eyebrow">会话治理</p>
+                <strong class="session-user-name">
+                  {{ sessionDetail.displayName || sessionDetail.username }}
+                </strong>
+              </div>
+              <el-tag :type="statusTagType(sessionDetail.status)" effect="plain">
+                {{ sessionDetail.status }}
+              </el-tag>
+            </div>
+            <div class="tag-list">
+              <el-tag
+                v-for="roleCode in sessionDetail.roles"
+                :key="`detail-${sessionDetail.userId}-${roleCode}`"
+                :type="roleTagType(roleCode)"
+                effect="plain"
+              >
+                {{ roleLabel(roleCode) }}
+              </el-tag>
+            </div>
+            <p class="session-summary-text">
+              当前平台在线用户：<strong>{{ sessionSummary.allOnline }}</strong>
+              <span>当前查看对象支持前后台分域下线。</span>
+            </p>
+          </template>
+          <p v-else-if="sessionDetailError" class="error-text">{{ sessionDetailError }}</p>
+        </section>
+
+        <section v-if="sessionDetail" class="session-domain-grid">
+          <article class="session-domain-card soft-panel">
+            <div class="session-domain-head">
+              <div>
+                <span class="session-domain-label">后台管理域</span>
+                <strong>admin</strong>
+              </div>
+              <el-tag :type="sessionTagType(sessionDetail.adminOnline)">
+                {{ sessionDetail.adminOnline ? '在线' : '离线' }}
+              </el-tag>
+            </div>
+            <dl class="session-metadata">
+              <div>
+                <dt>最近登录</dt>
+                <dd>{{ formatDateTime(sessionDetail.adminLastLoginAt) }}</dd>
+              </div>
+              <div>
+                <dt>最近活跃</dt>
+                <dd>{{ formatDateTime(sessionDetail.adminLastActiveAt) }}</dd>
+              </div>
+            </dl>
+            <div class="session-domain-actions">
+              <el-button
+                type="warning"
+                plain
+                :disabled="!sessionDetail.adminOnline"
+                @click="openKickoutDialogForCurrentSession('admin')"
+              >
+                强制下线
+              </el-button>
+            </div>
+          </article>
+
+          <article class="session-domain-card soft-panel">
+            <div class="session-domain-head">
+              <div>
+                <span class="session-domain-label">问答前台域</span>
+                <strong>app</strong>
+              </div>
+              <el-tag :type="sessionTagType(sessionDetail.appOnline)">
+                {{ sessionDetail.appOnline ? '在线' : '离线' }}
+              </el-tag>
+            </div>
+            <dl class="session-metadata">
+              <div>
+                <dt>最近登录</dt>
+                <dd>{{ formatDateTime(sessionDetail.appLastLoginAt) }}</dd>
+              </div>
+              <div>
+                <dt>最近活跃</dt>
+                <dd>{{ formatDateTime(sessionDetail.appLastActiveAt) }}</dd>
+              </div>
+            </dl>
+            <div class="session-domain-actions">
+              <el-button
+                type="warning"
+                plain
+                :disabled="!sessionDetail.appOnline"
+                @click="openKickoutDialogForCurrentSession('app')"
+              >
+                强制下线
+              </el-button>
+            </div>
+          </article>
+        </section>
+
+        <div v-if="sessionDetail" class="session-drawer-footer">
+          <el-button
+            type="danger"
+            :disabled="sessionOnlineDisabled"
+            @click="openKickoutDialogForCurrentSession('all')"
+          >
+            全部下线
+          </el-button>
+        </div>
+      </div>
+    </el-drawer>
+
+    <el-dialog
+      v-model="kickoutDialogVisible"
+      title="强制用户下线"
+      width="560px"
+      @closed="resetKickoutDialog"
+    >
+      <div class="kickout-dialog-head">
+        <strong>{{ kickoutTargetName }}</strong>
+        <span>按 userId 执行分域下线，`admin` 与 `app` 会分别影响后台和聊天前台。</span>
+      </div>
+
+      <el-form label-position="top">
+        <el-form-item label="下线范围">
+          <el-radio-group v-model="kickoutForm.scope">
+            <el-radio value="admin">仅后台</el-radio>
+            <el-radio value="app">仅前台</el-radio>
+            <el-radio value="all">全部域</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="下线原因">
+          <el-input
+            v-model="kickoutForm.reason"
+            type="textarea"
+            :rows="4"
+            maxlength="200"
+            show-word-limit
+            placeholder="请输入管理员执行下线的原因"
+          />
+        </el-form-item>
+      </el-form>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="kickoutDialogVisible = false">取消</el-button>
+          <el-button type="danger" :loading="kickoutSubmitting" @click="handleKickout">
+            确认下线
           </el-button>
         </div>
       </template>
@@ -660,7 +990,9 @@ onMounted(async () => {
 .contact-cell small,
 .error-text,
 .reset-tip span,
-.role-dialog-head span {
+.role-dialog-head span,
+.kickout-dialog-head span,
+.session-summary-text span {
   color: #8f7159;
 }
 
@@ -717,6 +1049,94 @@ onMounted(async () => {
   line-height: 1.7;
 }
 
+.session-drawer {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.session-summary-card,
+.session-domain-card {
+  padding: 20px;
+}
+
+.session-summary-head,
+.session-domain-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-user-name {
+  display: block;
+  margin-top: 4px;
+  color: #2f241d;
+  font-family: "Noto Serif SC", serif;
+  font-size: 24px;
+}
+
+.session-summary-text {
+  margin: 14px 0 0;
+  color: #6d5948;
+  line-height: 1.7;
+}
+
+.session-domain-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.session-domain-label {
+  display: block;
+  margin-bottom: 6px;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.session-domain-head strong {
+  color: #2f241d;
+  font-family: "Noto Serif SC", serif;
+  font-size: 20px;
+}
+
+.session-metadata {
+  display: grid;
+  gap: 14px;
+  margin: 18px 0 0;
+}
+
+.session-metadata dt {
+  margin-bottom: 6px;
+  color: #9d7a58;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.session-metadata dd {
+  margin: 0;
+  color: #3d2f25;
+  line-height: 1.7;
+}
+
+.session-domain-actions,
+.session-drawer-footer {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 18px;
+}
+
+.kickout-dialog-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
 @media (max-width: 1180px) {
   .summary-grid,
   .role-guide {
@@ -734,7 +1154,8 @@ onMounted(async () => {
   .filter-grid,
   .form-grid,
   .summary-grid,
-  .role-guide {
+  .role-guide,
+  .session-domain-grid {
     grid-template-columns: 1fr;
   }
 }

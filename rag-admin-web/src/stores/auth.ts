@@ -18,7 +18,18 @@ function parseStoredUser(): CurrentUser | null {
     return null
   }
   try {
-    return JSON.parse(raw) as CurrentUser
+    const parsed = JSON.parse(raw) as Partial<CurrentUser>
+    if (!parsed.id || !parsed.username || !parsed.displayName || !Array.isArray(parsed.roles)) {
+      return null
+    }
+    return {
+      id: parsed.id,
+      username: parsed.username,
+      displayName: parsed.displayName,
+      mobile: parsed.mobile,
+      roles: parsed.roles,
+      permissions: Array.isArray(parsed.permissions) ? parsed.permissions : [],
+    }
   } catch {
     return null
   }
@@ -62,10 +73,6 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function hydrateCurrentUser(): Promise<void> {
     if (!accessToken.value) {
-      bootstrapFinished.value = true
-      return
-    }
-    if (currentUser.value) {
       bootstrapFinished.value = true
       return
     }

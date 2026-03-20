@@ -42,6 +42,17 @@ export function resolveErrorMessage(error: unknown): string {
   return '请求失败，请稍后重试'
 }
 
+function redirectToLogin(): void {
+  if (typeof window === 'undefined' || window.location.pathname === '/login') {
+    return
+  }
+  const redirect = `${window.location.pathname}${window.location.search}${window.location.hash}`
+  const target = redirect && redirect !== '/login'
+    ? `/login?redirect=${encodeURIComponent(redirect)}`
+    : '/login'
+  window.location.replace(target)
+}
+
 async function refreshAccessToken(): Promise<string> {
   const refreshToken = getRefreshToken()
   if (!refreshToken) {
@@ -92,11 +103,16 @@ http.interceptors.response.use(
         return http(config)
       } catch (refreshError) {
         clearSessionStorage()
+        redirectToLogin()
         throw refreshError
       }
     }
 
     const payload = error.response?.data
+    if (status === 401 && !isAuthEndpoint) {
+      clearSessionStorage()
+      redirectToLogin()
+    }
     throw new ApiError(
       payload?.message || error.message || '请求失败',
       payload?.code,
