@@ -55,6 +55,14 @@ interface SessionKnowledgeBasePayload {
   selectedKbIds: number[]
 }
 
+type PreferenceSyncStatus = 'IDLE' | 'SAVING' | 'SAVED' | 'FAILED'
+
+interface StreamRecoveryNotice {
+  tone: 'connection' | 'model'
+  title: string
+  description: string
+}
+
 const props = defineProps<Props>()
 const router = useRouter()
 const KNOWLEDGE_BASE_MENTION_STOP_PATTERN = /[\s@,，.。!！?？:：;；()（）\[\]【】]/
@@ -84,11 +92,15 @@ const knowledgeBasePickerKeyword = ref('')
 const knowledgeBaseMentionState = ref<KnowledgeBaseMentionState | null>(null)
 const knowledgeBaseMentionActiveIndex = ref(0)
 const preferencePersistencePauseDepth = ref(0)
+const preferenceSyncStatus = ref<PreferenceSyncStatus>('IDLE')
+const preferenceSyncErrorMessage = ref('')
+const preferenceSyncPendingCount = ref(0)
 
 let streamHandle: ChatStreamHandle | null = null
 let composerBlurTimer: number | null = null
 let sessionMetadataSyncTask: Promise<void> = Promise.resolve()
 let sessionKnowledgeBaseSyncTask: Promise<void> = Promise.resolve()
+let preferenceSyncResetTimer: number | null = null
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
 const sessionPanelTitle = computed(() => {
@@ -183,6 +195,74 @@ const composerPlaceholder = computed(() => {
     : '输入问题后，可以纯模型回答，也可以临时联合多个知识库检索'
 })
 
+const showPreferenceSyncNotice = computed(() => {
+  return activeSession.value !== null && preferenceSyncStatus.value !== 'IDLE'
+})
+
+const preferenceSyncNoticeTitle = computed(() => {
+  switch (preferenceSyncStatus.value) {
+    case 'SAVING':
+      return '偏好保存中'
+    case 'SAVED':
+      return '偏好已保存'
+    case 'FAILED':
+      return '偏好保存失败'
+    default:
+      return ''
+  }
+})
+
+const preferenceSyncNoticeText = computed(() => {
+  switch (preferenceSyncStatus.value) {
+    case 'SAVING':
+      return '正在同步当前会话的模型、联网和知识库选择。'
+    case 'SAVED':
+      return '当前会话偏好已同步到服务端。'
+    case 'FAILED':
+      return preferenceSyncErrorMessage.value || '本次偏好同步失败，请稍后重试。'
+    default:
+      return ''
+  }
+})
+
+const preferenceSyncNoticeClass = computed(() => {
+  switch (preferenceSyncStatus.value) {
+    case 'SAVING':
+      return 'is-saving'
+    case 'SAVED':
+      return 'is-saved'
+    case 'FAILED':
+      return 'is-failed'
+    default:
+      return ''
+  }
+})
+
+const pendingStreamRecoveryNotice = computed<StreamRecoveryNotice | null>(() => {
+  const errorMessage = pendingExchange.value?.errorMessage?.trim()
+  if (!errorMessage) {
+    return null
+  }
+
+  if (isConnectionInterruptedMessage(errorMessage)) {
+    return {
+      tone: 'connection',
+      title: '连接已中断',
+      description: '当前回答尚未完整返回。你可以点击“重新连接并发送”，或等待网络恢复后再次提问。',
+    }
+  }
+
+  return {
+    tone: 'model',
+    title: '模型返回失败',
+    description: '这次失败来自模型或服务端返回。建议检查模型配置、联网开关或知识库范围后再重试。',
+  }
+})
+
+const retryPendingExchangeLabel = computed(() => {
+  return pendingStreamRecoveryNotice.value?.tone === 'connection' ? '重新连接并发送' : '重新发送'
+})
+
 function normalizeSelectedKbIds(value?: number[] | null): number[] {
   const ordered = new Set<number>()
   if (typeof props.anchorKbId === 'number') {
@@ -213,6 +293,61 @@ function resetKnowledgeBasePickerState(): void {
   knowledgeBaseMentionActiveIndex.value = 0
 }
 
+function clearPreferenceSyncResetTimer(): void {
+  if (preferenceSyncResetTimer === null) {
+    return
+  }
+  window.clearTimeout(preferenceSyncResetTimer)
+  preferenceSyncResetTimer = null
+}
+
+function resetPreferenceSyncState(): void {
+  clearPreferenceSyncResetTimer()
+  preferenceSyncPendingCount.value = 0
+  preferenceSyncStatus.value = 'IDLE'
+  preferenceSyncErrorMessage.value = ''
+}
+
+function beginPreferenceSync(sessionId: number): void {
+  if (activeSessionId.value !== sessionId) {
+    return
+  }
+  clearPreferenceSyncResetTimer()
+  preferenceSyncPendingCount.value += 1
+  preferenceSyncStatus.value = 'SAVING'
+  preferenceSyncErrorMessage.value = ''
+}
+
+function completePreferenceSyncSuccess(sessionId: number): void {
+  if (activeSessionId.value !== sessionId) {
+    return
+  }
+
+  preferenceSyncPendingCount.value = Math.max(0, preferenceSyncPendingCount.value - 1)
+  if (preferenceSyncPendingCount.value > 0) {
+    preferenceSyncStatus.value = 'SAVING'
+    return
+  }
+
+  preferenceSyncStatus.value = 'SAVED'
+  preferenceSyncResetTimer = window.setTimeout(() => {
+    if (activeSessionId.value === sessionId && preferenceSyncStatus.value === 'SAVED') {
+      preferenceSyncStatus.value = 'IDLE'
+    }
+    preferenceSyncResetTimer = null
+  }, 1800)
+}
+
+function completePreferenceSyncFailure(sessionId: number, errorMessage: string): void {
+  if (activeSessionId.value !== sessionId) {
+    return
+  }
+  clearPreferenceSyncResetTimer()
+  preferenceSyncPendingCount.value = Math.max(0, preferenceSyncPendingCount.value - 1)
+  preferenceSyncStatus.value = 'FAILED'
+  preferenceSyncErrorMessage.value = errorMessage
+}
+
 function suspendPreferencePersistence(mutator: () => void): void {
   preferencePersistencePauseDepth.value += 1
   mutator()
@@ -222,6 +357,7 @@ function suspendPreferencePersistence(mutator: () => void): void {
 }
 
 function applySessionPreferences(session: ChatSession | null): void {
+  resetPreferenceSyncState()
   suspendPreferencePersistence(() => {
     if (!session) {
       resetPreferenceInputs()
@@ -249,6 +385,10 @@ function closeStream(): void {
   streamHandle?.close()
   streamHandle = null
   streaming.value = false
+}
+
+function isConnectionInterruptedMessage(message: string): boolean {
+  return /流式连接已中断|连接已中断|网络|network|fetch|timeout|timed out|连接失败|断开/i.test(message)
 }
 
 function isSameNumberArray(left: number[], right: number[]): boolean {
@@ -283,6 +423,7 @@ function buildSessionKnowledgeBasePayload(): SessionKnowledgeBasePayload | null 
 }
 
 async function persistSessionMetadata(payload: SessionMetadataPayload): Promise<void> {
+  beginPreferenceSync(payload.sessionId)
   try {
     const updated = await updateChatSession(payload.sessionId, {
       sessionName: payload.sessionName,
@@ -294,12 +435,14 @@ async function persistSessionMetadata(payload: SessionMetadataPayload): Promise<
       chatModelId: updated.chatModelId,
       webSearchEnabled: updated.webSearchEnabled,
     })
+    completePreferenceSyncSuccess(payload.sessionId)
   } catch (error) {
-    ElMessage.error(resolveChatStreamError(error))
+    completePreferenceSyncFailure(payload.sessionId, resolveChatStreamError(error))
   }
 }
 
 async function persistSessionKnowledgeBases(payload: SessionKnowledgeBasePayload): Promise<void> {
+  beginPreferenceSync(payload.sessionId)
   try {
     const updated = await updateSessionKnowledgeBases(payload.sessionId, {
       selectedKbIds: payload.selectedKbIds,
@@ -307,8 +450,9 @@ async function persistSessionKnowledgeBases(payload: SessionKnowledgeBasePayload
     replaceSessionLocal(payload.sessionId, {
       selectedKbIds: [...updated.selectedKbIds],
     })
+    completePreferenceSyncSuccess(payload.sessionId)
   } catch (error) {
-    ElMessage.error(resolveChatStreamError(error))
+    completePreferenceSyncFailure(payload.sessionId, resolveChatStreamError(error))
   }
 }
 
@@ -565,6 +709,7 @@ function handleStartNewSession(): void {
   if (streaming.value) {
     return
   }
+  resetPreferenceSyncState()
   activeSessionId.value = null
   messages.value = []
   pendingExchange.value = null
@@ -1009,6 +1154,7 @@ onMounted(async () => {
 onUnmounted(() => {
   closeStream()
   clearComposerBlurTimer()
+  clearPreferenceSyncResetTimer()
 })
 </script>
 
@@ -1082,6 +1228,20 @@ onUnmounted(() => {
           <small>Provider 不可用时服务端会优雅降级</small>
         </div>
         <el-switch v-model="webSearchEnabled" :disabled="streaming" />
+      </div>
+      <div v-if="streaming || showPreferenceSyncNotice" class="control-status-bar">
+        <div v-if="streaming" class="control-status-pill is-streaming">
+          <strong>只读中</strong>
+          <span>当前回答生成中，模型、联网和知识库选择已锁定，本轮不会响应偏好变更。</span>
+        </div>
+        <div
+          v-if="showPreferenceSyncNotice"
+          class="control-status-pill"
+          :class="preferenceSyncNoticeClass"
+        >
+          <strong>{{ preferenceSyncNoticeTitle }}</strong>
+          <span>{{ preferenceSyncNoticeText }}</span>
+        </div>
       </div>
     </section>
 
@@ -1160,7 +1320,7 @@ onUnmounted(() => {
               {{ selectedKnowledgeBaseNames.join(' / ') }}
             </el-tag>
           </div>
-          <el-button text :icon="RefreshRight" @click="initialize">刷新</el-button>
+          <el-button text :icon="RefreshRight" :disabled="streaming" @click="initialize">刷新</el-button>
         </div>
 
         <div ref="messageContainerRef" class="conversation-body page-scrollbar">
@@ -1256,13 +1416,21 @@ onUnmounted(() => {
                 <span class="message-role">助手</span>
                 <p>{{ pendingExchange.answer || '正在生成回答...' }}</p>
                 <p v-if="pendingExchange.errorMessage" class="pending-error">{{ pendingExchange.errorMessage }}</p>
+                <div
+                  v-if="pendingStreamRecoveryNotice"
+                  class="pending-recovery-card"
+                  :class="`is-${pendingStreamRecoveryNotice.tone}`"
+                >
+                  <strong>{{ pendingStreamRecoveryNotice.title }}</strong>
+                  <span>{{ pendingStreamRecoveryNotice.description }}</span>
+                </div>
                 <el-button
                   v-if="pendingExchange.errorMessage"
                   text
                   :icon="RefreshRight"
                   @click="handleRetryPendingExchange"
                 >
-                  重新发送
+                  {{ retryPendingExchangeLabel }}
                 </el-button>
               </article>
             </div>
@@ -1509,6 +1677,59 @@ onUnmounted(() => {
   grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.2fr) 220px;
   gap: 16px;
   padding: 18px 20px;
+}
+
+.control-status-bar {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.control-status-pill {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: min(320px, 100%);
+  padding: 12px 14px;
+  border: 1px solid rgba(122, 89, 53, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 252, 248, 0.9);
+}
+
+.control-status-pill strong {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.control-status-pill span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.control-status-pill.is-streaming {
+  border-color: rgba(157, 91, 47, 0.18);
+  background: rgba(255, 246, 235, 0.92);
+}
+
+.control-status-pill.is-saving {
+  border-color: rgba(150, 117, 56, 0.18);
+  background: rgba(255, 250, 238, 0.92);
+}
+
+.control-status-pill.is-saved {
+  border-color: rgba(79, 132, 86, 0.18);
+  background: rgba(244, 250, 244, 0.94);
+}
+
+.control-status-pill.is-failed {
+  border-color: rgba(176, 77, 53, 0.22);
+  background: rgba(255, 244, 240, 0.94);
 }
 
 .control-block {
@@ -1898,6 +2119,40 @@ onUnmounted(() => {
 .pending-error {
   margin-top: 12px;
   color: #b04d35;
+}
+
+.pending-recovery-card {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 12px 14px;
+  border: 1px solid rgba(122, 89, 53, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 252, 248, 0.9);
+}
+
+.pending-recovery-card strong {
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.pending-recovery-card span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.pending-recovery-card.is-connection {
+  border-color: rgba(157, 91, 47, 0.18);
+  background: rgba(255, 246, 235, 0.92);
+}
+
+.pending-recovery-card.is-model {
+  border-color: rgba(176, 77, 53, 0.22);
+  background: rgba(255, 244, 240, 0.94);
 }
 
 .composer-card {
