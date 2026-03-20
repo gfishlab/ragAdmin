@@ -101,7 +101,13 @@ ragAdmin/
 - `/api/app` 前台登录、知识库列表、模型列表
 - 首页通用聊天与知识库内聊天
 - 多知识库临时联查
+- 前台运行时模型切换与联网开关
 - SSE 流式输出
+
+说明：
+
+- 前台联网能力当前已接入 `WebSearchProvider` 抽象
+- 如果未配置真实联网搜索 Provider，开启联网开关后会自动降级为空结果，不会中断主问答链路
 
 ## 4. 本地启动
 
@@ -188,3 +194,4 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 - 前台架构设计：[docs/plans/2026-03-19-app-chat-frontend-architecture-design.md](docs/plans/2026-03-19-app-chat-frontend-architecture-design.md)
 - 前台实施计划：[docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md](docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)
+

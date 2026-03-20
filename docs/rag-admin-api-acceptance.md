@@ -492,6 +492,32 @@ Invoke-RestMethod `
   -Body $AppChatBody
 ```
 
+### 5.21.1 前台验证运行时模型切换与联网开关
+
+```powershell
+$AppChatWithModelBody = @"
+{
+  "question": "请用一句话说明当前平台支持哪些前台问答能力",
+  "chatModelId": $ChatModelId,
+  "selectedKbIds": [],
+  "webSearchEnabled": true
+}
+"@
+
+Invoke-RestMethod `
+  -Method Post `
+  -Uri "$BaseUrl/api/app/chat/sessions/$AppSessionId/messages" `
+  -Headers @{ Authorization = "Bearer $AppAccessToken" } `
+  -ContentType "application/json" `
+  -Body $AppChatWithModelBody
+```
+
+判定要点：
+
+- 显式传入 `chatModelId` 后仍能正常返回答案
+- `webSearchEnabled=true` 时请求不应因为“未配置真实联网 Provider”而直接失败
+- 若当前环境已接入真实搜索 Provider，可结合日志或回答内容进一步确认联网摘要已参与编排
+
 ### 5.22 前台验证流式输出
 
 ```powershell
@@ -536,3 +562,4 @@ curl.exe `
 
 - `docs/rag-admin-backend-debug-guide.md`
 - `docs/rag-admin-error-codes.md`
+

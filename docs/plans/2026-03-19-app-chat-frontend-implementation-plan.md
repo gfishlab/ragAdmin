@@ -679,7 +679,7 @@ git commit -m "feat(app-web): 支持知识库内部聊天场景"
 - Modify: `docs/rag-admin-backend-debug-guide.md`
 - Modify: `docs/rag-admin-api-acceptance.md`
 
-- [ ] **Step 1: 更新仓库结构说明**
+- [x] **Step 1: 更新仓库结构说明**
 
 补充：
 
@@ -687,7 +687,7 @@ git commit -m "feat(app-web): 支持知识库内部聊天场景"
 - 前台启动命令
 - 前后台端口说明
 
-- [ ] **Step 2: 补充前台联调验收步骤**
+- [x] **Step 2: 补充前台联调验收步骤**
 
 至少包含：
 
@@ -698,7 +698,7 @@ git commit -m "feat(app-web): 支持知识库内部聊天场景"
 - 多知识库选择
 - SSE 流式输出验收
 
-- [ ] **Step 3: 最终构建验收**
+- [x] **Step 3: 最终构建验收**
 
 Run:
 
@@ -713,6 +713,12 @@ Expected:
 
 - 后端测试通过
 - 两个前端都能构建
+
+执行说明：
+
+- 已执行 `mvn -q -pl rag-admin-server test`，测试通过
+- 已执行 `npm --prefix rag-admin-web run build` 与 `npm --prefix rag-chat-web run build`
+- 受限沙箱内构建会因 `esbuild spawn EPERM` 出现假失败；在正常 Shell 环境中两端构建均已验证通过
 
 - [ ] **Step 4: 最终提交**
 
@@ -732,3 +738,4 @@ git commit -m "docs(app): 补充独立问答前台联调说明"
 - [ ] 后端测试、前端构建、SSE 联调全部通过
 
 Plan complete and saved to `docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md`. Ready to execute?
+

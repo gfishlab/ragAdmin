@@ -36,6 +36,7 @@
 - `/api/app` 前台登录、模型列表、知识库列表、问答会话
 - `rag-admin-web` 管理后台
 - `rag-chat-web` 独立问答前台
+- 前台运行时模型切换、知识库多选与联网开关降级编排
 - 审计日志查询
 - 模型调用统计、知识库问答统计
 - 系统健康检查
@@ -246,7 +247,7 @@ GET /api/admin/system/health
 3. 首页勾选多个知识库后提问
 4. 切入知识库内聊天
 5. 切换聊天模型
-6. 打开或关闭联网开关
+6. 打开或关闭联网开关，并验证未配置真实 Provider 时不会报错
 7. 验证 SSE 流式输出
 
 ### 5.6 治理与统计
@@ -385,6 +386,7 @@ GET /api/admin/system/health
 - `/api/app/chat/sessions/{sessionId}/messages/stream` 是否返回了 401 或 5xx
 - 当前前台会话是否已经绑定正确知识库
 - 选中的 `chatModelId` 是否为可用聊天模型
+- 如果 `webSearchEnabled=true` 但当前环境未接入真实搜索 Provider，预期应自动降级为空联网结果，而不是直接失败
 
 ### 7.7 审计与统计为空
 
@@ -393,3 +395,4 @@ GET /api/admin/system/health
 - 是否真的有接口访问记录
 - 访问是否走了 `/api/admin/**`
 - 问答消息是否已成功落库
+
