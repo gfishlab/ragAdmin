@@ -89,6 +89,13 @@ rag:
   chat:
     memory:
       max-messages: 20
+      short-term-rounds: 10
+      short-term-idle-ttl-minutes: 120
+      summary-trigger-rounds: 10
+      summary-trigger-token-threshold: 4000
+      summary-max-length: 2000
+      summary-lock-seconds: 30
+      redis-key-prefix: rag:chat:memory
   document:
     parse:
       max-concurrency: 4

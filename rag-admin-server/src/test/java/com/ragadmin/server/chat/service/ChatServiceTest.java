@@ -15,8 +15,10 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
+import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -26,6 +28,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
@@ -69,6 +72,9 @@ class ChatServiceTest {
     private ConversationChatClient conversationChatClient;
 
     @Mock
+    private ConversationMemoryManager conversationMemoryManager;
+
+    @Mock
     private DocumentMapper documentMapper;
 
     @Mock
@@ -76,6 +82,9 @@ class ChatServiceTest {
 
     @Mock
     private ChatExchangePersistenceService chatExchangePersistenceService;
+
+    @Spy
+    private ConversationIdCodec conversationIdCodec = new ConversationIdCodec();
 
     @InjectMocks
     private ChatService chatService;

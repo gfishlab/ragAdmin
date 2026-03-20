@@ -26,8 +26,10 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
-import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
+import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
+import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -85,6 +87,12 @@ public class ChatService {
 
     @Autowired
     private ChatExchangePersistenceService chatExchangePersistenceService;
+
+    @Autowired
+    private ConversationMemoryManager conversationMemoryManager;
+
+    @Autowired
+    private ConversationIdCodec conversationIdCodec;
 
     public ChatSessionResponse createSession(CreateChatSessionRequest request, AuthenticatedUser user) {
         String sceneType = normalizeSceneType(request.getSceneType());
@@ -187,7 +195,7 @@ public class ChatService {
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
 
-        return chatExchangePersistenceService.persistExchange(
+        ChatResponse response = chatExchangePersistenceService.persistExchange(
                 execution.session(),
                 user.getUserId(),
                 request.getQuestion(),
@@ -198,6 +206,8 @@ public class ChatService {
                 latencyMs,
                 execution.retrievalResult()
         );
+        conversationMemoryManager.refresh(execution.conversationId());
+        return response;
     }
 
     public Flux<ChatStreamEventResponse> streamChat(Long sessionId, ChatRequest request, AuthenticatedUser user) {
@@ -236,6 +246,7 @@ public class ChatService {
                             (int) Duration.between(start, Instant.now()).toMillis(),
                             execution.retrievalResult()
                     );
+                    conversationMemoryManager.refresh(execution.conversationId());
                     return ChatStreamEventResponse.complete(response);
                 }))
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
@@ -298,19 +309,6 @@ public class ChatService {
     }
 
     /**
-     * 会话记忆需要显式区分场景和知识库，避免首页通用会话、不同知识库会话之间互相污染。
-     */
-    private String buildConversationId(ChatSessionEntity session) {
-        String sceneType = normalizeSceneType(session.getSceneType());
-        if (ChatSceneTypes.GENERAL.equals(sceneType)) {
-            return "chat-scene-home-user-" + session.getUserId();
-        }
-        return "chat-scene-kb-user-" + session.getUserId()
-                + "-kb-" + requireKnowledgeBaseId(session.getKbId())
-                + "-session-" + session.getId();
-    }
-
-    /**
      * 旧会话首次切到 Spring AI memory 时，按历史问答补种 USER / ASSISTANT 消息。
      */
     private List<ChatModelClient.ChatMessage> buildHistoryMessages(Long sessionId) {
@@ -368,7 +366,7 @@ public class ChatService {
                 retrievalResult,
                 promptMessages,
                 buildHistoryMessages(session.getId()),
-                buildConversationId(session)
+                conversationIdCodec.encode(session)
         );
     }
 

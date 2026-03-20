@@ -31,8 +31,9 @@ import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatModelClient;
-import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
+import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
+import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
@@ -96,6 +97,9 @@ public class AppChatService {
 
     @Autowired
     private ChatExchangePersistenceService chatExchangePersistenceService;
+
+    @Autowired
+    private ConversationIdCodec conversationIdCodec;
 
     @Transactional
     public AppChatSessionResponse createSession(AppCreateChatSessionRequest request, AuthenticatedUser user) {
@@ -225,7 +229,7 @@ public class AppChatService {
                 .eq(ChatMessageEntity::getSessionId, session.getId()));
         chatSessionKnowledgeBaseRelMapper.delete(new LambdaQueryWrapper<ChatSessionKnowledgeBaseRelEntity>()
                 .eq(ChatSessionKnowledgeBaseRelEntity::getSessionId, session.getId()));
-        conversationMemoryManager.clear(buildConversationId(session));
+        conversationMemoryManager.clear(conversationIdCodec.encode(session));
         chatSessionMapper.deleteById(session.getId());
     }
 
@@ -254,7 +258,7 @@ public class AppChatService {
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
 
-        return chatExchangePersistenceService.persistExchange(
+        ChatResponse response = chatExchangePersistenceService.persistExchange(
                 execution.session(),
                 user.getUserId(),
                 request.getQuestion(),
@@ -265,6 +269,8 @@ public class AppChatService {
                 latencyMs,
                 execution.retrievalResult()
         );
+        conversationMemoryManager.refresh(execution.conversationId());
+        return response;
     }
 
     public Flux<ChatStreamEventResponse> streamChat(Long sessionId, AppChatRequest request, AuthenticatedUser user) {
@@ -303,6 +309,7 @@ public class AppChatService {
                             (int) Duration.between(start, Instant.now()).toMillis(),
                             execution.retrievalResult()
                     );
+                    conversationMemoryManager.refresh(execution.conversationId());
                     return ChatStreamEventResponse.complete(response);
                 }))
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
@@ -372,13 +379,6 @@ public class AppChatService {
         return "知识片段：\n" + context + "\n\n问题：\n" + question + "\n\n请基于知识片段回答，并尽量简洁。";
     }
 
-    private String buildConversationId(ChatSessionEntity session) {
-        return "chat-terminal-" + normalizeTerminalType(session.getTerminalType()).toLowerCase()
-                + "-scene-" + normalizeSceneType(session.getSceneType()).toLowerCase()
-                + "-user-" + session.getUserId()
-                + "-session-" + session.getId();
-    }
-
     private List<ChatModelClient.ChatMessage> buildHistoryMessages(Long sessionId) {
         List<ChatMessageEntity> history = chatMessageMapper.selectList(new LambdaQueryWrapper<ChatMessageEntity>()
                 .eq(ChatMessageEntity::getSessionId, sessionId)
@@ -432,7 +432,7 @@ public class AppChatService {
                 retrievalResult,
                 promptMessages,
                 buildHistoryMessages(session.getId()),
-                buildConversationId(session)
+                conversationIdCodec.encode(session)
         );
     }
 
