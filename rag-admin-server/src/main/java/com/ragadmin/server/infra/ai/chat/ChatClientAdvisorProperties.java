@@ -17,4 +17,14 @@ public class ChatClientAdvisorProperties {
      * SimpleLoggerAdvisor 单条文本的最大日志字符数。
      */
     private int simpleLoggerMaxTextLength = 800;
+
+    /**
+     * 是否记录请求消息正文。
+     */
+    private boolean simpleLoggerRequestBodyEnabled = true;
+
+    /**
+     * 是否记录响应消息正文。
+     */
+    private boolean simpleLoggerResponseBodyEnabled = false;
 }

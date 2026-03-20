@@ -65,6 +65,7 @@ class SpringAiConversationChatClientTest {
     @Test
     void shouldFormatRequestWithTruncatedMessagesAndContextKeysOnly() {
         chatClientAdvisorProperties.setSimpleLoggerMaxTextLength(10);
+        chatClientAdvisorProperties.setSimpleLoggerRequestBodyEnabled(true);
 
         ChatClientRequest request = new ChatClientRequest(
                 new Prompt(List.of(
@@ -80,8 +81,7 @@ class SpringAiConversationChatClientTest {
         String formatted = chatClient.formatChatClientRequest(request);
 
         assertTrue(formatted.contains("messageCount=2"));
-        assertTrue(formatted.contains("contextKeys=[conversationId, tenantCode]")
-                || formatted.contains("contextKeys=[tenantCode, conversationId]"));
+        assertTrue(formatted.contains("contextKeys=[conversationId, tenantCode]"));
         assertTrue(formatted.contains("truncated,total="));
         assertFalse(formatted.contains("secret-conversation-id"));
         assertFalse(formatted.contains("internal-tenant"));
@@ -90,6 +90,7 @@ class SpringAiConversationChatClientTest {
     @Test
     void shouldFormatResponseWithTruncatedAssistantTextAndUsageSummary() {
         chatClientAdvisorProperties.setSimpleLoggerMaxTextLength(18);
+        chatClientAdvisorProperties.setSimpleLoggerResponseBodyEnabled(true);
 
         ChatResponse response = ChatResponse.builder()
                 .metadata(ChatResponseMetadata.builder()
@@ -122,5 +123,39 @@ class SpringAiConversationChatClientTest {
         assertTrue(formatted.contains("completionTokens=34"));
         assertTrue(formatted.contains("totalTokens=46"));
         assertTrue(formatted.contains("truncated,total="));
+        assertTrue(formatted.contains("sha256="));
+    }
+
+    @Test
+    void shouldHideRequestBodyWhenBodyLoggingDisabled() {
+        chatClientAdvisorProperties.setSimpleLoggerRequestBodyEnabled(false);
+
+        ChatClientRequest request = new ChatClientRequest(
+                new Prompt(List.of(new UserMessage("这里是一段不应该直接出现在日志里的请求正文"))),
+                Map.of("conversationId", "secret-conversation-id")
+        );
+
+        String formatted = chatClient.formatChatClientRequest(request);
+
+        assertTrue(formatted.contains("(hidden,len="));
+        assertTrue(formatted.contains("sha256="));
+        assertFalse(formatted.contains("这里是一段不应该直接出现在日志里的请求正文"));
+        assertFalse(formatted.contains("secret-conversation-id"));
+    }
+
+    @Test
+    void shouldHideResponseBodyWhenBodyLoggingDisabled() {
+        chatClientAdvisorProperties.setSimpleLoggerResponseBodyEnabled(false);
+
+        ChatResponse response = ChatResponse.builder()
+                .metadata(ChatResponseMetadata.builder().model("qwen-plus").build())
+                .generations(List.of(new Generation(new AssistantMessage("这里是一段不应该直接出现在日志里的回答正文"))))
+                .build();
+
+        String formatted = chatClient.formatChatResponse(response);
+
+        assertTrue(formatted.contains("(hidden,len="));
+        assertTrue(formatted.contains("sha256="));
+        assertFalse(formatted.contains("这里是一段不应该直接出现在日志里的回答正文"));
     }
 }

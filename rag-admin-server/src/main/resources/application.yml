@@ -67,6 +67,8 @@ rag:
       client:
         simple-logger-advisor-enabled: false
         simple-logger-max-text-length: 800
+        simple-logger-request-body-enabled: true
+        simple-logger-response-body-enabled: false
     bailian:
       enabled: true
       api-key:

@@ -18,7 +18,11 @@ import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -117,7 +121,7 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         List<Message> messages = request.prompt().getInstructions();
         return "ChatClientRequest{"
                 + "messageCount=" + messages.size()
-                + ", contextKeys=" + request.context().keySet()
+                + ", contextKeys=" + request.context().keySet().stream().sorted().toList()
                 + ", messages=" + summarizeMessages(messages)
                 + "}";
     }
@@ -161,7 +165,10 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     private String summarizeMessage(Message message) {
         StringBuilder builder = new StringBuilder();
         builder.append("{role=").append(message.getMessageType());
-        builder.append(", text=").append(abbreviateText(message.getText()));
+        builder.append(", text=").append(renderTextSummary(
+                message.getText(),
+                chatClientAdvisorProperties.isSimpleLoggerRequestBodyEnabled()
+        ));
         builder.append(", metadataKeys=").append(safeMetadataKeys(message.getMetadata()));
 
         if (message instanceof AssistantMessage assistantMessage) {
@@ -173,7 +180,10 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
     }
 
     private String summarizeAssistantMessage(AssistantMessage message) {
-        return "{text=" + abbreviateText(message.getText())
+        return "{text=" + renderTextSummary(
+                message.getText(),
+                chatClientAdvisorProperties.isSimpleLoggerResponseBodyEnabled()
+        )
                 + ", toolCallCount=" + message.getToolCalls().size()
                 + ", metadataKeys=" + safeMetadataKeys(message.getMetadata())
                 + "}";
@@ -186,21 +196,39 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         return metadata.keySet().stream().sorted().toList();
     }
 
-    private String abbreviateText(String text) {
+    private String renderTextSummary(String text, boolean bodyEnabled) {
         if (!StringUtils.hasText(text)) {
             return "\"\"";
         }
 
         String normalized = text.replaceAll("\\s+", " ").trim();
+        String digest = sha256Digest(normalized);
+        if (!bodyEnabled) {
+            return "\"(hidden,len=" + normalized.length() + ",sha256=" + digest + ")\"";
+        }
+
         int maxLength = Math.max(1, chatClientAdvisorProperties.getSimpleLoggerMaxTextLength());
         if (normalized.length() <= maxLength) {
             return "\"" + normalized + "\"";
         }
-        return "\"" + normalized.substring(0, maxLength) + "...(truncated,total=" + normalized.length() + ")\"";
+        return "\"" + normalized.substring(0, maxLength)
+                + "...(truncated,total=" + normalized.length()
+                + ",sha256=" + digest
+                + ")\"";
     }
 
     private int safeInteger(Integer value) {
         return value == null ? 0 : value;
+    }
+
+    private String sha256Digest(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] bytes = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(bytes).substring(0, 16);
+        } catch (NoSuchAlgorithmException ex) {
+            throw new IllegalStateException("SHA-256 不可用", ex);
+        }
     }
 
     private void seedConversationMemoryIfNecessary(

@@ -32,6 +32,7 @@ rag:
     chat:
       client:
         simple-logger-advisor-enabled: true
+        simple-logger-response-body-enabled: true
     bailian:
       enabled: true
       base-url: https://dashscope.aliyuncs.com
