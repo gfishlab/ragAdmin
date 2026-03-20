@@ -63,7 +63,39 @@
 - Ollama：`127.0.0.1:11434`
 - Milvus：`127.0.0.1:19530`
 
-### 3.2 联调前至少确认
+### 3.2 ChatClient 日志 advisor 说明
+
+当前问答链路已经接入 Spring AI `SimpleLoggerAdvisor`，但不同环境的日志可见范围不同。
+
+基础配置 `application.yml` 默认策略：
+
+- `rag.ai.chat.client.simple-logger-advisor-enabled=false`
+- `rag.ai.chat.client.simple-logger-max-text-length=800`
+- `rag.ai.chat.client.simple-logger-request-body-enabled=true`
+- `rag.ai.chat.client.simple-logger-response-body-enabled=false`
+
+本地与开发环境额外覆盖策略：
+
+- `application-local.yml` 默认开启 `simple-logger-advisor-enabled=true`
+- `application-dev.yml` 默认开启 `simple-logger-advisor-enabled=true`
+- `application-local.yml` 与 `application-dev.yml` 默认开启 `simple-logger-response-body-enabled=true`
+- 两个 profile 默认把 `org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor` 日志级别提升到 `DEBUG`
+
+当前日志输出规则：
+
+- 请求日志记录消息条数、`contextKeys`、消息角色、元数据键集合
+- `context` 只记录 key，不直接输出 value，避免把 `conversationId` 等上下文原值打进日志
+- 当正文可记录且超长时，只保留前缀，并附带 `truncated`、原始长度和短 `sha256`
+- 当正文日志关闭时，输出 `hidden`、原始长度和短 `sha256`
+- 响应日志额外输出 `model`、`promptTokens`、`completionTokens`、`totalTokens`
+
+联调建议：
+
+- 排查 prompt 编排、记忆注入、联网摘要拼装问题时，优先使用 `local` 或 `dev` profile
+- 如果只想确认模型调用是否发生，可以保持 `simple-logger-response-body-enabled=false`
+- 不建议在生产环境长期开启响应正文日志
+
+### 3.3 联调前至少确认
 
 1. PostgreSQL 已创建数据库 `rag_admin`
 2. Redis 可连通，密码正确
@@ -73,7 +105,7 @@
    - `nomic-embed-text`
 5. Milvus 已启动，`base-url` 当前按 `http://127.0.0.1:19530`
 
-### 3.3 首次启动会自动初始化
+### 3.4 首次启动会自动初始化
 
 应用首次启动后会自动初始化：
 
@@ -395,4 +427,17 @@ GET /api/admin/system/health
 - 是否真的有接口访问记录
 - 访问是否走了 `/api/admin/**`
 - 问答消息是否已成功落库
+
+### 7.8 ChatClient 日志没有输出
+
+优先检查：
+
+- 当前是否真的使用了 `local` 或 `dev` profile
+- `rag.ai.chat.client.simple-logger-advisor-enabled` 是否为 `true`
+- `logging.level.org.springframework.ai.chat.client.advisor.SimpleLoggerAdvisor` 是否为 `DEBUG`
+- 当前问答链路是否走到了 `SpringAiConversationChatClient`
+- 如果只看到 `hidden` 但没有正文，检查：
+  - `rag.ai.chat.client.simple-logger-request-body-enabled`
+  - `rag.ai.chat.client.simple-logger-response-body-enabled`
+- 如果只看到前缀没有完整长文本，这是预期行为；需要结合 `sha256` 和原始长度做问题比对
 
