@@ -15,6 +15,7 @@ import com.ragadmin.server.auth.service.AuthInterceptor;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
+import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
 import com.ragadmin.server.common.exception.GlobalExceptionHandler;
 import com.ragadmin.server.common.model.PageResponse;
@@ -30,21 +31,29 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.containsString;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -409,6 +418,47 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.messageId").value(102))
                 .andExpect(jsonPath("$.data.usage.promptTokens").value(180));
+    }
+
+    @Test
+    void shouldStreamChatThroughAppEndpointWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.APP_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        when(appChatService.streamChat(eq(22L), any(), any())).thenReturn(Flux.just(
+                ChatStreamEventResponse.delta("先检查回归测试。"),
+                ChatStreamEventResponse.complete(new ChatResponse(
+                        103L,
+                        "再确认知识库引用是否命中。",
+                        List.of(),
+                        new ChatUsageResponse(156, 38)
+                ))
+        ));
+
+        MvcResult mvcResult = protectedMockMvc.perform(post("/api/app/chat/sessions/22/messages/stream")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(new AppChatPayload(
+                                "发布前还要确认什么？",
+                                1L,
+                                List.of(11L),
+                                true
+                        ))))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        MvcResult streamResult = protectedMockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(containsString("event:delta")))
+                .andExpect(content().string(containsString("event:complete")))
+                .andExpect(content().string(containsString("\"eventType\":\"DELTA\"")))
+                .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
+                .andExpect(content().string(containsString("\"messageId\":103")))
+                .andExpect(content().string(containsString("\"promptTokens\":156")))
+                .andReturn();
+
+        String body = streamResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(body.contains("先检查回归测试。"));
+        assertTrue(body.contains("再确认知识库引用是否命中。"));
     }
 
     private AuthenticatedUser authenticatedUser() {
