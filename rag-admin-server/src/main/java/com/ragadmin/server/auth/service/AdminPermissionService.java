@@ -34,7 +34,6 @@ public class AdminPermissionService {
         Set<String> permissions = new LinkedHashSet<>();
         if (roleCodes.contains("KB_ADMIN")) {
             permissions.add(AdminPermissionCode.DASHBOARD_VIEW.name());
-            permissions.add(AdminPermissionCode.CHAT_CONSOLE_ACCESS.name());
             permissions.add(AdminPermissionCode.KB_MANAGE.name());
             permissions.add(AdminPermissionCode.MODEL_MANAGE.name());
             permissions.add(AdminPermissionCode.TASK_VIEW.name());

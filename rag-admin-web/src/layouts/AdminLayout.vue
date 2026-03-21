@@ -2,7 +2,7 @@
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ChatDotRound, Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets, User } from '@element-plus/icons-vue'
+import { Collection, Connection, DataAnalysis, Histogram, List, SwitchButton, Tickets, User } from '@element-plus/icons-vue'
 import { useAuthStore } from '@/stores/auth'
 import { resolveErrorMessage } from '@/api/http'
 import { hasPermission } from '@/utils/permission'
@@ -16,7 +16,6 @@ const activeMenu = computed(() => route.path)
 const menuItems = computed(() => {
   const items = [
     { index: '/dashboard', label: '概览', icon: Histogram, permission: 'DASHBOARD_VIEW' },
-    { index: '/chat', label: '智能问答', icon: ChatDotRound, permission: 'CHAT_CONSOLE_ACCESS' },
     { index: '/knowledge-bases', label: '知识库管理', icon: Collection, permission: 'KB_MANAGE' },
     { index: '/models', label: '模型管理', icon: Connection, permission: 'MODEL_MANAGE' },
     { index: '/users', label: '用户管理', icon: User, permission: 'USER_MANAGE' },

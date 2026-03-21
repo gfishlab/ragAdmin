@@ -542,183 +542,12 @@
 
 说明：
 
-- 后台管理端和问答前台共用问答核心链路，但必须通过不同接口域和不同会话终端类型隔离
+- 当前问答主场景统一收口到问答前台 `rag-chat-web`
+- 后台管理端不再承载独立问答入口，也不再暴露 `/api/admin/chat/**`
 - 会话隔离至少依赖 `terminalType + sceneType + sessionId`
-- 对于问答前台，知识库集合通过会话关系表维护，运行时允许切换聊天模型与联网开关
+- 前台知识库集合通过会话关系表维护，运行时允许切换聊天模型与联网开关
 
-### 7.1 创建会话
-
-- `POST /api/admin/chat/sessions`
-
-请求体：
-
-```json
-{
-  "sceneType": "KNOWLEDGE_BASE",
-  "kbId": 1,
-  "sessionName": "制度问答"
-}
-```
-
-说明：
-
-- `sceneType=KNOWLEDGE_BASE` 时，`kbId` 必填
-- `sceneType=GENERAL` 时，`kbId` 必须为空
-- `sceneType` 不传时，默认按 `KNOWLEDGE_BASE` 处理，兼容历史接口
-
-### 7.2 会话列表
-
-- `GET /api/admin/chat/sessions`
-
-查询参数：
-
-- `kbId`
-- `sceneType`
-- `pageNo`
-- `pageSize`
-
-### 7.3 获取会话消息
-
-- `GET /api/admin/chat/sessions/{sessionId}/messages`
-
-响应体示例：
-
-```json
-{
-  "code": "OK",
-  "message": "success",
-  "data": [
-    {
-      "messageId": 101,
-      "question": "公司年假规则是什么？",
-      "answer": "根据员工手册，年假按工龄分段计算。",
-      "references": [
-        {
-          "documentId": 11,
-          "documentName": "员工手册.pdf",
-          "chunkId": 201,
-          "chunkNo": 35,
-          "score": 0.92,
-          "contentSnippet": "员工累计工作满 1 年不满 10 年..."
-        }
-      ],
-      "feedbackType": "LIKE",
-      "feedbackComment": null
-    }
-  ]
-}
-```
-
-### 7.4 发起 RAG 问答
-
-- `POST /api/admin/chat/sessions/{sessionId}/messages`
-
-请求体：
-
-```json
-{
-  "question": "公司年假规则是什么？",
-  "kbId": 1,
-  "stream": false
-}
-```
-
-说明：
-
-- 知识库内会话必须携带匹配的 `kbId`
-- 首页通用会话不得携带 `kbId`
-
-首页通用会话示例：
-
-```json
-{
-  "question": "帮我总结一下今天待办",
-  "stream": false
-}
-```
-
-响应体：
-
-```json
-{
-  "code": "OK",
-  "message": "success",
-  "data": {
-    "messageId": 101,
-    "answer": "根据员工手册，年假按工龄分段计算。",
-    "references": [
-      {
-        "documentId": 11,
-        "documentName": "员工手册.pdf",
-        "chunkId": 201,
-        "chunkNo": 35,
-        "score": 0.92,
-        "contentSnippet": "员工累计工作满 1 年不满 10 年..."
-      }
-    ],
-    "usage": {
-      "promptTokens": 600,
-      "completionTokens": 120
-    }
-  }
-}
-```
-
-### 7.5 发起流式 RAG 问答
-
-- `POST /api/admin/chat/sessions/{sessionId}/messages/stream`
-- `Content-Type: application/json`
-- `Accept: text/event-stream`
-
-请求体：
-
-```json
-{
-  "question": "公司年假规则是什么？",
-  "kbId": 1
-}
-```
-
-说明：
-
-- 当前服务主体仍为 `Spring MVC`，流式接口通过 `Flux<ServerSentEvent<...>>` 输出 `SSE`
-- 知识库内会话必须携带匹配的 `kbId`
-- 首页通用会话不得携带 `kbId`
-- `stream` 字段不再作为流式开关，是否流式由接口路径决定
-
-事件类型：
-
-- `DELTA`：增量文本片段
-- `COMPLETE`：回答完成，同时返回落库后的消息主键、引用和用量信息
-- `ERROR`：流式执行失败，当前轮回答不落业务消息
-
-事件示例：
-
-```text
-event: delta
-data: {"eventType":"DELTA","delta":"根据员工手册，"}
-
-event: delta
-data: {"eventType":"DELTA","delta":"年假按工龄分段计算。"}
-
-event: complete
-data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年假按工龄分段计算。","references":[{"documentId":11,"documentName":"员工手册.pdf","chunkId":201,"chunkNo":35,"score":0.92,"contentSnippet":"员工累计工作满 1 年不满 10 年..."}],"usage":{"promptTokens":600,"completionTokens":120}}
-```
-
-### 7.6 提交反馈
-
-- `POST /api/admin/chat/messages/{messageId}/feedback`
-
-请求体：
-
-```json
-{
-  "feedbackType": "LIKE",
-  "comment": "回答准确"
-}
-```
-
-### 7.7 前台创建会话
+### 7.1 前台创建会话
 
 - `POST /api/app/chat/sessions`
 
@@ -740,7 +569,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - 前台首页通用会话允许 `selectedKbIds` 为空
 - 前台知识库内会话创建时，`kbId` 作为当前主知识库锚点，同时仍会把知识库集合写入关系表
 
-### 7.8 前台会话列表
+### 7.2 前台会话列表
 
 - `GET /api/app/chat/sessions`
 
@@ -751,11 +580,11 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `pageNo`
 - `pageSize`
 
-### 7.9 前台获取会话消息
+### 7.3 前台获取会话消息
 
 - `GET /api/app/chat/sessions/{sessionId}/messages`
 
-### 7.10 前台更新会话元数据
+### 7.4 前台更新会话元数据
 
 - `PUT /api/app/chat/sessions/{sessionId}`
 
@@ -775,7 +604,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `chatModelId=null` 表示清空显式模型，回退到系统默认模型或知识库默认聊天模型
 - 前台工作台切换模型或联网开关后，会使用该接口即时持久化当前会话偏好
 
-### 7.11 前台更新会话知识库集合
+### 7.5 前台更新会话知识库集合
 
 - `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
 
@@ -787,7 +616,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 }
 ```
 
-### 7.12 前台发起流式问答
+### 7.6 前台发起流式问答
 
 - `POST /api/app/chat/sessions/{sessionId}/messages/stream`
 - `Content-Type: application/json`
@@ -810,7 +639,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `chatModelId` 为运行时模型选择，优先级高于知识库默认聊天模型
 - `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
 
-### 7.13 前台提交反馈
+### 7.7 前台提交反馈
 
 - `POST /api/app/chat/messages/{messageId}/feedback`
 
@@ -871,10 +700,7 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `POST /api/admin/knowledge-bases/{kbId}/documents`
 - `POST /api/admin/documents/{documentId}/parse`
 - `GET /api/admin/tasks`
-- `POST /api/admin/chat/sessions`
 - `POST /api/app/chat/sessions`
-- `POST /api/admin/chat/sessions/{sessionId}/messages`
-- `POST /api/admin/chat/sessions/{sessionId}/messages/stream`
 - `POST /api/app/chat/sessions/{sessionId}/messages/stream`
 
 ### P1
@@ -882,7 +708,6 @@ data: {"eventType":"COMPLETE","messageId":101,"answer":"根据员工手册，年
 - `GET /api/admin/documents/{documentId}/chunks`
 - `POST /api/admin/tasks/{taskId}/retry`
 - `PUT /api/app/chat/sessions/{sessionId}`
-- `POST /api/admin/chat/messages/{messageId}/feedback`
 - `PUT /api/app/chat/sessions/{sessionId}/knowledge-bases`
 - `POST /api/app/chat/messages/{messageId}/feedback`
 - `GET /api/admin/audit-logs`

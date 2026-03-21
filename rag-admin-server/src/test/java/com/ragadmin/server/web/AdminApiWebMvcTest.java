@@ -14,10 +14,6 @@ import com.ragadmin.server.auth.service.AuthInterceptor;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.auth.service.UserAdminService;
 import com.ragadmin.server.auth.service.UserSessionAdminService;
-import com.ragadmin.server.chat.controller.ChatController;
-import com.ragadmin.server.chat.dto.ChatResponse;
-import com.ragadmin.server.chat.dto.ChatUsageResponse;
-import com.ragadmin.server.chat.service.ChatService;
 import com.ragadmin.server.common.exception.GlobalExceptionHandler;
 import com.ragadmin.server.document.controller.DocumentController;
 import com.ragadmin.server.document.controller.FileController;
@@ -86,9 +82,6 @@ class AdminApiWebMvcTest {
     private TaskService taskService;
 
     @Mock
-    private ChatService chatService;
-
-    @Mock
     private KnowledgeBaseService knowledgeBaseService;
 
     @Mock
@@ -126,9 +119,6 @@ class AdminApiWebMvcTest {
 
         TaskController taskController = new TaskController();
         ReflectionTestUtils.setField(taskController, "taskService", taskService);
-
-        ChatController chatController = new ChatController();
-        ReflectionTestUtils.setField(chatController, "chatService", chatService);
 
         KnowledgeBaseController knowledgeBaseController = new KnowledgeBaseController();
         ReflectionTestUtils.setField(knowledgeBaseController, "knowledgeBaseService", knowledgeBaseService);
@@ -169,7 +159,6 @@ class AdminApiWebMvcTest {
 
         protectedMockMvc = MockMvcBuilders.standaloneSetup(
                         taskController,
-                        chatController,
                         knowledgeBaseController,
                         documentController,
                         fileController,
@@ -281,27 +270,6 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.documentName").value("员工手册.md"))
                 .andExpect(jsonPath("$.data.steps[0].stepCode").value("EXTRACT_TEXT"))
                 .andExpect(jsonPath("$.data.retryRecords[0].retryResult").value("SUBMITTED"));
-    }
-
-    @Test
-    void shouldReturnChatResponseWhenBearerTokenIsValid() throws Exception {
-        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
-        when(chatService.chat(eq(11L), any(), any())).thenReturn(new ChatResponse(
-                101L,
-                "这是知识库回答",
-                List.of(),
-                new ChatUsageResponse(120, 30)
-        ));
-
-        protectedMockMvc.perform(post("/api/admin/chat/sessions/11/messages")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(new ChatRequestPayload("总结文档内容", 20L, false))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.code").value("OK"))
-                .andExpect(jsonPath("$.data.messageId").value(101))
-                .andExpect(jsonPath("$.data.answer").value("这是知识库回答"))
-                .andExpect(jsonPath("$.data.usage.promptTokens").value(120));
     }
 
     @Test
@@ -715,8 +683,4 @@ class AdminApiWebMvcTest {
                 .setLoginType(AuthService.ADMIN_LOGIN_TYPE)
                 .setTokenValue("access-token");
     }
-
-    private record ChatRequestPayload(String question, Long kbId, Boolean stream) {
-    }
 }
-

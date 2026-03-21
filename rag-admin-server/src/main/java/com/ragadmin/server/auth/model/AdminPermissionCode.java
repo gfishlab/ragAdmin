@@ -6,7 +6,6 @@ import java.util.List;
 public enum AdminPermissionCode {
 
     DASHBOARD_VIEW,
-    CHAT_CONSOLE_ACCESS,
     KB_MANAGE,
     MODEL_MANAGE,
     TASK_VIEW,

@@ -130,7 +130,6 @@ git commit -m "feat: 切换前后台认证到 sa-token"
 - Create: `rag-admin-server/src/main/java/com/ragadmin/server/auth/model/AdminPermissionCode.java`
 - Create: `rag-admin-server/src/main/java/com/ragadmin/server/auth/service/AdminPermissionService.java`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/auth/controller/UserController.java`
-- Modify: `rag-admin-server/src/main/java/com/ragadmin/server/chat/controller/ChatController.java`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/knowledge/controller/KnowledgeBaseController.java`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/document/controller/DocumentController.java`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/document/controller/FileController.java`
@@ -147,7 +146,6 @@ git commit -m "feat: 切换前后台认证到 sa-token"
 ```java
 public enum AdminPermissionCode {
     DASHBOARD_VIEW,
-    CHAT_CONSOLE_ACCESS,
     KB_MANAGE,
     MODEL_MANAGE,
     TASK_VIEW,
@@ -162,7 +160,7 @@ public enum AdminPermissionCode {
 
 ```java
 ADMIN -> all
-KB_ADMIN -> DASHBOARD_VIEW, CHAT_CONSOLE_ACCESS, KB_MANAGE, MODEL_MANAGE, TASK_VIEW, TASK_OPERATE, STATISTICS_VIEW
+KB_ADMIN -> DASHBOARD_VIEW, KB_MANAGE, MODEL_MANAGE, TASK_VIEW, TASK_OPERATE, STATISTICS_VIEW
 AUDITOR -> DASHBOARD_VIEW, TASK_VIEW, AUDIT_VIEW, STATISTICS_VIEW
 ```
 
@@ -182,7 +180,7 @@ Expected: 后台受保护接口按权限码返回 200/403，测试不再依赖 `
 - [ ] **Step 5: 提交**
 
 ```bash
-git add rag-admin-server/src/main/java/com/ragadmin/server/auth/model/AdminPermissionCode.java rag-admin-server/src/main/java/com/ragadmin/server/auth/service/AdminPermissionService.java rag-admin-server/src/main/java/com/ragadmin/server/auth/controller/UserController.java rag-admin-server/src/main/java/com/ragadmin/server/chat/controller/ChatController.java rag-admin-server/src/main/java/com/ragadmin/server/knowledge/controller/KnowledgeBaseController.java rag-admin-server/src/main/java/com/ragadmin/server/document/controller/DocumentController.java rag-admin-server/src/main/java/com/ragadmin/server/document/controller/FileController.java rag-admin-server/src/main/java/com/ragadmin/server/model/controller/ModelController.java rag-admin-server/src/main/java/com/ragadmin/server/model/controller/ModelProviderController.java rag-admin-server/src/main/java/com/ragadmin/server/task/controller/TaskController.java rag-admin-server/src/main/java/com/ragadmin/server/task/controller/TaskEventController.java rag-admin-server/src/main/java/com/ragadmin/server/audit/controller/AuditLogController.java rag-admin-server/src/main/java/com/ragadmin/server/statistics/controller/StatisticsController.java rag-admin-server/src/test/java/com/ragadmin/server/web/AdminApiWebMvcTest.java
+git add rag-admin-server/src/main/java/com/ragadmin/server/auth/model/AdminPermissionCode.java rag-admin-server/src/main/java/com/ragadmin/server/auth/service/AdminPermissionService.java rag-admin-server/src/main/java/com/ragadmin/server/auth/controller/UserController.java rag-admin-server/src/main/java/com/ragadmin/server/knowledge/controller/KnowledgeBaseController.java rag-admin-server/src/main/java/com/ragadmin/server/document/controller/DocumentController.java rag-admin-server/src/main/java/com/ragadmin/server/document/controller/FileController.java rag-admin-server/src/main/java/com/ragadmin/server/model/controller/ModelController.java rag-admin-server/src/main/java/com/ragadmin/server/model/controller/ModelProviderController.java rag-admin-server/src/main/java/com/ragadmin/server/task/controller/TaskController.java rag-admin-server/src/main/java/com/ragadmin/server/task/controller/TaskEventController.java rag-admin-server/src/main/java/com/ragadmin/server/audit/controller/AuditLogController.java rag-admin-server/src/main/java/com/ragadmin/server/statistics/controller/StatisticsController.java rag-admin-server/src/test/java/com/ragadmin/server/web/AdminApiWebMvcTest.java
 git commit -m "feat: 落地后台权限码注解鉴权"
 ```
 

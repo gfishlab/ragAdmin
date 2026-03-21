@@ -37,12 +37,7 @@ const router = createRouter({
         },
         {
           path: 'chat',
-          name: 'general-chat',
-          component: () => import('@/views/chat/GeneralChatView.vue'),
-          meta: {
-            title: '智能问答',
-            requiredPermissions: ['CHAT_CONSOLE_ACCESS'],
-          },
+          redirect: '/dashboard',
         },
         {
           path: 'knowledge-bases',

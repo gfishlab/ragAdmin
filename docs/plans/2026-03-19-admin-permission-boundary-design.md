@@ -44,7 +44,6 @@
 本轮后台权限码固定为以下集合：
 
 - `DASHBOARD_VIEW`
-- `CHAT_CONSOLE_ACCESS`
 - `KB_MANAGE`
 - `MODEL_MANAGE`
 - `TASK_VIEW`
@@ -56,7 +55,7 @@
 角色与权限矩阵建议如下：
 
 - `ADMIN`：拥有全部权限
-- `KB_ADMIN`：`DASHBOARD_VIEW`、`CHAT_CONSOLE_ACCESS`、`KB_MANAGE`、`MODEL_MANAGE`、`TASK_VIEW`、`TASK_OPERATE`、`STATISTICS_VIEW`
+- `KB_ADMIN`：`DASHBOARD_VIEW`、`KB_MANAGE`、`MODEL_MANAGE`、`TASK_VIEW`、`TASK_OPERATE`、`STATISTICS_VIEW`
 - `AUDITOR`：`DASHBOARD_VIEW`、`TASK_VIEW`、`AUDIT_VIEW`、`STATISTICS_VIEW`
 - `APP_USER`：不进入后台，不参与后台权限矩阵
 
@@ -65,7 +64,6 @@
 ### 5.1 后台页面
 
 - `/dashboard` 对应 `DASHBOARD_VIEW`
-- `/chat` 对应 `CHAT_CONSOLE_ACCESS`
 - `/knowledge-bases`、`/knowledge-bases/create`、`/knowledge-bases/:id`、`/knowledge-bases/:id/edit`、`/documents/:id` 对应 `KB_MANAGE`
 - `/models` 对应 `MODEL_MANAGE`
 - `/tasks`、`/tasks/:id` 对应 `TASK_VIEW`
@@ -75,7 +73,6 @@
 
 ### 5.2 后台接口
 
-- `/api/admin/chat/**` 对应 `CHAT_CONSOLE_ACCESS`
 - `/api/admin/knowledge-bases/**`、`/api/admin/documents/**`、`/api/admin/files/**` 对应 `KB_MANAGE`
 - `/api/admin/models/**`、`/api/admin/model-providers/**` 对应 `MODEL_MANAGE`
 - `/api/admin/tasks`、`/api/admin/tasks/{id}`、`/api/admin/tasks/summary`、`/api/admin/events/tasks` 对应 `TASK_VIEW`
@@ -168,11 +165,16 @@ PostgreSQL 承担问答业务事实数据：
 
 - 首页通用问答
 - 知识库内问答
-- 后台管理端问答
 
 聊天历史查询、追问、删除和导出都必须显式校验 `userId` 归属。
 
 ## 8. 迁移与验收边界
+
+补充说明：
+
+- 当前产品方向已调整为“后台管理端不再承载独立问答入口”
+- 因此后台不再保留 `/chat` 页面与 `/api/admin/chat/**` 接口权限映射
+- 问答主场景统一收口到前台 `rag-chat-web`
 
 建议按以下顺序推进：
 

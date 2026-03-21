@@ -334,22 +334,14 @@ GET /api/admin/system/health
 - `GET /api/admin/tasks/{taskId}`
 - `POST /api/admin/tasks/{taskId}/retry`
 
-### 6.6 问答
-
-- `POST /api/admin/chat/sessions`
-- `GET /api/admin/chat/sessions`
-- `GET /api/admin/chat/sessions/{sessionId}/messages`
-- `POST /api/admin/chat/sessions/{sessionId}/messages`
-- `POST /api/admin/chat/messages/{messageId}/feedback`
-
-### 6.7 治理与统计
+### 6.6 治理与统计
 
 - `GET /api/admin/audit-logs`
 - `GET /api/admin/statistics/model-calls`
 - `GET /api/admin/statistics/knowledge-bases/{kbId}/chat`
 - `GET /api/admin/system/health`
 
-### 6.8 前台问答接口
+### 6.7 前台问答接口
 
 - `POST /api/app/auth/login`
 - `POST /api/app/auth/refresh`
@@ -410,7 +402,12 @@ GET /api/admin/system/health
 - `kb_chunk_vector_ref` 是否已回写
 - Milvus collection 是否已写入向量
 
-### 7.6 前台流式问答没有返回
+### 7.6 后台管理端问答已下线
+
+- 后台管理端不再提供独立 `/api/admin/chat/**` 接口
+- 如需验证问答主链路，请转到前台 `rag-chat-web` 或直接排查 `/api/app/chat/**`
+
+### 7.7 前台流式问答没有返回
 
 优先检查：
 
@@ -440,4 +437,3 @@ GET /api/admin/system/health
   - `rag.ai.chat.client.simple-logger-request-body-enabled`
   - `rag.ai.chat.client.simple-logger-response-body-enabled`
 - 如果只看到前缀没有完整长文本，这是预期行为；需要结合 `sha256` 和原始长度做问题比对
-

@@ -27,7 +27,6 @@ class AdminPermissionServiceTest {
         assertEquals(
                 List.of(
                         "DASHBOARD_VIEW",
-                        "CHAT_CONSOLE_ACCESS",
                         "KB_MANAGE",
                         "MODEL_MANAGE",
                         "TASK_VIEW",

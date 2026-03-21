@@ -333,82 +333,11 @@ curl.exe `
 
 - `data.list` 不为空
 
-### 5.13 创建会话
+### 5.13 后台问答已下线
 
-```powershell
-$SessionBody = @"
-{
-  "kbId": $KbId,
-  "sessionName": "验收会话"
-}
-"@
+后台管理端不再承载独立问答入口，`/api/admin/chat/**` 验收项已取消。问答链路统一转到前台 `rag-chat-web` 的 `/api/app/chat/**` 进行验收。
 
-$SessionResp = Invoke-RestMethod `
-  -Method Post `
-  -Uri "$BaseUrl/api/admin/chat/sessions" `
-  -Headers @{ Authorization = "Bearer $AccessToken" } `
-  -ContentType "application/json" `
-  -Body $SessionBody
-
-$SessionId = $SessionResp.data.id
-$SessionId
-```
-
-### 5.14 发起问答
-
-```powershell
-$ChatBody = @"
-{
-  "question": "请总结 sample.md 的主要内容",
-  "kbId": $KbId,
-  "stream": false
-}
-"@
-
-$ChatResp = Invoke-RestMethod `
-  -Method Post `
-  -Uri "$BaseUrl/api/admin/chat/sessions/$SessionId/messages" `
-  -Headers @{ Authorization = "Bearer $AccessToken" } `
-  -ContentType "application/json" `
-  -Body $ChatBody
-
-$MessageId = $ChatResp.data.messageId
-$MessageId
-```
-
-判定要点：
-
-- 成功返回 `messageId`
-- `answer` 非空
-- `references` 至少有一条
-
-### 5.15 查询消息列表
-
-```powershell
-curl.exe `
-  -H "Authorization: Bearer $AccessToken" `
-  "$BaseUrl/api/admin/chat/sessions/$SessionId/messages"
-```
-
-### 5.16 提交反馈
-
-```powershell
-$FeedbackBody = @'
-{
-  "feedbackType": "LIKE",
-  "comment": "验收通过"
-}
-'@
-
-Invoke-RestMethod `
-  -Method Post `
-  -Uri "$BaseUrl/api/admin/chat/messages/$MessageId/feedback" `
-  -Headers @{ Authorization = "Bearer $AccessToken" } `
-  -ContentType "application/json" `
-  -Body $FeedbackBody
-```
-
-### 5.17 登出
+### 5.14 登出
 
 ```powershell
 Invoke-RestMethod `
@@ -417,7 +346,7 @@ Invoke-RestMethod `
   -Headers @{ Authorization = "Bearer $AccessToken" }
 ```
 
-### 5.18 前台登录
+### 5.15 前台登录
 
 ```powershell
 $AppLoginBody = @'
@@ -562,4 +491,3 @@ curl.exe `
 
 - `docs/rag-admin-backend-debug-guide.md`
 - `docs/rag-admin-error-codes.md`
-
