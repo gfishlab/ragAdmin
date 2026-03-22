@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { ChatDotRound, Compass, Connection, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
+import { ChatDotRound, MoreFilled, Plus, RefreshRight } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   createChatSession,
@@ -17,8 +17,6 @@ import {
 } from '@/api/chat'
 import { listKnowledgeBases } from '@/api/knowledge-base'
 import { listModels } from '@/api/model'
-import KnowledgeBaseSelector from '@/components/chat/KnowledgeBaseSelector.vue'
-import ModelSelector from '@/components/chat/ModelSelector.vue'
 import type { ChatExchange, ChatFeedbackType, ChatReference, ChatSceneType, ChatSession, ChatStreamEvent } from '@/types/chat'
 import type { KnowledgeBaseSummary } from '@/types/knowledge-base'
 import type { ModelSummary } from '@/types/model'
@@ -103,6 +101,23 @@ let sessionKnowledgeBaseSyncTask: Promise<void> = Promise.resolve()
 let preferenceSyncResetTimer: number | null = null
 
 const isKnowledgeBaseScene = computed(() => props.sceneType === 'KNOWLEDGE_BASE')
+const activeKnowledgeBase = computed<KnowledgeBaseSummary | null>(() => {
+  if (!isKnowledgeBaseScene.value || typeof props.anchorKbId !== 'number') {
+    return null
+  }
+  return availableKnowledgeBases.value.find((item) => item.id === props.anchorKbId) ?? null
+})
+const workspaceTitle = computed(() => {
+  return isKnowledgeBaseScene.value
+    ? (activeKnowledgeBase.value?.kbName || '知识库问答')
+    : '通用问答'
+})
+const workspaceDescription = computed(() => {
+  if (!isKnowledgeBaseScene.value) {
+    return '先和模型对话，需要时再把知识库临时拉进来。'
+  }
+  return activeKnowledgeBase.value?.description || '围绕当前知识库进行问答，回答会优先使用这里的内容。'
+})
 const sessionPanelTitle = computed(() => {
   return isKnowledgeBaseScene.value ? '知识库会话' : '首页会话'
 })
@@ -177,6 +192,28 @@ const currentModelName = computed(() => {
   }
   return availableModels.value.find((item) => item.id === selectedModelId.value)?.modelName || '指定模型'
 })
+
+function handleOpenGeneralChat(): void {
+  if (streaming.value || !isKnowledgeBaseScene.value) {
+    return
+  }
+  void router.push({ name: 'app-chat-home' })
+}
+
+function handleOpenKnowledgeBase(kbId: number): void {
+  if (streaming.value) {
+    return
+  }
+  if (isKnowledgeBaseScene.value && props.anchorKbId === kbId) {
+    return
+  }
+  void router.push({
+    name: 'app-knowledge-base-chat',
+    params: {
+      kbId: String(kbId),
+    },
+  })
+}
 
 const hasConversation = computed(() => {
   return messages.value.length > 0 || pendingExchange.value !== null
@@ -1160,112 +1197,82 @@ onUnmounted(() => {
 
 <template>
   <section class="workspace-shell">
-    <header class="workspace-hero app-shell-panel">
-      <div class="hero-copy">
-        <p class="hero-kicker">{{ props.eyebrow }}</p>
-        <h1 class="serif-title">{{ props.title }}</h1>
-        <p>{{ props.description }}</p>
+    <aside class="workspace-sidebar app-shell-panel">
+      <div class="sidebar-brand">
+        <p class="sidebar-eyebrow">{{ props.eyebrow }}</p>
+        <strong>问答</strong>
+        <span>保留最少入口，直接进入对话。</span>
       </div>
-      <div class="hero-summary">
-        <article>
-          <span>当前模型</span>
-          <strong>{{ currentModelName }}</strong>
-        </article>
-        <article>
-          <span>知识库范围</span>
-          <strong>{{ selectedKbIds.length }} 个</strong>
-        </article>
-        <article>
-          <span>联网开关</span>
-          <strong>{{ webSearchEnabled ? '已开启' : '已关闭' }}</strong>
-        </article>
-      </div>
-    </header>
 
-    <section class="control-strip app-shell-panel" :class="{ 'is-general-scene': !isKnowledgeBaseScene }">
-      <div class="control-block">
-        <ModelSelector
-          v-model="selectedModelId"
-          :options="availableModels"
-          :loading="optionLoading"
+      <div class="sidebar-section">
+        <el-button
+          class="sidebar-primary-action"
+          type="primary"
+          :icon="Plus"
           :disabled="streaming"
-        />
-      </div>
-      <div v-if="isKnowledgeBaseScene" class="control-block is-wide">
-        <KnowledgeBaseSelector
-          v-model="selectedKbIds"
-          :options="availableKnowledgeBases"
-          :loading="optionLoading"
-          :disabled="streaming"
-          :locked-kb-id="props.anchorKbId ?? null"
-        />
-      </div>
-      <div v-else class="control-block control-summary">
-        <div class="control-summary-head">
-          <span>@知识库选择</span>
-          <small>{{ selectedKbIds.length }} 个已接入</small>
-        </div>
-        <p class="control-summary-copy">
-          首页场景不固定绑定知识库。你可以在输入区点击 `@知识库`，把本轮问题切换成临时多库检索模式。
-        </p>
-        <div v-if="selectedKnowledgeBases.length > 0" class="control-summary-tags">
-          <el-tag
-            v-for="knowledgeBase in selectedKnowledgeBases.slice(0, 4)"
-            :key="knowledgeBase.id"
-            effect="plain"
-            type="info"
-          >
-            @{{ knowledgeBase.kbName }}
-          </el-tag>
-          <span v-if="selectedKnowledgeBases.length > 4" class="control-summary-more">
-            +{{ selectedKnowledgeBases.length - 4 }}
-          </span>
-        </div>
-      </div>
-      <div class="control-block control-toggle">
-        <div class="toggle-head">
-          <span>联网搜索</span>
-          <small>Provider 不可用时服务端会优雅降级</small>
-        </div>
-        <el-switch v-model="webSearchEnabled" :disabled="streaming" />
-      </div>
-      <div v-if="streaming || showPreferenceSyncNotice" class="control-status-bar">
-        <div v-if="streaming" class="control-status-pill is-streaming">
-          <strong>只读中</strong>
-          <span>当前回答生成中，模型、联网和知识库选择已锁定，本轮不会响应偏好变更。</span>
-        </div>
-        <div
-          v-if="showPreferenceSyncNotice"
-          class="control-status-pill"
-          :class="preferenceSyncNoticeClass"
+          @click="handleStartNewSession"
         >
-          <strong>{{ preferenceSyncNoticeTitle }}</strong>
-          <span>{{ preferenceSyncNoticeText }}</span>
+          新会话
+        </el-button>
+        <button
+          type="button"
+          class="sidebar-entry"
+          :class="{ 'is-active': !isKnowledgeBaseScene }"
+          :disabled="streaming"
+          @click="handleOpenGeneralChat"
+        >
+          <strong>通用问答</strong>
+          <span>直接和模型对话，需要时临时接入知识库。</span>
+        </button>
+      </div>
+
+      <div class="sidebar-section sidebar-knowledge">
+        <div class="sidebar-section-head">
+          <div>
+            <p>知识库</p>
+            <span>进入单库问答场景</span>
+          </div>
+          <small v-if="availableKnowledgeBases.length > 0">{{ availableKnowledgeBases.length }}</small>
+        </div>
+        <div class="sidebar-list thin-scrollbar">
+          <div v-if="optionLoading" class="sidebar-placeholder">正在加载知识库...</div>
+          <button
+            v-for="knowledgeBase in availableKnowledgeBases"
+            :key="knowledgeBase.id"
+            type="button"
+            class="sidebar-entry is-knowledge"
+            :class="{ 'is-active': isKnowledgeBaseScene && props.anchorKbId === knowledgeBase.id }"
+            :disabled="streaming"
+            @click="handleOpenKnowledgeBase(knowledgeBase.id)"
+          >
+            <strong>{{ knowledgeBase.kbName }}</strong>
+            <span>{{ knowledgeBase.description || knowledgeBase.kbCode }}</span>
+          </button>
+          <div v-if="!optionLoading && availableKnowledgeBases.length === 0" class="sidebar-placeholder">
+            暂无可用知识库
+          </div>
         </div>
       </div>
-    </section>
 
-    <section class="conversation-grid has-session-list">
-      <aside class="session-list-card app-shell-panel">
-        <div class="session-list-head">
+      <div class="sidebar-section sidebar-sessions">
+        <div class="sidebar-section-head">
           <div>
             <p>{{ sessionPanelTitle }}</p>
-            <strong>{{ sessions.length }} 个</strong>
-            <span class="session-list-subtitle">{{ sessionPanelHint }}</span>
+            <span>{{ sessionPanelHint }}</span>
           </div>
-          <el-button text :icon="Plus" :disabled="streaming" @click="handleStartNewSession">新会话</el-button>
+          <small>{{ sessions.length }}</small>
         </div>
-        <div class="session-list thin-scrollbar">
-          <div v-if="sessionLoading" class="session-placeholder">正在加载会话...</div>
+        <div class="sidebar-list thin-scrollbar">
+          <div v-if="sessionLoading" class="sidebar-placeholder">正在加载会话...</div>
           <div
             v-for="session in sessions"
             :key="session.id"
-            class="session-item"
+            class="session-entry"
             :class="{ 'is-active': session.id === activeSessionId }"
           >
             <button
               type="button"
-              class="session-main"
+              class="session-entry-main"
               :disabled="streaming"
               @click="handleSelectSession(session)"
             >
@@ -1278,70 +1285,197 @@ onUnmounted(() => {
                 }}
               </span>
             </button>
-            <div class="session-item-tools">
-              <el-dropdown
-                trigger="click"
-                :teleported="false"
+            <el-dropdown
+              trigger="click"
+              :teleported="false"
+              :disabled="streaming || sessionActionLoadingId === session.id"
+              @command="handleSessionCommand(session, $event)"
+            >
+              <el-button
+                text
+                circle
+                class="session-entry-trigger"
                 :disabled="streaming || sessionActionLoadingId === session.id"
-                @command="handleSessionCommand(session, $event)"
+                @click.stop
               >
-                <el-button
-                  text
-                  circle
-                  class="session-action-trigger"
-                  :disabled="streaming || sessionActionLoadingId === session.id"
-                  @click.stop
-                >
-                  <el-icon><MoreFilled /></el-icon>
-                </el-button>
-                <template #dropdown>
-                  <el-dropdown-menu>
-                    <el-dropdown-item command="rename">重命名</el-dropdown-item>
-                    <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
-                  </el-dropdown-menu>
-                </template>
-              </el-dropdown>
-            </div>
+                <el-icon><MoreFilled /></el-icon>
+              </el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="rename">重命名</el-dropdown-item>
+                  <el-dropdown-item command="delete" divided>删除</el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
-          <div v-if="!sessionLoading && sessions.length === 0" class="session-placeholder">
+          <div v-if="!sessionLoading && sessions.length === 0" class="sidebar-placeholder">
             {{ sessionEmptyText }}
           </div>
         </div>
-      </aside>
+      </div>
+    </aside>
 
-      <section class="conversation-card app-shell-panel">
-        <div class="conversation-toolbar">
-          <div class="toolbar-tags">
-            <el-tag type="warning" effect="plain">
-              <el-icon><Compass /></el-icon>
-              <span>{{ props.sceneType === 'GENERAL' ? '首页通用场景' : '知识库内场景' }}</span>
-            </el-tag>
-            <el-tag v-if="selectedKnowledgeBaseNames.length > 0" type="info" effect="plain">
-              {{ selectedKnowledgeBaseNames.join(' / ') }}
-            </el-tag>
+    <section class="workspace-main app-shell-panel">
+      <header class="workspace-toolbar">
+        <div class="toolbar-copy">
+          <div class="toolbar-title-row">
+            <h1>{{ workspaceTitle }}</h1>
+            <span class="toolbar-scene-tag">{{ isKnowledgeBaseScene ? '知识库问答' : '通用问答' }}</span>
           </div>
+          <p>{{ workspaceDescription }}</p>
+          <p class="toolbar-subline">
+            {{
+              selectedKnowledgeBaseNames.length > 0
+                ? `当前范围：${selectedKnowledgeBaseNames.join(' / ')}`
+                : '当前范围：仅模型对话'
+            }}
+          </p>
+        </div>
+        <div class="toolbar-actions">
+          <el-button text :icon="ChatDotRound" :disabled="streaming" @click="handleClearView">清空视图</el-button>
           <el-button text :icon="RefreshRight" :disabled="streaming" @click="initialize">刷新</el-button>
         </div>
+      </header>
 
-        <div ref="messageContainerRef" class="conversation-body page-scrollbar">
-          <div v-if="messageLoading" class="conversation-placeholder">
-            正在加载历史消息...
-          </div>
+      <section class="workspace-controls">
+        <label class="control-field control-model-field">
+          <span class="control-label">模型</span>
+          <el-select
+            v-model="selectedModelId"
+            class="control-select"
+            clearable
+            filterable
+            placeholder="系统默认模型"
+            :loading="optionLoading"
+            :disabled="streaming"
+          >
+            <el-option
+              v-for="model in availableModels"
+              :key="model.id"
+              :label="model.modelName"
+              :value="model.id"
+            />
+          </el-select>
+        </label>
 
-          <template v-else-if="hasConversation">
-            <div
-              v-for="message in messages"
-              :key="message.id"
-              class="message-group"
+        <div class="control-field control-range-field">
+          <div class="control-range-head">
+            <span class="control-label">知识库范围</span>
+            <el-popover
+              v-if="!isKnowledgeBaseScene"
+              v-model:visible="knowledgeBasePickerVisible"
+              placement="bottom-end"
+              :width="360"
+              trigger="click"
+              :disabled="streaming"
+              :teleported="false"
+              popper-class="workspace-kb-popper"
             >
-              <article class="message-bubble message-bubble-user">
+              <template #reference>
+                <el-button plain size="small" :disabled="streaming">添加知识库</el-button>
+              </template>
+              <div class="range-picker">
+                <div class="range-picker-head">
+                  <div>
+                    <strong>选择本轮检索知识库</strong>
+                    <span>支持多选，不选则走纯模型回答</span>
+                  </div>
+                  <el-button
+                    text
+                    size="small"
+                    :disabled="streaming || selectedKbIds.length === 0"
+                    @click="clearSelectedKnowledgeBases"
+                  >
+                    清空
+                  </el-button>
+                </div>
+                <el-input
+                  v-model="knowledgeBasePickerKeyword"
+                  clearable
+                  :disabled="streaming"
+                  placeholder="搜索知识库编码或名称"
+                />
+                <div class="range-picker-list thin-scrollbar">
+                  <button
+                    v-for="knowledgeBase in filteredKnowledgeBases"
+                    :key="knowledgeBase.id"
+                    type="button"
+                    class="range-picker-item"
+                    :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
+                    :disabled="streaming"
+                    @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
+                  >
+                    <div class="range-picker-copy">
+                      <strong>{{ knowledgeBase.kbName }}</strong>
+                      <span>{{ knowledgeBase.kbCode }}</span>
+                    </div>
+                    <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已选择' : '点击接入' }}</small>
+                  </button>
+                  <div v-if="filteredKnowledgeBases.length === 0" class="range-picker-empty">
+                    未找到匹配知识库
+                  </div>
+                </div>
+              </div>
+            </el-popover>
+          </div>
+          <div v-if="selectedKnowledgeBases.length > 0" class="control-tag-list">
+            <el-tag
+              v-for="knowledgeBase in selectedKnowledgeBases"
+              :key="knowledgeBase.id"
+              :closable="!isKnowledgeBaseScene && !streaming"
+              effect="plain"
+              type="info"
+              @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
+            >
+              @{{ knowledgeBase.kbName }}
+            </el-tag>
+          </div>
+          <p v-else class="control-empty-text">
+            {{ isKnowledgeBaseScene ? '当前会话固定使用本知识库检索。' : '未选择知识库，当前会话将直接走模型回答。' }}
+          </p>
+        </div>
+
+        <div class="control-field control-switch-field">
+          <div class="control-switch-head">
+            <span class="control-label">联网搜索</span>
+            <small>需要外部信息时再补充</small>
+          </div>
+          <el-switch v-model="webSearchEnabled" :disabled="streaming" />
+        </div>
+      </section>
+
+      <div v-if="streaming || showPreferenceSyncNotice || loadingError" class="workspace-status">
+        <div v-if="streaming" class="status-pill is-streaming">
+          <strong>回答生成中</strong>
+          <span>当前会话已锁定，避免中途切换模型、联网或知识库范围。</span>
+        </div>
+        <div v-if="showPreferenceSyncNotice" class="status-pill" :class="preferenceSyncNoticeClass">
+          <strong>{{ preferenceSyncNoticeTitle }}</strong>
+          <span>{{ preferenceSyncNoticeText }}</span>
+        </div>
+        <div v-if="loadingError" class="status-pill is-error">
+          <strong>加载失败</strong>
+          <span>{{ loadingError }}</span>
+        </div>
+      </div>
+
+      <div ref="messageContainerRef" class="conversation-body page-scrollbar">
+        <div v-if="messageLoading" class="conversation-placeholder">正在加载历史消息...</div>
+
+        <template v-else-if="hasConversation">
+          <div v-for="message in messages" :key="message.id" class="message-thread">
+            <article class="message-row is-user">
+              <div class="message-card is-user">
                 <span class="message-role">你</span>
                 <p>{{ message.questionText }}</p>
-              </article>
+              </div>
+            </article>
 
-              <article class="message-bubble message-bubble-assistant">
+            <article class="message-row is-assistant">
+              <div class="message-card is-assistant">
                 <span class="message-role">助手</span>
                 <p>{{ message.answerText || '模型没有返回内容' }}</p>
+
                 <div class="assistant-actions">
                   <button
                     v-if="message.references.length > 0"
@@ -1373,6 +1507,7 @@ onUnmounted(() => {
                     </el-button>
                   </div>
                 </div>
+
                 <div
                   v-if="message.references.length > 0 && isReferenceExpanded(message.id)"
                   class="reference-block"
@@ -1395,24 +1530,26 @@ onUnmounted(() => {
                     </div>
                   </div>
                 </div>
+
                 <p v-if="message.feedbackType" class="feedback-hint">
                   {{ message.feedbackType === 'LIKE' ? '你已标记这条回答有帮助。' : '你已标记这条回答需要改进。' }}
                 </p>
                 <div v-if="message.usage" class="message-usage">
                   Prompt {{ message.usage.promptTokens ?? 0 }} · Completion {{ message.usage.completionTokens ?? 0 }}
                 </div>
-              </article>
-            </div>
+              </div>
+            </article>
+          </div>
 
-            <div v-if="pendingExchange" class="message-group">
-              <article class="message-bubble message-bubble-user">
+          <div v-if="pendingExchange" class="message-thread">
+            <article class="message-row is-user">
+              <div class="message-card is-user">
                 <span class="message-role">你</span>
                 <p>{{ pendingExchange.question }}</p>
-              </article>
-              <article
-                class="message-bubble message-bubble-assistant"
-                :class="{ 'is-error': pendingExchange.errorMessage }"
-              >
+              </div>
+            </article>
+            <article class="message-row is-assistant">
+              <div class="message-card is-assistant" :class="{ 'is-error': pendingExchange.errorMessage }">
                 <span class="message-role">助手</span>
                 <p>{{ pendingExchange.answer || '正在生成回答...' }}</p>
                 <p v-if="pendingExchange.errorMessage" class="pending-error">{{ pendingExchange.errorMessage }}</p>
@@ -1424,444 +1561,302 @@ onUnmounted(() => {
                   <strong>{{ pendingStreamRecoveryNotice.title }}</strong>
                   <span>{{ pendingStreamRecoveryNotice.description }}</span>
                 </div>
-                <el-button
-                  v-if="pendingExchange.errorMessage"
-                  text
-                  :icon="RefreshRight"
-                  @click="handleRetryPendingExchange"
-                >
+                <el-button v-if="pendingExchange.errorMessage" text :icon="RefreshRight" @click="handleRetryPendingExchange">
                   {{ retryPendingExchangeLabel }}
                 </el-button>
-              </article>
-            </div>
-          </template>
-
-          <div v-else class="conversation-empty">
-            <el-empty description="还没有聊天内容">
-              <template #description>
-                <p>输入你的第一个问题，当前选择会在发送时生效。</p>
-              </template>
-            </el-empty>
+              </div>
+            </article>
           </div>
+        </template>
+
+        <div v-else class="conversation-empty">
+          <p class="conversation-empty-kicker">{{ isKnowledgeBaseScene ? '知识库问答' : '开始新的对话' }}</p>
+          <h2>{{ workspaceTitle }}</h2>
+          <p>{{ composerPlaceholder }}</p>
+        </div>
+      </div>
+
+      <footer class="composer-card">
+        <div class="composer-meta">
+          <div class="composer-meta-copy">
+            <span class="composer-meta-title">{{ currentModelName }}</span>
+            <span class="composer-meta-tip">输入 @ 可接入知识库，Enter 发送，Shift + Enter 换行</span>
+          </div>
+          <span class="composer-meta-state">
+            {{
+              isKnowledgeBaseScene
+                ? '当前知识库已固定接入'
+                : (selectedKbIds.length > 0 ? `${selectedKbIds.length} 个知识库已接入` : '未接入知识库')
+            }}
+          </span>
         </div>
 
-        <footer class="composer-card">
-          <div class="composer-head">
-            <div class="composer-hint">
-              <el-icon><Connection /></el-icon>
-              <span>{{ composerPlaceholder }}</span>
+        <div class="composer-input-shell">
+          <div v-if="mentionPanelVisible" class="composer-mention-panel">
+            <div class="composer-mention-head">
+              <strong>@知识库</strong>
+              <span>
+                {{ knowledgeBaseMentionState?.keyword ? `匹配“${knowledgeBaseMentionState.keyword}”` : '输入名称或编码快速接入' }}
+              </span>
             </div>
-            <div class="composer-tools">
-              <el-popover
-                v-if="!isKnowledgeBaseScene"
-                v-model:visible="knowledgeBasePickerVisible"
-                placement="top-end"
-                :width="380"
-                trigger="click"
+            <div v-if="mentionKnowledgeBases.length > 0" class="composer-mention-list thin-scrollbar">
+              <button
+                v-for="(knowledgeBase, index) in mentionKnowledgeBases"
+                :key="`mention-${knowledgeBase.id}`"
+                type="button"
+                class="composer-mention-item"
+                :class="{
+                  'is-active': index === knowledgeBaseMentionActiveIndex,
+                  'is-selected': selectedKbIds.includes(knowledgeBase.id),
+                }"
                 :disabled="streaming"
-                popper-class="composer-kb-popper"
+                @mousedown.prevent="selectKnowledgeBaseFromMention(knowledgeBase)"
+                @mouseenter="knowledgeBaseMentionActiveIndex = index"
               >
-                <template #reference>
-                  <el-button plain size="small" :disabled="streaming">@知识库</el-button>
-                </template>
-                <div class="composer-kb-picker">
-                  <div class="composer-kb-picker-head">
-                    <div>
-                      <strong>选择本轮检索知识库</strong>
-                      <span>支持多选，不选则走纯模型回答</span>
-                    </div>
-                    <el-button
-                      text
-                      size="small"
-                      :disabled="streaming || selectedKbIds.length === 0"
-                      @click="clearSelectedKnowledgeBases"
-                    >
-                      清空
-                    </el-button>
-                  </div>
-                  <el-input
-                    v-model="knowledgeBasePickerKeyword"
-                    clearable
-                    :disabled="streaming"
-                    placeholder="搜索知识库编码或名称"
-                  />
-                  <div class="composer-kb-picker-list thin-scrollbar">
-                    <button
-                      v-for="knowledgeBase in filteredKnowledgeBases"
-                      :key="knowledgeBase.id"
-                      type="button"
-                      class="composer-kb-picker-item"
-                      :class="{ 'is-selected': selectedKbIds.includes(knowledgeBase.id) }"
-                      :disabled="streaming"
-                      @click="toggleKnowledgeBaseSelection(knowledgeBase.id)"
-                    >
-                      <div class="composer-kb-picker-copy">
-                        <strong>{{ knowledgeBase.kbName }}</strong>
-                        <span>{{ knowledgeBase.kbCode }}</span>
-                      </div>
-                      <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已选择' : '点击接入' }}</small>
-                    </button>
-                    <div v-if="filteredKnowledgeBases.length === 0" class="composer-kb-picker-empty">
-                      未找到匹配知识库
-                    </div>
-                  </div>
+                <div class="composer-mention-copy">
+                  <strong>{{ knowledgeBase.kbName }}</strong>
+                  <span>{{ knowledgeBase.kbCode }}</span>
                 </div>
-              </el-popover>
-              <span class="composer-tip">输入 @ 可接入知识库，Enter 发送，Shift + Enter 换行</span>
+                <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已接入' : '按 Enter 选择' }}</small>
+              </button>
+            </div>
+            <div v-else class="composer-mention-empty">
+              未找到匹配知识库，继续输入可缩小范围
             </div>
           </div>
-          <div v-if="!isKnowledgeBaseScene" class="composer-kb-strip">
-            <span class="composer-kb-strip-label">@ 当前知识库</span>
-            <div v-if="selectedKnowledgeBases.length > 0" class="composer-kb-strip-tags">
-              <el-tag
-                v-for="knowledgeBase in selectedKnowledgeBases"
-                :key="knowledgeBase.id"
-                :closable="!streaming"
-                effect="plain"
-                type="info"
-                @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
-              >
-                @{{ knowledgeBase.kbName }}
-              </el-tag>
-            </div>
-            <span v-else class="composer-kb-strip-empty">未选择，当前将走纯模型问答</span>
+
+          <el-input
+            ref="composerInputRef"
+            v-model="draftQuestion"
+            type="textarea"
+            :rows="4"
+            resize="none"
+            :placeholder="composerPlaceholder"
+            @blur="handleComposerBlur"
+            @click="handleComposerCursorChange"
+            @focus="handleComposerFocus"
+            @keydown="handleComposerKeydown"
+            @keyup="handleComposerCursorChange"
+          />
+        </div>
+
+        <div class="composer-footer">
+          <div class="composer-footer-tags">
+            <el-tag
+              v-for="knowledgeBase in selectedKnowledgeBases"
+              :key="knowledgeBase.id"
+              :closable="!isKnowledgeBaseScene && !streaming"
+              effect="plain"
+              type="info"
+              @close="removeSelectedKnowledgeBase(knowledgeBase.id)"
+            >
+              @{{ knowledgeBase.kbName }}
+            </el-tag>
           </div>
-          <div class="composer-input-shell">
-            <div v-if="mentionPanelVisible" class="composer-mention-panel">
-              <div class="composer-mention-head">
-                <strong>@知识库</strong>
-                <span>
-                  {{ knowledgeBaseMentionState?.keyword ? `匹配“${knowledgeBaseMentionState.keyword}”` : '输入名称或编码快速接入' }}
-                </span>
-              </div>
-              <div v-if="mentionKnowledgeBases.length > 0" class="composer-mention-list thin-scrollbar">
-                <button
-                  v-for="(knowledgeBase, index) in mentionKnowledgeBases"
-                  :key="`mention-${knowledgeBase.id}`"
-                  type="button"
-                  class="composer-mention-item"
-                  :class="{
-                    'is-active': index === knowledgeBaseMentionActiveIndex,
-                    'is-selected': selectedKbIds.includes(knowledgeBase.id),
-                  }"
-                  :disabled="streaming"
-                  @mousedown.prevent="selectKnowledgeBaseFromMention(knowledgeBase)"
-                  @mouseenter="knowledgeBaseMentionActiveIndex = index"
-                >
-                  <div class="composer-mention-copy">
-                    <strong>{{ knowledgeBase.kbName }}</strong>
-                    <span>{{ knowledgeBase.kbCode }}</span>
-                  </div>
-                  <small>{{ selectedKbIds.includes(knowledgeBase.id) ? '已接入' : '按 Enter 选择' }}</small>
-                </button>
-              </div>
-              <div v-else class="composer-mention-empty">
-                未找到匹配知识库，继续输入可缩小范围
-              </div>
-            </div>
-            <el-input
-              ref="composerInputRef"
-              v-model="draftQuestion"
-              type="textarea"
-              :rows="5"
-              resize="none"
-              :placeholder="composerPlaceholder"
-              @blur="handleComposerBlur"
-              @click="handleComposerCursorChange"
-              @focus="handleComposerFocus"
-              @keydown="handleComposerKeydown"
-              @keyup="handleComposerCursorChange"
-            />
-          </div>
-          <div class="composer-actions">
-            <p v-if="loadingError" class="composer-error">{{ loadingError }}</p>
-            <div class="composer-action-buttons">
-              <el-button plain :icon="ChatDotRound" :disabled="streaming" @click="handleClearView">
-                清空视图
-              </el-button>
-              <el-button
-                type="primary"
-                :loading="streaming"
-                :disabled="!draftQuestion.trim()"
-                @click="handleSendQuestion"
-              >
-                {{ streaming ? '生成中...' : '发送问题' }}
-              </el-button>
-            </div>
-          </div>
-        </footer>
-      </section>
+          <el-button
+            type="primary"
+            :loading="streaming"
+            :disabled="!draftQuestion.trim()"
+            @click="handleSendQuestion"
+          >
+            {{ streaming ? '生成中...' : '发送' }}
+          </el-button>
+        </div>
+      </footer>
     </section>
   </section>
 </template>
 
 <style scoped>
 .workspace-shell {
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
+  --surface-base: rgba(255, 252, 248, 0.94);
+  --surface-muted: rgba(248, 244, 238, 0.92);
+  --surface-strong: rgba(255, 255, 255, 0.78);
+  --border-soft: rgba(122, 89, 53, 0.08);
+  --border-medium: rgba(122, 89, 53, 0.14);
+  --accent-soft: rgba(157, 91, 47, 0.1);
+  --accent-medium: rgba(157, 91, 47, 0.24);
+  display: grid;
+  grid-template-columns: 296px minmax(0, 1fr);
+  gap: 16px;
   min-height: calc(100vh - 40px);
 }
 
-.workspace-hero,
-.control-strip,
-.session-list-card,
-.conversation-card {
-  border-radius: 30px;
+.workspace-sidebar,
+.workspace-main {
+  min-height: 0;
+  border-radius: 28px;
+  overflow: hidden;
 }
 
-.workspace-hero {
+.workspace-sidebar {
   display: flex;
-  align-items: stretch;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 28px;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 14px 16px;
+  background:
+    linear-gradient(180deg, rgba(252, 248, 242, 0.96), rgba(248, 243, 236, 0.92));
 }
 
-.hero-copy {
-  max-width: 760px;
+.sidebar-brand {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 10px 14px;
+  border-bottom: 1px solid var(--border-soft);
 }
 
-.hero-kicker {
-  margin: 0 0 8px;
+.sidebar-eyebrow {
+  margin: 0;
   color: var(--text-muted);
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
-.hero-copy h1 {
-  margin: 0;
-  font-size: clamp(30px, 3vw, 46px);
-  line-height: 1.18;
+.sidebar-brand strong {
+  font-size: 28px;
+  line-height: 1;
 }
 
-.hero-copy p:last-child {
-  margin: 16px 0 0;
+.sidebar-brand span {
   color: var(--text-secondary);
-  line-height: 1.8;
+  line-height: 1.7;
 }
 
-.hero-summary {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(120px, 1fr));
-  gap: 12px;
-  min-width: 360px;
-}
-
-.hero-summary article {
-  padding: 16px;
-  border-radius: 20px;
-  background: rgba(255, 255, 255, 0.54);
-  border: 1px solid rgba(122, 89, 53, 0.08);
-}
-
-.hero-summary span,
-.session-list-head p {
-  display: block;
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.hero-summary strong,
-.session-list-head strong {
-  display: block;
-  margin-top: 10px;
-  font-size: 18px;
-}
-
-.control-strip {
-  display: grid;
-  grid-template-columns: minmax(220px, 0.9fr) minmax(260px, 1.2fr) 220px;
-  gap: 16px;
-  padding: 18px 20px;
-}
-
-.control-status-bar {
+.sidebar-section {
   display: flex;
-  grid-column: 1 / -1;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 10px;
 }
 
-.control-status-pill {
-  display: flex;
+.sidebar-knowledge {
+  min-height: 0;
+}
+
+.sidebar-sessions {
   flex: 1;
+  min-height: 0;
+}
+
+.sidebar-primary-action {
+  width: 100%;
+}
+
+.sidebar-section-head {
+  display: flex;
   align-items: flex-start;
-  gap: 10px;
-  min-width: min(320px, 100%);
-  padding: 12px 14px;
-  border: 1px solid rgba(122, 89, 53, 0.12);
-  border-radius: 18px;
-  background: rgba(255, 252, 248, 0.9);
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 10px;
 }
 
-.control-status-pill strong {
-  flex: none;
-  color: var(--text-secondary);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.control-status-pill span {
+.sidebar-section-head p {
+  margin: 0;
   color: var(--text-secondary);
   font-size: 13px;
-  line-height: 1.7;
-}
-
-.control-status-pill.is-streaming {
-  border-color: rgba(157, 91, 47, 0.18);
-  background: rgba(255, 246, 235, 0.92);
-}
-
-.control-status-pill.is-saving {
-  border-color: rgba(150, 117, 56, 0.18);
-  background: rgba(255, 250, 238, 0.92);
-}
-
-.control-status-pill.is-saved {
-  border-color: rgba(79, 132, 86, 0.18);
-  background: rgba(244, 250, 244, 0.94);
-}
-
-.control-status-pill.is-failed {
-  border-color: rgba(176, 77, 53, 0.22);
-  background: rgba(255, 244, 240, 0.94);
-}
-
-.control-block {
-  padding: 14px;
-  border-radius: 22px;
-  background: rgba(255, 255, 255, 0.48);
-  border: 1px solid rgba(122, 89, 53, 0.08);
-}
-
-.control-toggle {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.control-summary {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.control-summary-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.control-summary-head span {
   font-weight: 600;
 }
 
-.control-summary-copy,
-.control-summary-head small,
-.control-summary-more {
-  color: var(--text-muted);
-}
-
-.control-summary-copy {
-  margin: 0;
-  line-height: 1.7;
-}
-
-.control-summary-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.toggle-head span {
-  display: block;
-  font-weight: 600;
-}
-
-.toggle-head small {
-  display: block;
-  margin-top: 8px;
-  color: var(--text-muted);
-  line-height: 1.6;
-}
-
-.conversation-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 18px;
-  min-height: 0;
-  flex: 1;
-}
-
-.conversation-grid.has-session-list {
-  grid-template-columns: 280px minmax(0, 1fr);
-}
-
-.session-list-card {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px;
-}
-
-.session-list-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.session-list-subtitle {
-  display: block;
-  margin-top: 8px;
+.sidebar-section-head span,
+.sidebar-section-head small {
   color: var(--text-muted);
   font-size: 12px;
   line-height: 1.6;
 }
 
-.session-list {
+.sidebar-list {
   display: flex;
-  flex: 1;
   flex-direction: column;
-  gap: 10px;
-  min-height: 420px;
-  max-height: calc(100vh - 340px);
+  gap: 8px;
+  min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
 }
 
-.session-item {
+.sidebar-knowledge .sidebar-list {
+  max-height: 240px;
+}
+
+.sidebar-sessions .sidebar-list {
+  flex: 1;
+  min-height: 240px;
+}
+
+.sidebar-entry,
+.session-entry {
   display: flex;
-  align-items: stretch;
+  align-items: center;
   gap: 8px;
-  padding: 10px;
+  width: 100%;
+  padding: 12px 12px 12px 14px;
+  border: 1px solid transparent;
   border-radius: 18px;
-  border: 1px solid rgba(122, 89, 53, 0.08);
-  background: rgba(255, 255, 255, 0.58);
+  background: transparent;
+  color: inherit;
   transition:
-    transform 180ms ease,
+    background 180ms ease,
     border-color 180ms ease,
-    box-shadow 180ms ease;
+    transform 180ms ease;
 }
 
-.session-item:hover,
-.session-item.is-active {
+.sidebar-entry {
+  cursor: pointer;
+  text-align: left;
+}
+
+.sidebar-entry:hover,
+.sidebar-entry.is-active,
+.session-entry:hover,
+.session-entry.is-active {
   transform: translateY(-1px);
-  border-color: rgba(157, 91, 47, 0.26);
-  box-shadow: 0 14px 28px rgba(91, 58, 24, 0.08);
+  border-color: var(--border-medium);
+  background: rgba(255, 255, 255, 0.64);
 }
 
-.session-main {
+.sidebar-entry.is-active,
+.session-entry.is-active {
+  border-color: var(--accent-medium);
+  background: rgba(255, 247, 238, 0.9);
+}
+
+.sidebar-entry:disabled,
+.session-entry-main:disabled {
+  cursor: not-allowed;
+}
+
+.sidebar-entry strong,
+.sidebar-entry span,
+.session-entry-main strong,
+.session-entry-main span {
+  display: block;
+}
+
+.sidebar-entry strong,
+.session-entry-main strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.sidebar-entry span,
+.session-entry-main span {
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.session-entry {
+  padding-right: 6px;
+}
+
+.session-entry-main {
   flex: 1;
   min-width: 0;
-  padding: 6px;
+  padding: 0;
   border: none;
   background: transparent;
   color: inherit;
@@ -1869,80 +1864,309 @@ onUnmounted(() => {
   text-align: left;
 }
 
-.session-main:disabled {
-  cursor: not-allowed;
+.session-entry-trigger {
+  color: var(--text-muted);
 }
 
-.session-main strong,
-.session-main span {
+.session-entry.is-active .session-entry-trigger,
+.session-entry-trigger:hover {
+  color: var(--brand-strong);
+}
+
+.sidebar-placeholder {
+  display: grid;
+  place-items: center;
+  min-height: 96px;
+  padding: 16px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+  text-align: center;
+}
+
+.workspace-main {
+  display: grid;
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+  flex: 1;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 252, 248, 0.92));
+}
+
+.workspace-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 24px 18px;
+}
+
+.toolbar-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 760px;
+}
+
+.toolbar-title-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toolbar-title-row h1 {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 44px);
+  line-height: 1.08;
+}
+
+.toolbar-scene-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 247, 238, 0.92);
+  border: 1px solid var(--accent-medium);
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.toolbar-copy p {
+  margin: 0;
+  color: var(--text-secondary);
+  line-height: 1.75;
+}
+
+.toolbar-subline {
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.85fr) minmax(0, 1fr) 220px;
+  gap: 12px;
+  padding: 0 24px 18px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border-soft);
+  border-radius: 18px;
+  background: var(--surface-muted);
+}
+
+.control-label {
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.control-select :deep(.el-select__wrapper) {
+  min-height: 44px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: none;
+}
+
+.control-range-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.control-tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.control-empty-text {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.control-switch-field {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.control-switch-head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.control-switch-head small {
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.range-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.range-picker-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.range-picker-head strong {
+  display: block;
+  color: var(--text-secondary);
+  font-size: 14px;
+}
+
+.range-picker-head span {
+  display: block;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.range-picker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 280px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.range-picker-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    transform 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.range-picker-item:hover,
+.range-picker-item.is-selected {
+  transform: translateY(-1px);
+  border-color: var(--accent-medium);
+  box-shadow: 0 14px 28px rgba(91, 58, 24, 0.08);
+}
+
+.range-picker-copy {
+  min-width: 0;
+}
+
+.range-picker-copy strong,
+.range-picker-copy span {
   display: block;
 }
 
-.session-main strong {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.session-main span {
-  margin-top: 8px;
+.range-picker-copy span,
+.range-picker-item small {
+  margin-top: 4px;
   color: var(--text-muted);
   font-size: 12px;
 }
 
-.session-item-tools {
-  display: flex;
-  align-items: flex-start;
-}
-
-.session-action-trigger {
-  margin-top: 2px;
-  color: var(--text-muted);
-}
-
-.session-action-trigger:hover,
-.session-item.is-active .session-action-trigger {
-  color: var(--brand-strong);
-}
-
-.session-placeholder {
+.range-picker-empty {
   display: grid;
   place-items: center;
-  min-height: 140px;
-  padding: 18px;
+  min-height: 100px;
   color: var(--text-muted);
-  text-align: center;
+  font-size: 12px;
 }
 
-.conversation-card {
-  display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.conversation-toolbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 18px 20px;
-  border-bottom: 1px solid rgba(122, 89, 53, 0.08);
-}
-
-.toolbar-tags {
+.workspace-status {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  padding: 0 24px 14px;
+}
+
+.status-pill {
+  display: flex;
+  flex: 1;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: min(320px, 100%);
+  padding: 12px 14px;
+  border: 1px solid var(--border-medium);
+  border-radius: 18px;
+  background: var(--surface-base);
+}
+
+.status-pill strong {
+  flex: none;
+  color: var(--text-secondary);
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.status-pill span {
+  color: var(--text-secondary);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.status-pill.is-streaming {
+  border-color: rgba(157, 91, 47, 0.18);
+  background: rgba(255, 246, 235, 0.92);
+}
+
+.status-pill.is-saving {
+  border-color: rgba(150, 117, 56, 0.18);
+  background: rgba(255, 250, 238, 0.92);
+}
+
+.status-pill.is-saved {
+  border-color: rgba(79, 132, 86, 0.18);
+  background: rgba(244, 250, 244, 0.94);
+}
+
+.status-pill.is-failed,
+.status-pill.is-error {
+  border-color: rgba(176, 77, 53, 0.22);
+  background: rgba(255, 244, 240, 0.94);
 }
 
 .conversation-body {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  overflow-y: auto;
-  padding: 24px;
+  gap: 24px;
   min-height: 0;
+  overflow-y: auto;
+  padding: 26px 32px;
 }
 
 .conversation-placeholder,
@@ -1953,123 +2177,94 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
-.message-group {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+.conversation-empty {
+  gap: 10px;
+  padding: 24px;
+  text-align: center;
 }
 
-.message-bubble {
-  max-width: min(84%, 920px);
-  padding: 16px 18px;
-  border-radius: 22px;
-  box-shadow: 0 16px 30px rgba(76, 51, 23, 0.06);
+.conversation-empty-kicker {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.conversation-empty h2 {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 42px);
+  line-height: 1.1;
+}
+
+.conversation-empty p:last-child {
+  max-width: 560px;
+  color: var(--text-secondary);
   line-height: 1.8;
 }
 
-.message-bubble p {
+.message-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.message-row {
+  display: flex;
+}
+
+.message-row.is-user {
+  justify-content: flex-end;
+}
+
+.message-row.is-assistant {
+  justify-content: flex-start;
+}
+
+.message-card {
+  max-width: min(88%, 860px);
+  padding: 16px 18px;
+  border-radius: 22px;
+  line-height: 1.8;
+}
+
+.message-card p {
   margin: 0;
   white-space: pre-wrap;
   word-break: break-word;
 }
 
-.message-bubble-user {
-  align-self: flex-end;
+.message-card.is-user {
   color: #fffaf4;
-  background: linear-gradient(150deg, #9d5b2f, #7f431b);
+  background: linear-gradient(150deg, #9d5b2f, #77411b);
 }
 
-.message-bubble-assistant {
-  align-self: flex-start;
-  background: rgba(255, 255, 255, 0.8);
+.message-card.is-assistant {
+  border: 1px solid var(--border-soft);
+  background: var(--surface-strong);
 }
 
-.message-bubble-assistant.is-error {
-  border: 1px solid rgba(176, 77, 53, 0.22);
-  background: rgba(255, 247, 244, 0.88);
+.message-card.is-assistant.is-error {
+  border-color: rgba(176, 77, 53, 0.24);
+  background: rgba(255, 244, 240, 0.92);
 }
 
 .message-role {
   display: inline-flex;
   margin-bottom: 10px;
-  color: inherit;
-  opacity: 0.8;
-  font-size: 12px;
+  opacity: 0.78;
+  font-size: 11px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-}
-
-.reference-block {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  margin-top: 14px;
-  padding-top: 14px;
-  border-top: 1px solid rgba(122, 89, 53, 0.1);
-}
-
-.reference-item {
-  padding: 12px 14px;
-  border-radius: 16px;
-  background: rgba(243, 234, 222, 0.86);
-}
-
-.reference-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.reference-head span,
-.message-usage,
-.pending-error,
-.composer-tip {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.reference-item p {
-  margin-top: 8px;
-  color: var(--text-secondary);
-}
-
-.reference-actions {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 10px;
-}
-
-.reference-meta {
-  color: var(--text-muted);
-  font-size: 12px;
 }
 
 .assistant-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
   flex-wrap: wrap;
+  gap: 12px;
   margin-top: 12px;
-}
-
-.assistant-action {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  padding: 6px 12px;
-  border: 1px solid rgba(157, 91, 47, 0.16);
-  border-radius: 999px;
-  background: rgba(255, 251, 245, 0.92);
-  color: var(--text-secondary);
-  cursor: pointer;
-  transition:
-    border-color 180ms ease,
-    color 180ms ease,
-    background 180ms ease;
 }
 
 .assistant-action strong {
@@ -2082,6 +2277,22 @@ onUnmounted(() => {
   background: rgba(157, 91, 47, 0.12);
   color: var(--brand-strong);
   font-size: 12px;
+}
+
+.assistant-action {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid rgba(157, 91, 47, 0.16);
+  border-radius: 999px;
+  background: rgba(255, 251, 245, 0.92);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    color 180ms ease,
+    background 180ms ease;
 }
 
 .assistant-action:hover {
@@ -2102,16 +2313,50 @@ onUnmounted(() => {
   background: rgba(243, 234, 222, 0.82);
 }
 
-.feedback-hint,
-.message-usage {
-  margin-top: 12px;
+.reference-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(122, 89, 53, 0.1);
 }
 
-.feedback-hint {
+.reference-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(243, 234, 222, 0.86);
+}
+
+.reference-head,
+.reference-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reference-item p {
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+
+.reference-head span,
+.reference-meta,
+.feedback-hint,
+.message-usage,
+.pending-error,
+.composer-meta-tip,
+.composer-meta-state {
   color: var(--text-muted);
   font-size: 12px;
 }
 
+.reference-actions {
+  margin-top: 10px;
+}
+
+.feedback-hint,
 .message-usage {
   margin-top: 12px;
 }
@@ -2127,9 +2372,9 @@ onUnmounted(() => {
   gap: 6px;
   margin-top: 12px;
   padding: 12px 14px;
-  border: 1px solid rgba(122, 89, 53, 0.12);
+  border: 1px solid var(--border-medium);
   border-radius: 16px;
-  background: rgba(255, 252, 248, 0.9);
+  background: var(--surface-base);
 }
 
 .pending-recovery-card strong {
@@ -2159,152 +2404,58 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  padding: 18px 20px 20px;
-  border-top: 1px solid rgba(122, 89, 53, 0.08);
+  padding: 18px 24px 22px;
+  border-top: 1px solid var(--border-soft);
   background: rgba(255, 252, 248, 0.92);
 }
 
-.composer-head {
+.composer-meta {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
 
-.composer-tools {
+.composer-meta-copy {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 4px;
 }
 
-.composer-hint {
+.composer-meta-title {
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.composer-meta-state {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  color: var(--text-secondary);
-}
-
-.composer-kb-strip {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px 14px;
-  border-radius: 18px;
-  background: rgba(255, 250, 244, 0.88);
-  border: 1px dashed rgba(157, 91, 47, 0.22);
-}
-
-.composer-kb-strip-label {
-  color: var(--text-secondary);
-  font-size: 12px;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
-
-.composer-kb-strip-tags {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.composer-kb-strip-empty {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.composer-kb-picker {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.composer-kb-picker-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.composer-kb-picker-head strong {
-  display: block;
-}
-
-.composer-kb-picker-head span {
-  display: block;
-  margin-top: 6px;
-  color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.composer-kb-picker-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 280px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.composer-kb-picker-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  padding: 12px 14px;
-  border: 1px solid rgba(122, 89, 53, 0.1);
-  border-radius: 16px;
-  background: rgba(255, 255, 255, 0.9);
-  color: inherit;
-  cursor: pointer;
-  text-align: left;
-  transition:
-    border-color 180ms ease,
-    box-shadow 180ms ease,
-    transform 180ms ease;
-}
-
-.composer-kb-picker-item:hover,
-.composer-kb-picker-item.is-selected {
-  transform: translateY(-1px);
-  border-color: rgba(157, 91, 47, 0.24);
-  box-shadow: 0 10px 24px rgba(91, 58, 24, 0.08);
-}
-
-.composer-kb-picker-item small {
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.composer-kb-picker-copy {
-  min-width: 0;
-}
-
-.composer-kb-picker-copy strong,
-.composer-kb-picker-copy span {
-  display: block;
-}
-
-.composer-kb-picker-copy span {
-  margin-top: 4px;
-  color: var(--text-muted);
-  font-size: 12px;
-}
-
-.composer-kb-picker-empty {
-  display: grid;
-  place-items: center;
-  min-height: 120px;
-  color: var(--text-muted);
-  font-size: 12px;
+  min-height: 24px;
+  text-align: right;
 }
 
 .composer-input-shell {
   position: relative;
+  padding: 10px 12px 12px;
+  border: 1px solid var(--border-medium);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.94);
+}
+
+.composer-input-shell :deep(.el-textarea__inner) {
+  min-height: 110px;
+  padding: 6px 4px 0;
+  border: none;
+  box-shadow: none;
+  background: transparent;
+  color: inherit;
+  font-size: 15px;
+  line-height: 1.8;
+}
+
+.composer-input-shell :deep(.el-textarea__inner:focus) {
+  box-shadow: none;
 }
 
 .composer-mention-panel {
@@ -2410,44 +2561,80 @@ onUnmounted(() => {
   font-size: 12px;
 }
 
-.composer-actions {
+.composer-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.composer-error {
-  margin: 0;
-  color: #b04d35;
-}
-
-.composer-action-buttons {
+.composer-footer-tags {
   display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-left: auto;
+  flex: 1;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 32px;
 }
 
 @media (max-width: 1280px) {
-  .hero-summary,
-  .control-strip,
-  .conversation-grid.has-session-list {
+  .workspace-shell {
     grid-template-columns: 1fr;
   }
 
-  .workspace-hero,
-  .composer-head,
-  .composer-actions,
-  .conversation-toolbar {
-    flex-direction: column;
-    align-items: flex-start;
+  .workspace-sidebar {
+    max-height: none;
+  }
+
+  .workspace-controls {
+    grid-template-columns: 1fr;
   }
 }
 
-@media (max-width: 900px) {
-  .message-bubble {
+@media (max-width: 960px) {
+  .workspace-toolbar,
+  .composer-meta,
+  .composer-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .conversation-body {
+    padding: 20px 18px;
+  }
+
+  .workspace-toolbar,
+  .workspace-controls,
+  .workspace-status,
+  .composer-card {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .message-card {
     max-width: 100%;
+  }
+
+  .control-switch-field,
+  .assistant-actions,
+  .reference-head,
+  .reference-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 680px) {
+  .workspace-sidebar,
+  .workspace-main {
+    border-radius: 22px;
+  }
+
+  .toolbar-title-row,
+  .sidebar-section-head,
+  .range-picker-head,
+  .composer-mention-head {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 </style>
