@@ -118,7 +118,34 @@ const hasOcrImageSelection = computed(() =>
   selectedFileSummaries.value.some((item) => isOcrImageDocumentType(item.docType)),
 )
 const supportedDocTypesText = computed(() => {
-  return uploadCapability.value?.supportedDocTypes.join(' / ') ?? 'TXT / MARKDOWN / PDF / DOCX / PPTX / XLSX / PNG / JPG / JPEG / WEBP'
+  const docTypes = uploadCapability.value?.supportedDocTypes ?? [
+    'TXT',
+    'MD',
+    'MARKDOWN',
+    'PDF',
+    'DOCX',
+    'PPTX',
+    'XLSX',
+    'PNG',
+    'JPG',
+    'JPEG',
+    'WEBP',
+  ]
+  const labelByDocType: Record<string, string> = {
+    TXT: 'TXT',
+    MD: 'Markdown（.md）',
+    MARKDOWN: 'Markdown（.md / .markdown）',
+    PDF: 'PDF',
+    DOCX: 'DOCX',
+    PPTX: 'PPTX',
+    XLSX: 'XLSX',
+    PNG: 'PNG',
+    JPG: 'JPG',
+    JPEG: 'JPEG',
+    WEBP: 'WEBP',
+  }
+  const normalized = docTypes.includes('MARKDOWN') ? docTypes.filter((item) => item !== 'MD') : docTypes
+  return normalized.map((item) => labelByDocType[item] ?? item).join(' / ')
 })
 
 const uploadOcrAlertType = computed<'success' | 'warning' | 'info'>(() => {
@@ -1127,7 +1154,10 @@ onUnmounted(() => {
           <div class="el-upload__text">将文件拖到此处，或 <em>点击选择</em></div>
           <template #tip>
             <div class="el-upload__tip">
-              当前支持批量上传，系统会逐个获取凭证、上传并登记文档。图片与扫描版 PDF 依赖 OCR。
+              <div class="upload-tip-line">支持格式：{{ supportedDocTypesText }}</div>
+              <div class="upload-tip-line">
+                当前支持批量上传，系统会逐个获取凭证、上传并登记文档。图片与扫描版 PDF 依赖 OCR。
+              </div>
             </div>
           </template>
         </el-upload>
@@ -1461,6 +1491,10 @@ onUnmounted(() => {
 
 .upload-box {
   width: 100%;
+}
+
+.upload-tip-line + .upload-tip-line {
+  margin-top: 4px;
 }
 
 .upload-meta {
