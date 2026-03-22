@@ -309,6 +309,7 @@ public class DocumentService {
     }
 
     private DocumentParseTaskEntity submitParseTask(DocumentEntity document, DocumentVersionEntity version, int retryCount) {
+        validateFileSize(document.getFileSize());
         DocumentParseTaskEntity existingTask = documentParseTaskMapper.selectOne(new LambdaQueryWrapper<DocumentParseTaskEntity>()
                 .eq(DocumentParseTaskEntity::getDocumentId, document.getId())
                 .eq(DocumentParseTaskEntity::getDocumentVersionId, version.getId())

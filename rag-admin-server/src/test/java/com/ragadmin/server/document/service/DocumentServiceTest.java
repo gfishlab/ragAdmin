@@ -210,6 +210,58 @@ class DocumentServiceTest {
     }
 
     @Test
+    void shouldRejectSubmitParseTaskWhenCurrentDocumentFileSizeIsZero() {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(1101L);
+        document.setKbId(31L);
+        document.setCurrentVersion(1);
+        document.setFileSize(0L);
+
+        DocumentVersionEntity version = new DocumentVersionEntity();
+        version.setId(1201L);
+        version.setDocumentId(1101L);
+        version.setVersionNo(1);
+
+        when(documentMapper.selectById(1101L)).thenReturn(document);
+        when(documentVersionMapper.selectOne(any())).thenReturn(version);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> documentService.submitParseTask(1101L, 0)
+        );
+
+        assertEquals("DOCUMENT_FILE_EMPTY", exception.getCode());
+        assertEquals("文件不能为空，请重新上传", exception.getMessage());
+        verify(documentParseTaskMapper, never()).insert(any(DocumentParseTaskEntity.class));
+    }
+
+    @Test
+    void shouldRejectSubmitParseTaskForSpecifiedVersionWhenDocumentFileSizeIsZero() {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(1301L);
+        document.setKbId(41L);
+        document.setCurrentVersion(2);
+        document.setFileSize(0L);
+
+        DocumentVersionEntity version = new DocumentVersionEntity();
+        version.setId(1401L);
+        version.setDocumentId(1301L);
+        version.setVersionNo(2);
+
+        when(documentMapper.selectById(1301L)).thenReturn(document);
+        when(documentVersionMapper.selectById(1401L)).thenReturn(version);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> documentService.submitParseTask(1301L, 1401L, 1)
+        );
+
+        assertEquals("DOCUMENT_FILE_EMPTY", exception.getCode());
+        assertEquals("文件不能为空，请重新上传", exception.getMessage());
+        verify(documentParseTaskMapper, never()).insert(any(DocumentParseTaskEntity.class));
+    }
+
+    @Test
     void shouldRejectCreateDocumentWhenFileSizeIsZero() {
         CreateDocumentRequest request = new CreateDocumentRequest();
         request.setDocName("空文件.pdf");
