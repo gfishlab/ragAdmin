@@ -18,6 +18,7 @@ function subscribe(
 ): RealtimeStreamHandle {
   const controller = new AbortController()
   const token = getAccessToken()
+  let handledByCallback = false
 
   void fetchEventSource(url, {
     method: 'GET',
@@ -43,9 +44,16 @@ function subscribe(
       }
     },
     onerror(error) {
+      handledByCallback = true
       options.onError?.(error)
       throw error
     },
+  }).catch((error) => {
+    // 某些失败路径不会进入 onerror 回调，需要在 Promise rejection 处补一次兜底。
+    if (controller.signal.aborted || handledByCallback) {
+      return
+    }
+    options.onError?.(error)
   })
 
   return {
