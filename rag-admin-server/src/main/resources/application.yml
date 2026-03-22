@@ -69,6 +69,9 @@ rag:
         simple-logger-max-text-length: 800
         simple-logger-request-body-enabled: true
         simple-logger-response-body-enabled: false
+      execution-planning:
+        enabled: true
+        log-plan: true
     bailian:
       enabled: true
       api-key:

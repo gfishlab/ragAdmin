@@ -12,6 +12,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -20,11 +21,15 @@ class DefaultChatExecutionPlanningServiceTest {
     @Mock
     private ConversationChatClient conversationChatClient;
 
+    private ChatExecutionPlanningProperties planningProperties;
+
     private DefaultChatExecutionPlanningService planningService;
 
     @BeforeEach
     void setUp() {
-        planningService = new DefaultChatExecutionPlanningService(conversationChatClient);
+        planningProperties = new ChatExecutionPlanningProperties();
+        planningProperties.setLogPlan(false);
+        planningService = new DefaultChatExecutionPlanningService(conversationChatClient, planningProperties);
     }
 
     @Test
@@ -101,5 +106,27 @@ class DefaultChatExecutionPlanningServiceTest {
         assertEquals("", plan.retrievalQuery());
         assertFalse(plan.needWebSearch());
         assertEquals("", plan.webSearchQuery());
+    }
+
+    @Test
+    void shouldFallbackToRuleBasedPlanWhenPlanningIsDisabled() {
+        planningProperties.setEnabled(false);
+        ChatExecutionPlanningRequest request = new ChatExecutionPlanningRequest(
+                "BAILIAN",
+                "qwen-max",
+                "请帮我总结知识库里的制度",
+                true,
+                true,
+                2,
+                true
+        );
+
+        ChatExecutionPlan plan = planningService.plan(request);
+
+        assertEquals("KNOWLEDGE_BASE_AND_WEB_SEARCH", plan.intent());
+        assertTrue(plan.needRetrieval());
+        assertTrue(plan.needWebSearch());
+        assertEquals("RULE_BASED", plan.source());
+        verifyNoInteractions(conversationChatClient);
     }
 }

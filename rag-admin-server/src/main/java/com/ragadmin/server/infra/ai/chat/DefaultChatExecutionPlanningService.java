@@ -26,14 +26,21 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
 
     private final ConversationChatClient conversationChatClient;
 
-    public DefaultChatExecutionPlanningService(ConversationChatClient conversationChatClient) {
+    private final ChatExecutionPlanningProperties planningProperties;
+
+    public DefaultChatExecutionPlanningService(
+            ConversationChatClient conversationChatClient,
+            ChatExecutionPlanningProperties planningProperties
+    ) {
         this.conversationChatClient = conversationChatClient;
+        this.planningProperties = planningProperties;
     }
 
     @Override
     public ChatExecutionPlan plan(ChatExecutionPlanningRequest request) {
         ChatExecutionPlan fallbackPlan = buildRuleBasedPlan(request);
         if (!canUseModel(request)) {
+            logPlan(request, fallbackPlan);
             return fallbackPlan;
         }
 
@@ -44,7 +51,9 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
                     buildPromptMessages(request),
                     ChatExecutionPlanStructuredOutput.class
             );
-            return mergePlan(request, fallbackPlan, output);
+            ChatExecutionPlan plan = mergePlan(request, fallbackPlan, output);
+            logPlan(request, plan);
+            return plan;
         } catch (Exception ex) {
             log.warn(
                     "问答规划模型调用失败，已回退规则规划，providerCode={}, modelCode={}, retrievalAvailable={}, webSearchAvailable={}",
@@ -54,11 +63,15 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
                     request.webSearchAvailable(),
                     ex
             );
+            logPlan(request, fallbackPlan);
             return fallbackPlan;
         }
     }
 
     private boolean canUseModel(ChatExecutionPlanningRequest request) {
+        if (!planningProperties.isEnabled()) {
+            return false;
+        }
         if (request == null || !StringUtils.hasText(request.question())) {
             return false;
         }
@@ -183,5 +196,30 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
             return second.trim();
         }
         return "";
+    }
+
+    private void logPlan(ChatExecutionPlanningRequest request, ChatExecutionPlan plan) {
+        if (!planningProperties.isLogPlan() || request == null || plan == null) {
+            return;
+        }
+        log.info(
+                "问答规划完成，source={}, intent={}, needRetrieval={}, needWebSearch={}, retrievalQueryLength={}, webSearchQueryLength={}, retrievalAvailable={}, webSearchAvailable={}, selectedKnowledgeBaseCount={}, knowledgeBaseScene={}, providerCode={}, modelCode={}",
+                plan.source(),
+                plan.intent(),
+                plan.needRetrieval(),
+                plan.needWebSearch(),
+                safeLength(plan.retrievalQuery()),
+                safeLength(plan.webSearchQuery()),
+                request.retrievalAvailable(),
+                request.webSearchAvailable(),
+                request.selectedKnowledgeBaseCount(),
+                request.knowledgeBaseScene(),
+                request.providerCode(),
+                request.modelCode()
+        );
+    }
+
+    private int safeLength(String text) {
+        return StringUtils.hasText(text) ? text.trim().length() : 0;
     }
 }

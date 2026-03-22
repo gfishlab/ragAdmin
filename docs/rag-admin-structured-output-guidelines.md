@@ -370,11 +370,13 @@
 当前已落地：
 
 - 会话摘要：适合结构化输出，已接入
+- 问答规划：适合结构化输出，已接入最小切片，当前覆盖意图识别、检索开关、联网开关、查询改写
 
 当前对应链路：
 
 - `ConversationChatClient.chatEntity(...)`
 - `DefaultConversationSummaryGenerator`
+- `DefaultChatExecutionPlanningService`
 
 ### 8.2 近期推荐优先级
 
