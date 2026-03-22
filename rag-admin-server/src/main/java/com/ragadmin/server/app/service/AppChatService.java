@@ -220,6 +220,7 @@ public class AppChatService {
                             refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
                                     .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
                                     .toList(),
+                            toMetadataResponse(message),
                             feedback == null ? null : feedback.getFeedbackType(),
                             feedback == null ? null : feedback.getCommentText()
                     );
@@ -622,6 +623,22 @@ public class AppChatService {
     private String resolveStreamErrorMessage(Throwable ex) {
         String message = ex.getMessage();
         return StringUtils.hasText(message) ? message : "流式问答失败";
+    }
+
+    private com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse toMetadataResponse(ChatMessageEntity message) {
+        if (message == null) {
+            return null;
+        }
+        if (!StringUtils.hasText(message.getAnswerConfidence())
+                && message.getHasKnowledgeBaseEvidence() == null
+                && message.getNeedFollowUp() == null) {
+            return null;
+        }
+        return new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse(
+                message.getAnswerConfidence(),
+                Boolean.TRUE.equals(message.getHasKnowledgeBaseEvidence()),
+                Boolean.TRUE.equals(message.getNeedFollowUp())
+        );
     }
 
     private String normalizeSceneType(String sceneType) {

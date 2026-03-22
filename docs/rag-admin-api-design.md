@@ -584,6 +584,12 @@
 
 - `GET /api/app/chat/sessions/{sessionId}/messages`
 
+说明：
+
+- 每条消息除 `question`、`answer`、`references`、`feedbackType`、`feedbackComment` 外，还会返回 `metadata`
+- 当前 `metadata` 最小字段为：`confidence`、`hasKnowledgeBaseEvidence`、`needFollowUp`
+- 对于历史老消息或尚未补写元数据的消息，`metadata` 允许为空
+
 ### 7.4 前台更新会话元数据
 
 - `PUT /api/app/chat/sessions/{sessionId}`

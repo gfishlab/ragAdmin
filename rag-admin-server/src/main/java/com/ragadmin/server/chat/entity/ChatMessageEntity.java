@@ -19,6 +19,9 @@ public class ChatMessageEntity {
     private String questionText;
     private String answerText;
     private Long modelId;
+    private String answerConfidence;
+    private Boolean hasKnowledgeBaseEvidence;
+    private Boolean needFollowUp;
     private Integer promptTokens;
     private Integer completionTokens;
     private Integer latencyMs;

@@ -11,6 +11,7 @@ import com.ragadmin.server.auth.dto.CurrentUserResponse;
 import com.ragadmin.server.auth.dto.LoginResponse;
 import com.ragadmin.server.auth.dto.RefreshTokenResponse;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
+import com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse;
 import com.ragadmin.server.auth.service.AuthInterceptor;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.chat.dto.ChatMessageResponse;
@@ -314,6 +315,7 @@ class AppApiWebMvcTest {
                         "今天有哪些待办？",
                         "今天需要完成接口联调。",
                         List.of(),
+                        new ChatAnswerMetadataResponse("LOW", false, true),
                         null,
                         null
                 )
@@ -324,7 +326,9 @@ class AppApiWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data[0].messageId").value(101))
-                .andExpect(jsonPath("$.data[0].answer").value("今天需要完成接口联调。"));
+                .andExpect(jsonPath("$.data[0].answer").value("今天需要完成接口联调。"))
+                .andExpect(jsonPath("$.data[0].metadata.confidence").value("LOW"))
+                .andExpect(jsonPath("$.data[0].metadata.needFollowUp").value(true));
     }
 
     @Test

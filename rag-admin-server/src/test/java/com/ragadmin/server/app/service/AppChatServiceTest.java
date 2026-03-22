@@ -7,6 +7,7 @@ import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.ChatTerminalTypes;
+import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
 import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadataGenerationService;
@@ -332,6 +333,39 @@ class AppChatServiceTest {
         verify(chatSessionKnowledgeBaseRelMapper).delete(any());
         verify(conversationMemoryManager).clear("chat-terminal-app-scene-general-user-5001-session-401");
         verify(chatSessionMapper).deleteById(401L);
+    }
+
+    @Test
+    void shouldIncludePersistedMetadataWhenListingMessages() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(450L);
+        session.setUserId(5002L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setStatus("ENABLED");
+
+        ChatMessageEntity message = new ChatMessageEntity();
+        message.setId(801L);
+        message.setSessionId(450L);
+        message.setQuestionText("今天有哪些待办？");
+        message.setAnswerText("今天需要完成接口联调。");
+        message.setAnswerConfidence("LOW");
+        message.setHasKnowledgeBaseEvidence(Boolean.FALSE);
+        message.setNeedFollowUp(Boolean.TRUE);
+
+        when(chatSessionMapper.selectById(450L)).thenReturn(session);
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(message));
+        when(chatAnswerReferenceMapper.selectList(any())).thenReturn(List.of());
+        when(chunkMapper.selectBatchIds(List.of())).thenReturn(List.of());
+        when(chatFeedbackMapper.selectList(any())).thenReturn(List.of());
+
+        List<ChatMessageResponse> messages = appChatService.listMessages(450L, user(5002L));
+
+        assertEquals(1, messages.size());
+        assertNotNull(messages.getFirst().metadata());
+        assertEquals("LOW", messages.getFirst().metadata().confidence());
+        assertEquals(false, messages.getFirst().metadata().hasKnowledgeBaseEvidence());
+        assertEquals(true, messages.getFirst().metadata().needFollowUp());
     }
 
     @Test

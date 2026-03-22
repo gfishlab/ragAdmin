@@ -57,6 +57,9 @@ public class ChatExchangePersistenceService {
         message.setQuestionText(question);
         message.setAnswerText(answer);
         message.setModelId(modelId);
+        message.setAnswerConfidence(answerMetadata == null ? null : answerMetadata.confidence());
+        message.setHasKnowledgeBaseEvidence(answerMetadata == null ? null : answerMetadata.hasKnowledgeBaseEvidence());
+        message.setNeedFollowUp(answerMetadata == null ? null : answerMetadata.needFollowUp());
         message.setPromptTokens(promptTokens);
         message.setCompletionTokens(completionTokens);
         message.setLatencyMs(latencyMs);

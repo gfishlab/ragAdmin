@@ -4,6 +4,7 @@ import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
+import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
@@ -165,6 +166,36 @@ class ChatServiceTest {
 
         assertEquals("CHAT_KB_MISMATCH", exception.getCode());
         verify(retrievalService, never()).retrieve(any(), any());
+    }
+
+    @Test
+    void shouldIncludePersistedMetadataWhenListingMessages() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(26L);
+        session.setUserId(100L);
+
+        ChatMessageEntity message = new ChatMessageEntity();
+        message.setId(601L);
+        message.setSessionId(26L);
+        message.setQuestionText("制度里是否要求提交周报？");
+        message.setAnswerText("制度要求按时提交周报。");
+        message.setAnswerConfidence("HIGH");
+        message.setHasKnowledgeBaseEvidence(Boolean.TRUE);
+        message.setNeedFollowUp(Boolean.FALSE);
+
+        when(chatSessionMapper.selectById(26L)).thenReturn(session);
+        when(chatMessageMapper.selectList(any())).thenReturn(List.of(message));
+        when(chatAnswerReferenceMapper.selectList(any())).thenReturn(List.of());
+        when(chunkMapper.selectBatchIds(List.of())).thenReturn(List.of());
+        when(chatFeedbackMapper.selectList(any())).thenReturn(List.of());
+
+        List<ChatMessageResponse> messages = chatService.listMessages(26L, user(100L));
+
+        assertEquals(1, messages.size());
+        assertNotNull(messages.getFirst().metadata());
+        assertEquals("HIGH", messages.getFirst().metadata().confidence());
+        assertEquals(true, messages.getFirst().metadata().hasKnowledgeBaseEvidence());
+        assertEquals(false, messages.getFirst().metadata().needFollowUp());
     }
 
     @Test
