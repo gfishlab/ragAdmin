@@ -16,6 +16,7 @@ import java.lang.reflect.Method;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadFactory;
 
 @Configuration
 @EnableAsync
@@ -24,6 +25,7 @@ public class AsyncExecutionConfiguration implements AsyncConfigurer, SchedulingC
     public static final String APPLICATION_TASK_EXECUTOR = "applicationTaskExecutor";
     public static final String IO_VIRTUAL_TASK_EXECUTOR = "ioVirtualTaskExecutor";
     public static final String APPLICATION_TASK_SCHEDULER = "applicationTaskScheduler";
+    private static final String IO_VIRTUAL_THREAD_NAME_PREFIX = "rag-io-";
 
     private static final Logger log = LoggerFactory.getLogger(AsyncExecutionConfiguration.class);
 
@@ -56,7 +58,11 @@ public class AsyncExecutionConfiguration implements AsyncConfigurer, SchedulingC
      */
     @Bean(name = IO_VIRTUAL_TASK_EXECUTOR, destroyMethod = "close")
     public ExecutorService ioVirtualTaskExecutor() {
-        return Executors.newVirtualThreadPerTaskExecutor();
+        // 为虚拟线程补充统一前缀，便于日志排障时快速识别阻塞型 IO 任务来源。
+        ThreadFactory threadFactory = Thread.ofVirtual()
+                .name(IO_VIRTUAL_THREAD_NAME_PREFIX, 0)
+                .factory();
+        return Executors.newThreadPerTaskExecutor(threadFactory);
     }
 
     /**
