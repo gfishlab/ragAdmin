@@ -1649,7 +1649,7 @@ onUnmounted(() => {
                 </button>
               </div>
 
-              <div class="composer-footer-tags">
+              <div v-if="!isKnowledgeBaseScene" class="composer-footer-tags">
                 <el-tag
                   v-for="knowledgeBase in selectedKnowledgeBases"
                   :key="knowledgeBase.id"
