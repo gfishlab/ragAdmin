@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -49,14 +50,70 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
             AiProviderEntity bailian = ensureProvider("BAILIAN", "阿里百炼", "https://dashscope.aliyuncs.com");
             ensureModel(bailian, "qwen-max", "通义千问 Max", "CHAT", List.of("TEXT_GENERATION"), 8000, new BigDecimal("0.7"));
             ensureModel(bailian, "text-embedding-v3", "通义文本向量", "EMBEDDING", List.of("EMBEDDING"), null, null);
+            // 配置文件里的兜底默认模型也必须落库，避免知识库未显式绑定模型时回退到一个数据库中不存在的模型编码。
+            ensureConfiguredDefaultModel(
+                    bailian,
+                    bailianProperties.getDefaultChatModel(),
+                    "qwen-max",
+                    "CHAT",
+                    List.of("TEXT_GENERATION"),
+                    8000,
+                    new BigDecimal("0.7")
+            );
+            ensureConfiguredDefaultModel(
+                    bailian,
+                    bailianProperties.getDefaultEmbeddingModel(),
+                    "text-embedding-v3",
+                    "EMBEDDING",
+                    List.of("EMBEDDING"),
+                    null,
+                    null
+            );
         }
         if (ollamaProperties.isEnabled()) {
             AiProviderEntity ollama = ensureProvider("OLLAMA", "Ollama", "http://127.0.0.1:11434");
             ensureModel(ollama, "qwen2.5:7b", "Ollama Qwen2.5 7B", "CHAT", List.of("TEXT_GENERATION"), 4096, new BigDecimal("0.7"));
             ensureModel(ollama, "nomic-embed-text", "Ollama Nomic Embed Text", "EMBEDDING", List.of("EMBEDDING"), null, null);
+            ensureConfiguredDefaultModel(
+                    ollama,
+                    ollamaProperties.getDefaultChatModel(),
+                    "qwen2.5:7b",
+                    "CHAT",
+                    List.of("TEXT_GENERATION"),
+                    4096,
+                    new BigDecimal("0.7")
+            );
+            ensureConfiguredDefaultModel(
+                    ollama,
+                    ollamaProperties.getDefaultEmbeddingModel(),
+                    "nomic-embed-text",
+                    "EMBEDDING",
+                    List.of("EMBEDDING"),
+                    null,
+                    null
+            );
         }
 
         log.info("已完成默认模型提供方与模型定义初始化");
+    }
+
+    private void ensureConfiguredDefaultModel(
+            AiProviderEntity provider,
+            String configuredModelCode,
+            String baselineModelCode,
+            String modelType,
+            List<String> capabilityTypes,
+            Integer maxTokens,
+            BigDecimal temperatureDefault
+    ) {
+        if (!StringUtils.hasText(configuredModelCode)) {
+            return;
+        }
+        String resolvedModelCode = configuredModelCode.trim();
+        if (resolvedModelCode.equalsIgnoreCase(baselineModelCode)) {
+            return;
+        }
+        ensureModel(provider, resolvedModelCode, resolvedModelCode, modelType, capabilityTypes, maxTokens, temperatureDefault);
     }
 
     private AiProviderEntity ensureProvider(String code, String name, String baseUrl) {

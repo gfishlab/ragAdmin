@@ -7,9 +7,11 @@ import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.util.DisconnectedClientHelper;
 
 import java.util.stream.Collectors;
 
@@ -17,6 +19,8 @@ import java.util.stream.Collectors;
 public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+    private static final DisconnectedClientHelper DISCONNECTED_CLIENT_HELPER =
+            new DisconnectedClientHelper(GlobalExceptionHandler.class.getName());
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ApiResponse<Void>> handleMethodArgumentNotValid(MethodArgumentNotValidException ex) {
@@ -36,6 +40,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public ResponseEntity<ApiResponse<Void>> handleBusinessException(BusinessException ex) {
         return ResponseEntity.status(ex.getHttpStatus()).body(ApiResponse.failure(ex.getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(AsyncRequestNotUsableException.class)
+    public void handleAsyncRequestNotUsableException(AsyncRequestNotUsableException ex) {
+        if (!DISCONNECTED_CLIENT_HELPER.checkAndLogClientDisconnectedException(ex)) {
+            log.debug("异步响应已不可用，忽略本次异常，message={}", ex.getMessage());
+        }
     }
 
     @ExceptionHandler(Exception.class)

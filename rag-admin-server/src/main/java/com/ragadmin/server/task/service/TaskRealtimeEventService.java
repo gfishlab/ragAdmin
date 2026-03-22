@@ -11,6 +11,7 @@ import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.DisconnectedClientHelper;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -25,6 +26,8 @@ import java.util.stream.Collectors;
 public class TaskRealtimeEventService {
 
     private static final Logger log = LoggerFactory.getLogger(TaskRealtimeEventService.class);
+    private static final DisconnectedClientHelper DISCONNECTED_CLIENT_HELPER =
+            new DisconnectedClientHelper(TaskRealtimeEventService.class.getName());
     private static final long SSE_TIMEOUT_MS = 0L;
     private static final String EVENT_NAME = "task-realtime";
     private static final String EVENT_TYPE_CONNECTED = "CONNECTED";
@@ -49,25 +52,27 @@ public class TaskRealtimeEventService {
 
     public SseEmitter subscribeKnowledgeBase(Long kbId) {
         SseEmitter emitter = createEmitter();
-        registerEmitter(knowledgeBaseEmitters.computeIfAbsent(kbId, key -> ConcurrentHashMap.newKeySet()), emitter);
-        sendConnectedEvent(emitter, "知识库文档解析实时通道已连接");
-        sendSnapshotEvents(emitter, listActiveEventsByKnowledgeBase(kbId));
+        Set<SseEmitter> emitters = knowledgeBaseEmitters.computeIfAbsent(kbId, key -> ConcurrentHashMap.newKeySet());
+        registerEmitter(emitters, emitter);
+        sendConnectedEvent(emitters, emitter, "知识库文档解析实时通道已连接");
+        sendSnapshotEvents(emitters, emitter, listActiveEventsByKnowledgeBase(kbId));
         return emitter;
     }
 
     public SseEmitter subscribeDocument(Long documentId) {
         SseEmitter emitter = createEmitter();
-        registerEmitter(documentEmitters.computeIfAbsent(documentId, key -> ConcurrentHashMap.newKeySet()), emitter);
-        sendConnectedEvent(emitter, "文档解析实时通道已连接");
-        sendSnapshotEvents(emitter, listActiveEventsByDocument(documentId));
+        Set<SseEmitter> emitters = documentEmitters.computeIfAbsent(documentId, key -> ConcurrentHashMap.newKeySet());
+        registerEmitter(emitters, emitter);
+        sendConnectedEvent(emitters, emitter, "文档解析实时通道已连接");
+        sendSnapshotEvents(emitters, emitter, listActiveEventsByDocument(documentId));
         return emitter;
     }
 
     public SseEmitter subscribeTasks() {
         SseEmitter emitter = createEmitter();
         registerEmitter(taskEmitters, emitter);
-        sendConnectedEvent(emitter, "任务实时通道已连接");
-        sendSnapshotEvents(emitter, listActiveEvents());
+        sendConnectedEvent(taskEmitters, emitter, "任务实时通道已连接");
+        sendSnapshotEvents(taskEmitters, emitter, listActiveEvents());
         return emitter;
     }
 
@@ -135,7 +140,7 @@ public class TaskRealtimeEventService {
         emitter.onError(ex -> emitters.remove(emitter));
     }
 
-    private void sendConnectedEvent(SseEmitter emitter, String message) {
+    private void sendConnectedEvent(Set<SseEmitter> emitters, SseEmitter emitter, String message) {
         TaskRealtimeEventResponse event = new TaskRealtimeEventResponse(
                 EVENT_TYPE_CONNECTED,
                 null,
@@ -151,12 +156,12 @@ public class TaskRealtimeEventService {
                 false,
                 LocalDateTime.now()
         );
-        send(emitter, event);
+        send(emitters, emitter, event);
     }
 
-    private void sendSnapshotEvents(SseEmitter emitter, List<TaskRealtimeEventResponse> events) {
+    private void sendSnapshotEvents(Set<SseEmitter> emitters, SseEmitter emitter, List<TaskRealtimeEventResponse> events) {
         for (TaskRealtimeEventResponse event : events) {
-            send(emitter, event);
+            send(emitters, emitter, event);
         }
     }
 
@@ -164,18 +169,30 @@ public class TaskRealtimeEventService {
         if (emitters == null || emitters.isEmpty()) {
             return;
         }
-        emitters.forEach(emitter -> send(emitter, event));
+        for (SseEmitter emitter : emitters) {
+            send(emitters, emitter, event);
+        }
     }
 
-    private void send(SseEmitter emitter, TaskRealtimeEventResponse event) {
+    private void send(Set<SseEmitter> emitters, SseEmitter emitter, TaskRealtimeEventResponse event) {
         try {
             emitter.send(SseEmitter.event()
                     .name(EVENT_NAME)
                     .data(event));
-        } catch (IOException ex) {
-            log.debug("SSE 事件推送失败，准备移除连接，message={}", ex.getMessage());
-            emitter.complete();
+        } catch (IOException | IllegalStateException ex) {
+            removeEmitter(emitters, emitter, ex);
         }
+    }
+
+    private void removeEmitter(Set<SseEmitter> emitters, SseEmitter emitter, Exception ex) {
+        if (emitters != null) {
+            emitters.remove(emitter);
+        }
+        if (DISCONNECTED_CLIENT_HELPER.checkAndLogClientDisconnectedException(ex)) {
+            return;
+        }
+        log.debug("SSE 连接已不可用，已移除连接，type={}, message={}",
+                ex.getClass().getSimpleName(), ex.getMessage());
     }
 
     private List<TaskRealtimeEventResponse> listActiveEventsByKnowledgeBase(Long kbId) {
