@@ -117,10 +117,10 @@ const workspaceTitle = computed(() => {
     : '通用问答'
 })
 const sessionPanelTitle = computed(() => {
-  return isKnowledgeBaseScene.value ? '知识库会话' : '首页会话'
+  return isKnowledgeBaseScene.value ? '知识库会话' : '通用会话'
 })
 const sessionEmptyText = computed(() => {
-  return isKnowledgeBaseScene.value ? '当前知识库还没有聊天会话' : '还没有首页会话，发送第一条问题后会自动创建'
+  return isKnowledgeBaseScene.value ? '当前知识库还没有聊天会话' : '还没有通用会话，发送第一条问题后会自动创建'
 })
 
 const selectedKnowledgeBases = computed<KnowledgeBaseSummary[]>(() => {
@@ -1223,13 +1223,15 @@ onUnmounted(() => {
         </el-button>
         <button
           type="button"
-          class="sidebar-entry"
+          class="sidebar-entry sidebar-entry-summary"
           :class="{ 'is-active': !isKnowledgeBaseScene }"
           :disabled="streaming"
           @click="handleOpenGeneralChat"
         >
-          <strong>通用问答</strong>
-          <span>默认纯模型对话，按需临时接入知识库。</span>
+          <div class="sidebar-entry-copy">
+            <strong>通用会话</strong>
+            <small>默认纯模型对话，按需临时接入知识库。</small>
+          </div>
         </button>
       </div>
 
@@ -1314,6 +1316,7 @@ onUnmounted(() => {
 
       <div class="sidebar-footer">
         <el-dropdown
+          class="sidebar-account-dropdown"
           placement="top-start"
           trigger="click"
           :teleported="false"
@@ -1787,6 +1790,16 @@ onUnmounted(() => {
   border-top: 1px solid var(--border-soft);
 }
 
+.sidebar-account-dropdown {
+  display: block;
+  width: 100%;
+}
+
+.sidebar-footer :deep(.el-dropdown) {
+  display: block;
+  width: 100%;
+}
+
 .sidebar-entry,
 .session-entry {
   display: flex;
@@ -1807,6 +1820,10 @@ onUnmounted(() => {
 .sidebar-entry {
   cursor: pointer;
   text-align: left;
+}
+
+.sidebar-entry-summary {
+  align-items: flex-start;
 }
 
 .sidebar-entry:hover,
@@ -1834,6 +1851,34 @@ onUnmounted(() => {
 .session-entry-main strong,
 .session-entry-main span {
   display: block;
+}
+
+.sidebar-entry-copy {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sidebar-entry-copy strong,
+.sidebar-entry-copy small {
+  display: block;
+  min-width: 0;
+}
+
+.sidebar-entry-copy strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sidebar-entry-copy small {
+  color: var(--text-muted);
+  font-size: 10px;
+  line-height: 1.45;
 }
 
 .sidebar-entry strong,
