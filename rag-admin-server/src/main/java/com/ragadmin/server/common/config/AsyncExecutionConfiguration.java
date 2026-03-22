@@ -24,6 +24,7 @@ public class AsyncExecutionConfiguration implements AsyncConfigurer, SchedulingC
 
     public static final String APPLICATION_TASK_EXECUTOR = "applicationTaskExecutor";
     public static final String IO_VIRTUAL_TASK_EXECUTOR = "ioVirtualTaskExecutor";
+    public static final String WEB_MVC_STREAMING_TASK_EXECUTOR = "webMvcStreamingTaskExecutor";
     public static final String APPLICATION_TASK_SCHEDULER = "applicationTaskScheduler";
     private static final String IO_VIRTUAL_THREAD_NAME_PREFIX = "rag-io-";
 
@@ -63,6 +64,24 @@ public class AsyncExecutionConfiguration implements AsyncConfigurer, SchedulingC
                 .name(IO_VIRTUAL_THREAD_NAME_PREFIX, 0)
                 .factory();
         return Executors.newThreadPerTaskExecutor(threadFactory);
+    }
+
+    /**
+     * Spring MVC 流式返回底层仍然要写 Servlet 响应流，单独隔离线程池避免挤占普通业务执行器。
+     */
+    @Bean(name = WEB_MVC_STREAMING_TASK_EXECUTOR)
+    public ThreadPoolTaskExecutor webMvcStreamingTaskExecutor() {
+        AsyncExecutionProperties.WebMvcStreaming webMvcStreaming = asyncExecutionProperties.getWebMvcStreaming();
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(Math.max(1, webMvcStreaming.getCoreSize()));
+        executor.setMaxPoolSize(Math.max(executor.getCorePoolSize(), webMvcStreaming.getMaxSize()));
+        executor.setQueueCapacity(Math.max(0, webMvcStreaming.getQueueCapacity()));
+        executor.setKeepAliveSeconds(Math.max(30, webMvcStreaming.getKeepAliveSeconds()));
+        executor.setThreadNamePrefix("rag-mvc-stream-");
+        executor.setWaitForTasksToCompleteOnShutdown(true);
+        executor.setAwaitTerminationSeconds(30);
+        executor.initialize();
+        return executor;
     }
 
     /**

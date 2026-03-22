@@ -95,6 +95,7 @@ class AppApiWebMvcTest {
         publicMockMvc = MockMvcBuilders.standaloneSetup(appAuthController)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+        publicMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(publicMockMvc);
 
         protectedMockMvc = MockMvcBuilders.standaloneSetup(
                         appAuthController,
@@ -105,6 +106,7 @@ class AppApiWebMvcTest {
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+        protectedMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(protectedMockMvc);
     }
 
     @Test

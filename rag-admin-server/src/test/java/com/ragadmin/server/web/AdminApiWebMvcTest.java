@@ -173,6 +173,7 @@ class AdminApiWebMvcTest {
         publicMockMvc = MockMvcBuilders.standaloneSetup(authController)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+        publicMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(publicMockMvc);
 
         protectedMockMvc = MockMvcBuilders.standaloneSetup(
                         taskController,
@@ -190,6 +191,7 @@ class AdminApiWebMvcTest {
                 .addInterceptors(authInterceptor)
                 .setControllerAdvice(exceptionHandler)
                 .build();
+        protectedMockMvc = MockMvcAsyncTestSupport.withStreamingExecutor(protectedMockMvc);
     }
 
     @Test

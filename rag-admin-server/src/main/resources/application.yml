@@ -55,6 +55,12 @@ rag:
       max-size: 16
       queue-capacity: 200
       keep-alive-seconds: 60
+    web-mvc-streaming:
+      core-size: 4
+      max-size: 16
+      queue-capacity: 200
+      keep-alive-seconds: 60
+      request-timeout-ms: 0
     scheduler:
       pool-size: 1
   auth:
