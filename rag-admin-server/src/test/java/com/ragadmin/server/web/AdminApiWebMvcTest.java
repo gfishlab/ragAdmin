@@ -304,6 +304,7 @@ class AdminApiWebMvcTest {
                 .andExpect(content().string(containsString("event:task_started")))
                 .andExpect(content().string(containsString("\"eventType\":\"CONNECTED\"")))
                 .andExpect(content().string(containsString("\"eventType\":\"TASK_STARTED\"")))
+                .andExpect(content().string(containsString("id:101")))
                 .andReturn();
 
         String body = streamResult.getResponse().getContentAsString(StandardCharsets.UTF_8);

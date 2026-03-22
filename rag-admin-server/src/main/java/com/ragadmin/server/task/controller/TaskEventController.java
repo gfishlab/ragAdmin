@@ -2,6 +2,7 @@ package com.ragadmin.server.task.controller;
 
 import cn.dev33.satoken.annotation.SaCheckLogin;
 import cn.dev33.satoken.annotation.SaCheckPermission;
+import com.ragadmin.server.common.web.ServerSentEventSupport;
 import com.ragadmin.server.task.dto.TaskRealtimeEventResponse;
 import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,25 +25,30 @@ public class TaskEventController {
     @GetMapping(value = "/knowledge-bases/{kbId}/documents", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaCheckPermission("KB_MANAGE")
     public Flux<ServerSentEvent<TaskRealtimeEventResponse>> subscribeKnowledgeBaseDocuments(@PathVariable Long kbId) {
-        return toServerSentEvents(taskRealtimeEventService.subscribeKnowledgeBase(kbId));
+        return ServerSentEventSupport.toEventStream(
+                taskRealtimeEventService.subscribeKnowledgeBase(kbId),
+                TaskRealtimeEventResponse::eventType,
+                event -> event.taskId() == null ? null : String.valueOf(event.taskId())
+        );
     }
 
     @GetMapping(value = "/documents/{documentId}", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaCheckPermission("KB_MANAGE")
     public Flux<ServerSentEvent<TaskRealtimeEventResponse>> subscribeDocument(@PathVariable Long documentId) {
-        return toServerSentEvents(taskRealtimeEventService.subscribeDocument(documentId));
+        return ServerSentEventSupport.toEventStream(
+                taskRealtimeEventService.subscribeDocument(documentId),
+                TaskRealtimeEventResponse::eventType,
+                event -> event.taskId() == null ? null : String.valueOf(event.taskId())
+        );
     }
 
     @GetMapping(value = "/tasks", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @SaCheckPermission("TASK_VIEW")
     public Flux<ServerSentEvent<TaskRealtimeEventResponse>> subscribeTasks() {
-        return toServerSentEvents(taskRealtimeEventService.subscribeTasks());
-    }
-
-    private Flux<ServerSentEvent<TaskRealtimeEventResponse>> toServerSentEvents(Flux<TaskRealtimeEventResponse> events) {
-        return events.map(event -> ServerSentEvent.<TaskRealtimeEventResponse>builder()
-                .event(event.eventType().toLowerCase())
-                .data(event)
-                .build());
+        return ServerSentEventSupport.toEventStream(
+                taskRealtimeEventService.subscribeTasks(),
+                TaskRealtimeEventResponse::eventType,
+                event -> event.taskId() == null ? null : String.valueOf(event.taskId())
+        );
     }
 }

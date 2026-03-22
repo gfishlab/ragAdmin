@@ -3,6 +3,7 @@ package com.ragadmin.server.chat.service;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.dto.ChatRequest;
 import com.ragadmin.server.chat.dto.ChatResponse;
+import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
@@ -309,6 +310,22 @@ class ChatServiceTest {
         assertEquals(100L, inserted.getUserId());
         assertEquals("LIKE", inserted.getFeedbackType());
         assertEquals("回答准确", inserted.getCommentText());
+    }
+
+    @Test
+    void shouldReturnErrorEventWhenStreamPreparationFailed() {
+        ChatRequest request = new ChatRequest();
+        request.setQuestion("会话还在吗？");
+        request.setKbId(1001L);
+
+        List<ChatStreamEventResponse> events = chatService.streamChat(999L, request, user(100L))
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(1, events.size());
+        assertEquals("ERROR", events.getFirst().eventType());
+        assertEquals("会话不存在", events.getFirst().errorMessage());
     }
 
     private AuthenticatedUser user(Long userId) {

@@ -27,6 +27,7 @@ import java.util.stream.Collectors;
 public class TaskRealtimeEventService {
 
     private static final String EVENT_TYPE_CONNECTED = "CONNECTED";
+    private static final String EVENT_TYPE_ERROR = "ERROR";
 
     private final DocumentParseTaskMapper documentParseTaskMapper;
     private final DocumentMapper documentMapper;
@@ -143,8 +144,9 @@ public class TaskRealtimeEventService {
             } catch (Exception ex) {
                 subscribers.remove(subscriber);
                 cleanupAction.run();
-                subscriber.complete();
-                return Flux.error(ex);
+                subscriber.emitSnapshot(buildErrorEvent(ex));
+                subscriber.completeSnapshot();
+                return subscriber.asFlux().doFinally(signalType -> subscriber.complete());
             }
             return subscriber.asFlux()
                     .doFinally(signalType -> {
@@ -158,6 +160,28 @@ public class TaskRealtimeEventService {
     private TaskRealtimeEventResponse buildConnectedEvent(String message) {
         return new TaskRealtimeEventResponse(
                 EVENT_TYPE_CONNECTED,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                0,
+                message,
+                false,
+                LocalDateTime.now()
+        );
+    }
+
+    private TaskRealtimeEventResponse buildErrorEvent(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null || message.isBlank()) {
+            message = "任务实时事件订阅失败";
+        }
+        return new TaskRealtimeEventResponse(
+                EVENT_TYPE_ERROR,
                 null,
                 null,
                 null,

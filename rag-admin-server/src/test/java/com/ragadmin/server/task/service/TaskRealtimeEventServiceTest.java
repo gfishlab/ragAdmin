@@ -19,6 +19,7 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -117,5 +118,21 @@ class TaskRealtimeEventServiceTest {
         assertEquals("解析任务已进入队列", events.get(1).message());
 
         disposable.dispose();
+    }
+
+    @Test
+    void shouldEmitErrorEventWhenSnapshotInitializationFailed() {
+        when(documentParseTaskMapper.selectList(any())).thenThrow(new RuntimeException("数据库暂时不可用"));
+
+        List<TaskRealtimeEventResponse> events = taskRealtimeEventService.subscribeTasks()
+                .take(2)
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(2, events.size());
+        assertEquals("CONNECTED", events.get(0).eventType());
+        assertEquals("ERROR", events.get(1).eventType());
+        assertEquals("数据库暂时不可用", events.get(1).message());
     }
 }

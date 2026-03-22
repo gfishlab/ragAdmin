@@ -14,6 +14,7 @@ import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.common.model.ApiResponse;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.common.web.ServerSentEventSupport;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -116,11 +117,11 @@ public class AppChatController {
             @Valid @RequestBody AppChatRequest request,
             HttpServletRequest httpServletRequest
     ) {
-        return appChatService.streamChat(sessionId, request, currentUser(httpServletRequest))
-                .map(event -> ServerSentEvent.<ChatStreamEventResponse>builder()
-                        .event(event.eventType().toLowerCase())
-                        .data(event)
-                        .build());
+        return ServerSentEventSupport.toEventStream(
+                appChatService.streamChat(sessionId, request, currentUser(httpServletRequest)),
+                ChatStreamEventResponse::eventType,
+                event -> event.messageId() == null ? null : String.valueOf(event.messageId())
+        );
     }
 
     @PostMapping("/messages/{messageId}/feedback")

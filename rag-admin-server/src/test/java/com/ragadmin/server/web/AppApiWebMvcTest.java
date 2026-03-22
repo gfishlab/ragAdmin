@@ -454,6 +454,7 @@ class AppApiWebMvcTest {
                 .andExpect(content().string(containsString("event:complete")))
                 .andExpect(content().string(containsString("\"eventType\":\"DELTA\"")))
                 .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
+                .andExpect(content().string(containsString("id:103")))
                 .andExpect(content().string(containsString("\"messageId\":103")))
                 .andExpect(content().string(containsString("\"promptTokens\":156")))
                 .andReturn();
@@ -480,4 +481,3 @@ class AppApiWebMvcTest {
     ) {
     }
 }
-

@@ -7,6 +7,7 @@ import com.ragadmin.server.app.dto.AppUpdateChatSessionRequest;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.ChatTerminalTypes;
+import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
@@ -47,6 +48,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertIterableEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
@@ -415,6 +417,21 @@ class AppChatServiceTest {
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));
         assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
+    }
+
+    @Test
+    void shouldReturnErrorEventWhenStreamPreparationFailed() {
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("会话还在吗？");
+
+        List<ChatStreamEventResponse> events = appChatService.streamChat(999L, request, user(7001L))
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(1, events.size());
+        assertEquals("ERROR", events.getFirst().eventType());
+        assertEquals("会话不存在", events.getFirst().errorMessage());
     }
 
     private AuthenticatedUser user(Long userId) {

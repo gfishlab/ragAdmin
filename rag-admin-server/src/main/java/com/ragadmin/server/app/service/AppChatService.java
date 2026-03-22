@@ -316,44 +316,46 @@ public class AppChatService {
     }
 
     public Flux<ChatStreamEventResponse> streamChat(Long sessionId, AppChatRequest request, AuthenticatedUser user) {
-        PreparedChatExecution execution = prepareChatExecution(sessionId, request, user);
-        StringBuilder answerBuilder = new StringBuilder();
-        Instant start = Instant.now();
-        AtomicReference<Integer> promptTokensRef = new AtomicReference<>();
-        AtomicReference<Integer> completionTokensRef = new AtomicReference<>();
+        return Flux.defer(() -> {
+                    PreparedChatExecution execution = prepareChatExecution(sessionId, request, user);
+                    StringBuilder answerBuilder = new StringBuilder();
+                    Instant start = Instant.now();
+                    AtomicReference<Integer> promptTokensRef = new AtomicReference<>();
+                    AtomicReference<Integer> completionTokensRef = new AtomicReference<>();
 
-        return conversationChatClient.stream(
-                        execution.chatModel().providerCode(),
-                        execution.chatModel().modelCode(),
-                        execution.conversationId(),
-                        execution.promptMessages(),
-                        execution.historyMessages()
-                )
-                .map(chunk -> {
-                    updateUsage(chunk, promptTokensRef, completionTokensRef);
-                    String delta = extractStreamText(chunk);
-                    if (!StringUtils.hasLength(delta)) {
-                        return null;
-                    }
-                    answerBuilder.append(delta);
-                    return ChatStreamEventResponse.delta(delta);
+                    return conversationChatClient.stream(
+                                    execution.chatModel().providerCode(),
+                                    execution.chatModel().modelCode(),
+                                    execution.conversationId(),
+                                    execution.promptMessages(),
+                                    execution.historyMessages()
+                            )
+                            .map(chunk -> {
+                                updateUsage(chunk, promptTokensRef, completionTokensRef);
+                                String delta = extractStreamText(chunk);
+                                if (!StringUtils.hasLength(delta)) {
+                                    return null;
+                                }
+                                answerBuilder.append(delta);
+                                return ChatStreamEventResponse.delta(delta);
+                            })
+                            .filter(Objects::nonNull)
+                            .concatWith(Mono.fromSupplier(() -> {
+                                ChatResponse response = chatExchangePersistenceService.persistExchange(
+                                        execution.session(),
+                                        user.getUserId(),
+                                        request.getQuestion(),
+                                        answerBuilder.toString(),
+                                        execution.chatModel().modelId(),
+                                        promptTokensRef.get(),
+                                        completionTokensRef.get(),
+                                        (int) Duration.between(start, Instant.now()).toMillis(),
+                                        execution.retrievalResult()
+                                );
+                                conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
+                                return ChatStreamEventResponse.complete(response);
+                            }));
                 })
-                .filter(Objects::nonNull)
-                .concatWith(Mono.fromSupplier(() -> {
-                    ChatResponse response = chatExchangePersistenceService.persistExchange(
-                            execution.session(),
-                            user.getUserId(),
-                            request.getQuestion(),
-                            answerBuilder.toString(),
-                            execution.chatModel().modelId(),
-                            promptTokensRef.get(),
-                            completionTokensRef.get(),
-                            (int) Duration.between(start, Instant.now()).toMillis(),
-                            execution.retrievalResult()
-                    );
-                    conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
-                    return ChatStreamEventResponse.complete(response);
-                }))
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
     }
 
