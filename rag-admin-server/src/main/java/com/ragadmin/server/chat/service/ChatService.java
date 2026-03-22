@@ -27,6 +27,8 @@ import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningService;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
@@ -79,6 +81,9 @@ public class ChatService {
 
     @Autowired
     private ConversationChatClient conversationChatClient;
+
+    @Autowired
+    private ChatExecutionPlanningService chatExecutionPlanningService;
 
     @Autowired
     private DocumentMapper documentMapper;
@@ -346,8 +351,19 @@ public class ChatService {
                 throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
             }
             KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
-            retrievalResult = retrievalService.retrieve(knowledgeBase, request.getQuestion());
             chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
+            var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
+                    chatModel.providerCode(),
+                    chatModel.modelCode(),
+                    request.getQuestion(),
+                    true,
+                    false,
+                    1,
+                    true
+            ));
+            retrievalResult = executionPlan.needRetrieval()
+                    ? retrievalService.retrieve(knowledgeBase, executionPlan.retrievalQuery())
+                    : new RetrievalService.RetrievalResult(List.of(), "");
             promptMessages = List.of(
                     new ChatPromptMessage("system", buildKnowledgeBaseSystemPrompt()),
                     new ChatPromptMessage("user", buildKnowledgeBaseUserPrompt(request.getQuestion(), retrievalResult.context()))

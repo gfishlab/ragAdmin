@@ -22,6 +22,9 @@ import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlan;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningService;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
@@ -34,6 +37,7 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -54,6 +58,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -90,6 +97,9 @@ class AppChatServiceTest {
     private ConversationChatClient conversationChatClient;
 
     @Mock
+    private ChatExecutionPlanningService chatExecutionPlanningService;
+
+    @Mock
     private ConversationMemoryManager conversationMemoryManager;
 
     @Mock
@@ -112,6 +122,25 @@ class AppChatServiceTest {
 
     @InjectMocks
     private AppChatService appChatService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> {
+            ChatExecutionPlanningRequest planningRequest = invocation.getArgument(0);
+            boolean needRetrieval = planningRequest.retrievalAvailable();
+            boolean needWebSearch = planningRequest.webSearchAvailable();
+            return new ChatExecutionPlan(
+                    needRetrieval && needWebSearch ? "KNOWLEDGE_BASE_AND_WEB_SEARCH"
+                            : (needRetrieval ? "KNOWLEDGE_BASE_QA" : (needWebSearch ? "WEB_SEARCH_QA" : "GENERAL_QA")),
+                    needRetrieval,
+                    needRetrieval ? planningRequest.question() : "",
+                    needWebSearch,
+                    needWebSearch ? planningRequest.question() : "",
+                    "测试默认规则规划",
+                    "RULE_BASED"
+            );
+        }).when(chatExecutionPlanningService).plan(any());
+    }
 
     @Test
     void shouldFallbackToNoopWebSearchProviderByDefault() {
@@ -418,6 +447,90 @@ class AppChatServiceTest {
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));
         assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
+    }
+
+    @Test
+    void shouldUseStructuredPlanQueriesForRetrievalAndWebSearch() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(503L);
+        session.setUserId(6003L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        ChatSessionKnowledgeBaseRelEntity rel = new ChatSessionKnowledgeBaseRelEntity();
+        rel.setSessionId(503L);
+        rel.setKbId(88L);
+        rel.setSortNo(1);
+
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(88L);
+        knowledgeBase.setChatModelId(903L);
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("最近智能体应用有什么值得关注的实践？");
+        request.setWebSearchEnabled(Boolean.TRUE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                903L,
+                "qwen-max",
+                "BAILIAN",
+                "百炼"
+        );
+        com.ragadmin.server.document.entity.ChunkEntity chunk = new com.ragadmin.server.document.entity.ChunkEntity();
+        chunk.setId(7001L);
+        chunk.setKbId(88L);
+        chunk.setDocumentId(9901L);
+        chunk.setChunkNo(1);
+        chunk.setChunkText("智能体落地应先从高频、低风险场景切入。");
+        RetrievalService.RetrievedChunk retrievedChunk = new RetrievalService.RetrievedChunk(chunk, 0.88D);
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(
+                List.of(retrievedChunk),
+                "片段1:\n智能体落地应先从高频、低风险场景切入。"
+        );
+
+        when(chatSessionMapper.selectById(503L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of(rel));
+        when(knowledgeBaseService.requireById(88L)).thenReturn(knowledgeBase);
+        when(modelService.resolveChatModelDescriptor(903L)).thenReturn(modelDescriptor);
+        doReturn(new ChatExecutionPlan(
+                "KNOWLEDGE_BASE_AND_WEB_SEARCH",
+                true,
+                "智能体应用落地 最佳实践",
+                true,
+                "智能体 行业动态",
+                "优先使用知识库并补充联网动态",
+                "MODEL"
+        )).when(chatExecutionPlanningService).plan(any());
+        when(webSearchProvider.search("智能体 行业动态", 5)).thenReturn(List.of(
+                new WebSearchSnippet("行业快讯", "近期多家企业推进智能体落地。", "https://example.com/agent-news", Instant.parse("2026-03-20T10:00:00Z"))
+        ));
+        when(retrievalService.retrieveAcrossKnowledgeBases(List.of(knowledgeBase), "智能体应用落地 最佳实践"))
+                .thenReturn(retrievalResult);
+        when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-max"), any(), any(), any()))
+                .thenReturn(new ChatCompletionResult("建议优先选择高频低风险场景，并关注近期行业落地案例。", 120, 40));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(6003L),
+                eq("最近智能体应用有什么值得关注的实践？"),
+                eq("建议优先选择高频低风险场景，并关注近期行业落地案例。"),
+                eq(903L),
+                eq(120),
+                eq(40),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                1003L,
+                "建议优先选择高频低风险场景，并关注近期行业落地案例。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 40)
+        ));
+
+        appChatService.chat(503L, request, user(6003L));
+
+        verify(webSearchProvider).search("智能体 行业动态", 5);
+        verify(retrievalService).retrieveAcrossKnowledgeBases(List.of(knowledgeBase), "智能体应用落地 最佳实践");
     }
 
     @Test

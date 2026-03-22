@@ -17,6 +17,9 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlan;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningService;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
@@ -25,6 +28,7 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -42,6 +46,8 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isA;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -74,6 +80,9 @@ class ChatServiceTest {
     private ConversationChatClient conversationChatClient;
 
     @Mock
+    private ChatExecutionPlanningService chatExecutionPlanningService;
+
+    @Mock
     private ConversationMemoryRefreshDispatcher conversationMemoryRefreshDispatcher;
 
     @Mock
@@ -90,6 +99,22 @@ class ChatServiceTest {
 
     @InjectMocks
     private ChatService chatService;
+
+    @BeforeEach
+    void setUp() {
+        lenient().doAnswer(invocation -> {
+            ChatExecutionPlanningRequest planningRequest = invocation.getArgument(0);
+            return new ChatExecutionPlan(
+                    planningRequest.retrievalAvailable() ? "KNOWLEDGE_BASE_QA" : "GENERAL_QA",
+                    planningRequest.retrievalAvailable(),
+                    planningRequest.retrievalAvailable() ? planningRequest.question() : "",
+                    false,
+                    "",
+                    "测试默认规则规划",
+                    "RULE_BASED"
+            );
+        }).when(chatExecutionPlanningService).plan(any());
+    }
 
     @Test
     void shouldRejectListingMessagesForOtherUsersSession() {
@@ -286,6 +311,66 @@ class ChatServiceTest {
         assertEquals(0, response.references().size());
         assertEquals(64, response.usage().promptTokens());
         assertEquals(18, response.usage().completionTokens());
+    }
+
+    @Test
+    void shouldUseStructuredPlanRetrievalQueryWhenAvailable() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(33L);
+        session.setKbId(403L);
+        session.setUserId(100L);
+
+        ChatRequest request = new ChatRequest();
+        request.setKbId(403L);
+        request.setQuestion("请总结制度里和周报有关的要求");
+
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(403L);
+        knowledgeBase.setChatModelId(503L);
+
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "片段1:\n周报需按时提交。");
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                803L,
+                "qwen2.5:7b",
+                "OLLAMA",
+                "Ollama"
+        );
+
+        when(chatSessionMapper.selectById(33L)).thenReturn(session);
+        when(knowledgeBaseService.requireById(403L)).thenReturn(knowledgeBase);
+        when(modelService.resolveChatModelDescriptor(503L)).thenReturn(modelDescriptor);
+        doReturn(new ChatExecutionPlan(
+                "KNOWLEDGE_BASE_QA",
+                true,
+                "制度 周报 提交 要求",
+                false,
+                "",
+                "问题明确指向知识库制度要求",
+                "MODEL"
+        )).when(chatExecutionPlanningService).plan(any());
+        when(retrievalService.retrieve(knowledgeBase, "制度 周报 提交 要求")).thenReturn(retrievalResult);
+        when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
+                .thenReturn(new ChatCompletionResult("制度要求按时提交周报。", 100, 20));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(100L),
+                eq("请总结制度里和周报有关的要求"),
+                eq("制度要求按时提交周报。"),
+                eq(803L),
+                eq(100),
+                eq(20),
+                anyInt(),
+                eq(retrievalResult)
+        )).thenReturn(new ChatResponse(
+                903L,
+                "制度要求按时提交周报。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20)
+        ));
+
+        chatService.chat(33L, request, user(100L));
+
+        verify(retrievalService).retrieve(knowledgeBase, "制度 周报 提交 要求");
     }
 
     @Test

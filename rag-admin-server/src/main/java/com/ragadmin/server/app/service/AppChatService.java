@@ -32,6 +32,8 @@ import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
+import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningService;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
@@ -97,6 +99,9 @@ public class AppChatService {
 
     @Autowired
     private ConversationChatClient conversationChatClient;
+
+    @Autowired
+    private ChatExecutionPlanningService chatExecutionPlanningService;
 
     @Autowired
     private ConversationMemoryManager conversationMemoryManager;
@@ -517,16 +522,29 @@ public class AppChatService {
         }
 
         refreshSessionPreferences(session, request.getChatModelId(), request.getWebSearchEnabled());
-        List<WebSearchSnippet> webSearchSnippets = loadWebSearchSnippets(request.getQuestion(), request.getWebSearchEnabled());
+        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, effectiveSelectedKbIds, request.getChatModelId());
+        var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
+                chatModel.providerCode(),
+                chatModel.modelCode(),
+                request.getQuestion(),
+                !effectiveSelectedKbIds.isEmpty(),
+                Boolean.TRUE.equals(request.getWebSearchEnabled()),
+                effectiveSelectedKbIds.size(),
+                ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)
+        ));
 
-        RetrievalService.RetrievalResult retrievalResult = effectiveSelectedKbIds.isEmpty()
+        List<WebSearchSnippet> webSearchSnippets = loadWebSearchSnippets(
+                executionPlan.webSearchQuery(),
+                executionPlan.needWebSearch()
+        );
+
+        RetrievalService.RetrievalResult retrievalResult = !executionPlan.needRetrieval() || effectiveSelectedKbIds.isEmpty()
                 ? new RetrievalService.RetrievalResult(List.of(), "")
                 : retrievalService.retrieveAcrossKnowledgeBases(
                 effectiveSelectedKbIds.stream().map(knowledgeBaseService::requireById).toList(),
-                request.getQuestion()
+                executionPlan.retrievalQuery()
         );
 
-        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, effectiveSelectedKbIds, request.getChatModelId());
         List<ChatPromptMessage> promptMessages = buildPromptMessages(
                 sceneType,
                 request.getQuestion(),
@@ -723,8 +741,8 @@ public class AppChatService {
         );
     }
 
-    private List<WebSearchSnippet> loadWebSearchSnippets(String question, Boolean webSearchEnabled) {
-        if (!Boolean.TRUE.equals(webSearchEnabled) || !StringUtils.hasText(question)) {
+    private List<WebSearchSnippet> loadWebSearchSnippets(String question, boolean webSearchEnabled) {
+        if (!webSearchEnabled || !StringUtils.hasText(question)) {
             return List.of();
         }
         try {
