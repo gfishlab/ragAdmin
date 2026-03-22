@@ -8,37 +8,33 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.task.dto.TaskRealtimeEventResponse;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.util.DisconnectedClientHelper;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Sinks;
 
-import java.io.IOException;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Supplier;
 import java.util.stream.Collectors;
 
 @Service
 public class TaskRealtimeEventService {
 
-    private static final Logger log = LoggerFactory.getLogger(TaskRealtimeEventService.class);
-    private static final DisconnectedClientHelper DISCONNECTED_CLIENT_HELPER =
-            new DisconnectedClientHelper(TaskRealtimeEventService.class.getName());
-    private static final long SSE_TIMEOUT_MS = 0L;
-    private static final String EVENT_NAME = "task-realtime";
     private static final String EVENT_TYPE_CONNECTED = "CONNECTED";
 
     private final DocumentParseTaskMapper documentParseTaskMapper;
     private final DocumentMapper documentMapper;
     private final TaskStepRecordMapper taskStepRecordMapper;
 
-    private final Map<Long, Set<SseEmitter>> knowledgeBaseEmitters = new ConcurrentHashMap<>();
-    private final Map<Long, Set<SseEmitter>> documentEmitters = new ConcurrentHashMap<>();
-    private final Set<SseEmitter> taskEmitters = ConcurrentHashMap.newKeySet();
+    private final Map<Long, Set<TaskEventSubscriber>> knowledgeBaseSubscribers = new ConcurrentHashMap<>();
+    private final Map<Long, Set<TaskEventSubscriber>> documentSubscribers = new ConcurrentHashMap<>();
+    private final Set<TaskEventSubscriber> taskSubscribers = ConcurrentHashMap.newKeySet();
 
     public TaskRealtimeEventService(
             DocumentParseTaskMapper documentParseTaskMapper,
@@ -50,30 +46,32 @@ public class TaskRealtimeEventService {
         this.taskStepRecordMapper = taskStepRecordMapper;
     }
 
-    public SseEmitter subscribeKnowledgeBase(Long kbId) {
-        SseEmitter emitter = createEmitter();
-        Set<SseEmitter> emitters = knowledgeBaseEmitters.computeIfAbsent(kbId, key -> ConcurrentHashMap.newKeySet());
-        registerEmitter(emitters, emitter);
-        sendConnectedEvent(emitters, emitter, "知识库文档解析实时通道已连接");
-        sendSnapshotEvents(emitters, emitter, listActiveEventsByKnowledgeBase(kbId));
-        return emitter;
+    public Flux<TaskRealtimeEventResponse> subscribeKnowledgeBase(Long kbId) {
+        return subscribe(
+                knowledgeBaseSubscribers.computeIfAbsent(kbId, key -> ConcurrentHashMap.newKeySet()),
+                () -> knowledgeBaseSubscribers.computeIfPresent(kbId, (key, subscribers) -> subscribers.isEmpty() ? null : subscribers),
+                "知识库文档解析实时通道已连接",
+                () -> listActiveEventsByKnowledgeBase(kbId)
+        );
     }
 
-    public SseEmitter subscribeDocument(Long documentId) {
-        SseEmitter emitter = createEmitter();
-        Set<SseEmitter> emitters = documentEmitters.computeIfAbsent(documentId, key -> ConcurrentHashMap.newKeySet());
-        registerEmitter(emitters, emitter);
-        sendConnectedEvent(emitters, emitter, "文档解析实时通道已连接");
-        sendSnapshotEvents(emitters, emitter, listActiveEventsByDocument(documentId));
-        return emitter;
+    public Flux<TaskRealtimeEventResponse> subscribeDocument(Long documentId) {
+        return subscribe(
+                documentSubscribers.computeIfAbsent(documentId, key -> ConcurrentHashMap.newKeySet()),
+                () -> documentSubscribers.computeIfPresent(documentId, (key, subscribers) -> subscribers.isEmpty() ? null : subscribers),
+                "文档解析实时通道已连接",
+                () -> listActiveEventsByDocument(documentId)
+        );
     }
 
-    public SseEmitter subscribeTasks() {
-        SseEmitter emitter = createEmitter();
-        registerEmitter(taskEmitters, emitter);
-        sendConnectedEvent(taskEmitters, emitter, "任务实时通道已连接");
-        sendSnapshotEvents(taskEmitters, emitter, listActiveEvents());
-        return emitter;
+    public Flux<TaskRealtimeEventResponse> subscribeTasks() {
+        return subscribe(
+                taskSubscribers,
+                () -> {
+                },
+                "任务实时通道已连接",
+                this::listActiveEvents
+        );
     }
 
     public void publishTaskQueued(DocumentParseTaskEntity task, DocumentEntity document) {
@@ -120,28 +118,45 @@ public class TaskRealtimeEventService {
     }
 
     private void publish(TaskRealtimeEventResponse event) {
-        sendToEmitters(taskEmitters, event);
+        emitToSubscribers(taskSubscribers, event);
         if (event.kbId() != null) {
-            sendToEmitters(knowledgeBaseEmitters.get(event.kbId()), event);
+            emitToSubscribers(knowledgeBaseSubscribers.get(event.kbId()), event);
         }
         if (event.documentId() != null) {
-            sendToEmitters(documentEmitters.get(event.documentId()), event);
+            emitToSubscribers(documentSubscribers.get(event.documentId()), event);
         }
     }
 
-    private SseEmitter createEmitter() {
-        return new SseEmitter(SSE_TIMEOUT_MS);
+    private Flux<TaskRealtimeEventResponse> subscribe(
+            Set<TaskEventSubscriber> subscribers,
+            Runnable cleanupAction,
+            String connectedMessage,
+            Supplier<List<TaskRealtimeEventResponse>> snapshotSupplier
+    ) {
+        return Flux.defer(() -> {
+            BufferedTaskEventSubscriber subscriber = new BufferedTaskEventSubscriber();
+            subscribers.add(subscriber);
+            try {
+                subscriber.emitSnapshot(buildConnectedEvent(connectedMessage));
+                snapshotSupplier.get().forEach(subscriber::emitSnapshot);
+                subscriber.completeSnapshot();
+            } catch (Exception ex) {
+                subscribers.remove(subscriber);
+                cleanupAction.run();
+                subscriber.complete();
+                return Flux.error(ex);
+            }
+            return subscriber.asFlux()
+                    .doFinally(signalType -> {
+                        subscribers.remove(subscriber);
+                        cleanupAction.run();
+                        subscriber.complete();
+                    });
+        });
     }
 
-    private void registerEmitter(Set<SseEmitter> emitters, SseEmitter emitter) {
-        emitters.add(emitter);
-        emitter.onCompletion(() -> emitters.remove(emitter));
-        emitter.onTimeout(() -> emitters.remove(emitter));
-        emitter.onError(ex -> emitters.remove(emitter));
-    }
-
-    private void sendConnectedEvent(Set<SseEmitter> emitters, SseEmitter emitter, String message) {
-        TaskRealtimeEventResponse event = new TaskRealtimeEventResponse(
+    private TaskRealtimeEventResponse buildConnectedEvent(String message) {
+        return new TaskRealtimeEventResponse(
                 EVENT_TYPE_CONNECTED,
                 null,
                 null,
@@ -156,43 +171,15 @@ public class TaskRealtimeEventService {
                 false,
                 LocalDateTime.now()
         );
-        send(emitters, emitter, event);
     }
 
-    private void sendSnapshotEvents(Set<SseEmitter> emitters, SseEmitter emitter, List<TaskRealtimeEventResponse> events) {
-        for (TaskRealtimeEventResponse event : events) {
-            send(emitters, emitter, event);
-        }
-    }
-
-    private void sendToEmitters(Set<SseEmitter> emitters, TaskRealtimeEventResponse event) {
-        if (emitters == null || emitters.isEmpty()) {
+    private void emitToSubscribers(Set<TaskEventSubscriber> subscribers, TaskRealtimeEventResponse event) {
+        if (subscribers == null || subscribers.isEmpty()) {
             return;
         }
-        for (SseEmitter emitter : emitters) {
-            send(emitters, emitter, event);
+        for (TaskEventSubscriber subscriber : subscribers) {
+            subscriber.emit(event);
         }
-    }
-
-    private void send(Set<SseEmitter> emitters, SseEmitter emitter, TaskRealtimeEventResponse event) {
-        try {
-            emitter.send(SseEmitter.event()
-                    .name(EVENT_NAME)
-                    .data(event));
-        } catch (IOException | IllegalStateException ex) {
-            removeEmitter(emitters, emitter, ex);
-        }
-    }
-
-    private void removeEmitter(Set<SseEmitter> emitters, SseEmitter emitter, Exception ex) {
-        if (emitters != null) {
-            emitters.remove(emitter);
-        }
-        if (DISCONNECTED_CLIENT_HELPER.checkAndLogClientDisconnectedException(ex)) {
-            return;
-        }
-        log.debug("SSE 连接已不可用，已移除连接，type={}, message={}",
-                ex.getClass().getSimpleName(), ex.getMessage());
     }
 
     private List<TaskRealtimeEventResponse> listActiveEventsByKnowledgeBase(Long kbId) {
@@ -331,5 +318,64 @@ public class TaskRealtimeEventService {
 
     private boolean isTerminal(String taskStatus) {
         return "SUCCESS".equals(taskStatus) || "FAILED".equals(taskStatus) || "CANCELED".equals(taskStatus);
+    }
+
+    @FunctionalInterface
+    private interface TaskEventSubscriber {
+
+        void emit(TaskRealtimeEventResponse event);
+    }
+
+    private static final class BufferedTaskEventSubscriber implements TaskEventSubscriber {
+
+        private final Sinks.Many<TaskRealtimeEventResponse> sink = Sinks.many().unicast().onBackpressureBuffer();
+        private final Object snapshotLock = new Object();
+        private final Queue<TaskRealtimeEventResponse> bufferedEvents = new ConcurrentLinkedQueue<>();
+
+        private boolean snapshotCompleted;
+
+        private Flux<TaskRealtimeEventResponse> asFlux() {
+            return sink.asFlux();
+        }
+
+        @Override
+        public void emit(TaskRealtimeEventResponse event) {
+            synchronized (snapshotLock) {
+                if (snapshotCompleted) {
+                    emitDirect(event);
+                    return;
+                }
+                bufferedEvents.add(event);
+            }
+        }
+
+        private void emitSnapshot(TaskRealtimeEventResponse event) {
+            emitDirect(event);
+        }
+
+        private void completeSnapshot() {
+            List<TaskRealtimeEventResponse> pendingEvents;
+            synchronized (snapshotLock) {
+                snapshotCompleted = true;
+                pendingEvents = new ArrayList<>(bufferedEvents);
+                bufferedEvents.clear();
+            }
+            pendingEvents.forEach(this::emitDirect);
+        }
+
+        private void emitDirect(TaskRealtimeEventResponse event) {
+            Sinks.EmitResult result = sink.tryEmitNext(event);
+            if (result == Sinks.EmitResult.OK
+                    || result == Sinks.EmitResult.FAIL_ZERO_SUBSCRIBER
+                    || result == Sinks.EmitResult.FAIL_CANCELLED
+                    || result == Sinks.EmitResult.FAIL_TERMINATED) {
+                return;
+            }
+            throw new IllegalStateException("任务实时事件写入响应式流失败: " + result);
+        }
+
+        private void complete() {
+            sink.tryEmitComplete();
+        }
     }
 }

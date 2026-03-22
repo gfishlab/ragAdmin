@@ -134,6 +134,8 @@
 - 禁止直接暴露 Entity 作为 API 契约
 - 除非用户明确接受动态结构，否则禁止将 `Map`、`JSONObject`、`Object` 作为公共 API 契约
 - 对外接口结构必须显式、可读、可校验
+- 所有流式接口统一使用 WebFlux 风格的 `Flux` / `Flux<ServerSentEvent<...>>` 返回，禁止新增或继续扩散 `SseEmitter`
+- 既有流式链路如需重构或修复，默认优先收口到 WebFlux `Flux` 方案，而不是在 `SseEmitter` 上继续补丁
 
 ## 数据库规范
 

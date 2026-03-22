@@ -1,5 +1,7 @@
 package com.ragadmin.server.task.service;
 
+import com.ragadmin.server.document.entity.DocumentEntity;
+import com.ragadmin.server.document.entity.DocumentParseTaskEntity;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.task.dto.TaskRealtimeEventResponse;
@@ -9,17 +11,17 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import reactor.core.Disposable;
 
-import java.io.IOException;
-import java.time.LocalDateTime;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
-import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 class TaskRealtimeEventServiceTest {
@@ -45,70 +47,75 @@ class TaskRealtimeEventServiceTest {
     }
 
     @Test
-    void shouldRemoveEmitterWhenAsyncResponseIsNotUsable() {
-        Set<SseEmitter> emitters = ConcurrentHashMap.newKeySet();
-        emitters.add(new FailingSseEmitter(new AsyncRequestNotUsableException("Response not usable after response errors.")));
+    void shouldEmitConnectedAndSnapshotEventsWhenSubscribeKnowledgeBase() throws InterruptedException {
+        DocumentParseTaskEntity task = new DocumentParseTaskEntity();
+        task.setId(11L);
+        task.setKbId(21L);
+        task.setDocumentId(31L);
+        task.setTaskStatus("WAITING");
 
-        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(
-                taskRealtimeEventService,
-                "sendToEmitters",
-                emitters,
-                buildEvent()
-        ));
+        DocumentEntity document = new DocumentEntity();
+        document.setId(31L);
+        document.setDocName("员工手册.pdf");
+        document.setParseStatus("PENDING");
 
-        assertTrue(emitters.isEmpty());
+        when(documentParseTaskMapper.selectList(any())).thenReturn(List.of(task));
+        when(documentMapper.selectBatchIds(any())).thenReturn(List.of(document));
+        when(taskStepRecordMapper.selectOne(any())).thenReturn(null);
+
+        List<TaskRealtimeEventResponse> events = new CopyOnWriteArrayList<>();
+        CountDownLatch latch = new CountDownLatch(2);
+
+        Disposable disposable = taskRealtimeEventService.subscribeKnowledgeBase(21L)
+                .take(2)
+                .subscribe(event -> {
+                    events.add(event);
+                    latch.countDown();
+                });
+
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        assertEquals("CONNECTED", events.get(0).eventType());
+        assertEquals("知识库文档解析实时通道已连接", events.get(0).message());
+        assertEquals("SNAPSHOT", events.get(1).eventType());
+        assertEquals(11L, events.get(1).taskId());
+        assertEquals("员工手册.pdf", events.get(1).documentName());
+
+        disposable.dispose();
     }
 
     @Test
-    void shouldRemoveEmitterWhenEmitterAlreadyCompleted() {
-        Set<SseEmitter> emitters = ConcurrentHashMap.newKeySet();
-        emitters.add(new FailingSseEmitter(new IllegalStateException("ResponseBodyEmitter has already completed")));
+    void shouldEmitRealtimeEventThroughKnowledgeBaseFlux() throws InterruptedException {
+        when(documentParseTaskMapper.selectList(any())).thenReturn(List.of());
 
-        assertDoesNotThrow(() -> ReflectionTestUtils.invokeMethod(
-                taskRealtimeEventService,
-                "sendToEmitters",
-                emitters,
-                buildEvent()
-        ));
+        List<TaskRealtimeEventResponse> events = new CopyOnWriteArrayList<>();
+        CountDownLatch latch = new CountDownLatch(2);
 
-        assertTrue(emitters.isEmpty());
-    }
+        Disposable disposable = taskRealtimeEventService.subscribeKnowledgeBase(21L)
+                .take(2)
+                .subscribe(event -> {
+                    events.add(event);
+                    latch.countDown();
+                });
 
-    private TaskRealtimeEventResponse buildEvent() {
-        return new TaskRealtimeEventResponse(
-                "TASK_STARTED",
-                11L,
-                21L,
-                31L,
-                "员工手册.pdf",
-                "RUNNING",
-                "PROCESSING",
-                "EXTRACT_TEXT",
-                "文本抽取",
-                20,
-                "解析任务已开始执行",
-                false,
-                LocalDateTime.now()
-        );
-    }
+        DocumentParseTaskEntity task = new DocumentParseTaskEntity();
+        task.setId(11L);
+        task.setKbId(21L);
+        task.setDocumentId(31L);
+        task.setTaskStatus("WAITING");
 
-    private static final class FailingSseEmitter extends SseEmitter {
+        DocumentEntity document = new DocumentEntity();
+        document.setId(31L);
+        document.setKbId(21L);
+        document.setDocName("员工手册.pdf");
+        document.setParseStatus("PENDING");
 
-        private final Exception exception;
+        taskRealtimeEventService.publishTaskQueued(task, document);
 
-        private FailingSseEmitter(Exception exception) {
-            this.exception = exception;
-        }
+        assertTrue(latch.await(1, TimeUnit.SECONDS));
+        assertEquals("CONNECTED", events.get(0).eventType());
+        assertEquals("TASK_QUEUED", events.get(1).eventType());
+        assertEquals("解析任务已进入队列", events.get(1).message());
 
-        @Override
-        public void send(SseEventBuilder builder) throws IOException {
-            if (exception instanceof IOException ioException) {
-                throw ioException;
-            }
-            if (exception instanceof RuntimeException runtimeException) {
-                throw runtimeException;
-            }
-            throw new IllegalStateException(exception);
-        }
+        disposable.dispose();
     }
 }

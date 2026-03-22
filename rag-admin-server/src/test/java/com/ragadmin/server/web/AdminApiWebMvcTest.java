@@ -38,9 +38,12 @@ import com.ragadmin.server.system.dto.DependencyHealthResponse;
 import com.ragadmin.server.system.dto.HealthCheckResponse;
 import com.ragadmin.server.system.service.SystemHealthService;
 import com.ragadmin.server.task.controller.TaskController;
+import com.ragadmin.server.task.controller.TaskEventController;
 import com.ragadmin.server.task.dto.TaskDetailResponse;
+import com.ragadmin.server.task.dto.TaskRealtimeEventResponse;
 import com.ragadmin.server.task.dto.TaskRetryRecordResponse;
 import com.ragadmin.server.task.dto.TaskStepResponse;
+import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import com.ragadmin.server.task.service.TaskService;
 import com.ragadmin.server.statistics.controller.StatisticsController;
 import com.ragadmin.server.statistics.dto.VectorIndexOverviewResponse;
@@ -54,22 +57,30 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+import reactor.core.publisher.Flux;
 
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.List;
 
+import static org.hamcrest.Matchers.containsString;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
@@ -80,6 +91,9 @@ class AdminApiWebMvcTest {
 
     @Mock
     private TaskService taskService;
+
+    @Mock
+    private TaskRealtimeEventService taskRealtimeEventService;
 
     @Mock
     private KnowledgeBaseService knowledgeBaseService;
@@ -120,6 +134,9 @@ class AdminApiWebMvcTest {
         TaskController taskController = new TaskController();
         ReflectionTestUtils.setField(taskController, "taskService", taskService);
 
+        TaskEventController taskEventController = new TaskEventController();
+        ReflectionTestUtils.setField(taskEventController, "taskRealtimeEventService", taskRealtimeEventService);
+
         KnowledgeBaseController knowledgeBaseController = new KnowledgeBaseController();
         ReflectionTestUtils.setField(knowledgeBaseController, "knowledgeBaseService", knowledgeBaseService);
         ReflectionTestUtils.setField(knowledgeBaseController, "documentService", documentService);
@@ -159,6 +176,7 @@ class AdminApiWebMvcTest {
 
         protectedMockMvc = MockMvcBuilders.standaloneSetup(
                         taskController,
+                        taskEventController,
                         knowledgeBaseController,
                         documentController,
                         fileController,
@@ -236,6 +254,61 @@ class AdminApiWebMvcTest {
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHORIZED"))
                 .andExpect(jsonPath("$.message").value("缺少有效的 Bearer Token"));
+    }
+
+    @Test
+    void shouldStreamTaskEventsThroughAdminEndpointWhenBearerTokenIsValid() throws Exception {
+        when(authService.authenticateAccessToken("access-token", AuthService.ADMIN_LOGIN_TYPE)).thenReturn(authenticatedUser());
+        when(taskRealtimeEventService.subscribeTasks()).thenReturn(Flux.just(
+                new TaskRealtimeEventResponse(
+                        "CONNECTED",
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        0,
+                        "任务实时通道已连接",
+                        false,
+                        LocalDateTime.of(2026, 3, 22, 9, 10)
+                ),
+                new TaskRealtimeEventResponse(
+                        "TASK_STARTED",
+                        101L,
+                        11L,
+                        21L,
+                        "员工手册.pdf",
+                        "RUNNING",
+                        "PROCESSING",
+                        "EXTRACT_TEXT",
+                        "文本抽取",
+                        20,
+                        "解析任务已开始执行",
+                        false,
+                        LocalDateTime.of(2026, 3, 22, 9, 10, 1)
+                )
+        ));
+
+        MvcResult mvcResult = protectedMockMvc.perform(get("/api/admin/events/tasks")
+                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .andExpect(request().asyncStarted())
+                .andReturn();
+
+        MvcResult streamResult = protectedMockMvc.perform(asyncDispatch(mvcResult))
+                .andExpect(status().isOk())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.TEXT_EVENT_STREAM))
+                .andExpect(content().string(containsString("event:connected")))
+                .andExpect(content().string(containsString("event:task_started")))
+                .andExpect(content().string(containsString("\"eventType\":\"CONNECTED\"")))
+                .andExpect(content().string(containsString("\"eventType\":\"TASK_STARTED\"")))
+                .andReturn();
+
+        String body = streamResult.getResponse().getContentAsString(StandardCharsets.UTF_8);
+        assertTrue(body.contains("任务实时通道已连接"));
+        assertTrue(body.contains("员工手册.pdf"));
     }
 
     @Test
