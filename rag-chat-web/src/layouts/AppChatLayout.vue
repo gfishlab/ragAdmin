@@ -74,25 +74,23 @@ onMounted(async () => {
 <template>
   <div class="chat-layout-shell">
     <aside class="chat-sidebar app-shell-panel">
-      <section class="brand-card">
-        <p class="brand-kicker">ragAdmin Chat</p>
-        <h1 class="serif-title">组织知识问答入口</h1>
-        <p>
-          与模型直接对话，或把多个知识库临时拉入本轮检索范围。管理后台维护模型与知识库，这里只负责面向用户的问答体验。
-        </p>
-      </section>
-
       <section class="sidebar-section">
+        <div class="section-head is-compact">
+          <div>
+            <p class="section-kicker">问答</p>
+            <h2>通用问答</h2>
+          </div>
+        </div>
         <button
           type="button"
           class="nav-entry"
           :class="{ 'is-active': route.name === 'app-chat-home' }"
           @click="openGeneralChat"
         >
-          <el-icon><ChatDotRound /></el-icon>
+          <el-icon class="nav-entry-icon"><ChatDotRound /></el-icon>
           <div>
             <strong>通用问答</strong>
-            <span>不绑定知识库，按需临时勾选</span>
+            <span>不绑定知识库，按需临时接入</span>
           </div>
         </button>
       </section>
@@ -154,8 +152,8 @@ onMounted(async () => {
 <style scoped>
 .chat-layout-shell {
   display: grid;
-  grid-template-columns: 300px minmax(0, 1fr);
-  gap: var(--layout-gap);
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
   min-height: 100vh;
   padding: 20px;
 }
@@ -163,45 +161,17 @@ onMounted(async () => {
 .chat-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 18px;
-  padding: 20px;
+  gap: 16px;
+  padding: 18px 16px;
   border-radius: var(--radius-xl);
-}
-
-.brand-card {
-  padding: 18px;
-  border-radius: 22px;
   background:
-    linear-gradient(150deg, rgba(255, 248, 240, 0.94), rgba(246, 235, 220, 0.82)),
-    rgba(255, 255, 255, 0.4);
-  border: 1px solid rgba(122, 89, 53, 0.12);
-}
-
-.brand-kicker,
-.section-kicker {
-  margin: 0 0 8px;
-  color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.brand-card h1 {
-  margin: 0;
-  font-size: 30px;
-  line-height: 1.25;
-}
-
-.brand-card p:last-child {
-  margin: 14px 0 0;
-  color: var(--text-secondary);
-  line-height: 1.8;
+    linear-gradient(180deg, rgba(252, 248, 242, 0.96), rgba(248, 243, 236, 0.92));
 }
 
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
   min-height: 0;
 }
 
@@ -212,15 +182,27 @@ onMounted(async () => {
   gap: 12px;
 }
 
+.section-head.is-compact {
+  padding: 0 4px;
+}
+
+.section-kicker {
+  margin: 0 0 6px;
+  color: var(--text-muted);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
 .section-head h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
 }
 
 .nav-entry,
 .kb-entry {
   width: 100%;
-  border: 1px solid rgba(122, 89, 53, 0.1);
+  border: 1px solid transparent;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.58);
   color: inherit;
@@ -237,15 +219,19 @@ onMounted(async () => {
 .kb-entry.is-active {
   transform: translateY(-1px);
   border-color: rgba(157, 91, 47, 0.26);
-  box-shadow: 0 14px 28px rgba(91, 58, 24, 0.08);
+  box-shadow: 0 10px 22px rgba(91, 58, 24, 0.06);
 }
 
 .nav-entry {
   display: flex;
   align-items: center;
   gap: 14px;
-  padding: 16px 18px;
+  padding: 14px 16px;
   text-align: left;
+}
+
+.nav-entry-icon {
+  color: var(--brand-strong);
 }
 
 .nav-entry strong,
@@ -273,7 +259,7 @@ onMounted(async () => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
   min-height: 220px;
   max-height: 50vh;
   overflow-y: auto;
@@ -281,7 +267,7 @@ onMounted(async () => {
 }
 
 .kb-entry {
-  padding: 14px 16px;
+  padding: 12px 14px;
   text-align: left;
 }
 
@@ -295,7 +281,7 @@ onMounted(async () => {
 .section-placeholder {
   display: grid;
   place-items: center;
-  min-height: 120px;
+  min-height: 96px;
   padding: 16px;
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.42);
@@ -313,7 +299,7 @@ onMounted(async () => {
 }
 
 .user-card {
-  padding: 16px;
+  padding: 14px 16px;
   border-radius: 20px;
   background: rgba(255, 249, 243, 0.84);
   border: 1px solid rgba(122, 89, 53, 0.1);
