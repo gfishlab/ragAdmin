@@ -8,6 +8,8 @@ import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.chat.ChatSceneTypes;
 import com.ragadmin.server.chat.ChatTerminalTypes;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadataGenerationService;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
@@ -100,6 +102,9 @@ class AppChatServiceTest {
     private ChatExecutionPlanningService chatExecutionPlanningService;
 
     @Mock
+    private ChatAnswerMetadataGenerationService chatAnswerMetadataGenerationService;
+
+    @Mock
     private ConversationMemoryManager conversationMemoryManager;
 
     @Mock
@@ -140,6 +145,8 @@ class AppChatServiceTest {
                     "RULE_BASED"
             );
         }).when(chatExecutionPlanningService).plan(any());
+        lenient().when(chatAnswerMetadataGenerationService.generate(any()))
+                .thenReturn(new ChatAnswerMetadata("LOW", false, false));
     }
 
     @Test
@@ -356,6 +363,8 @@ class AppChatServiceTest {
         when(modelService.resolveChatModelDescriptor(901L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
                 .thenReturn(new ChatCompletionResult("建议先处理高优先级事项。", 80, 20));
+        ChatAnswerMetadata metadata = new ChatAnswerMetadata("LOW", false, false);
+        when(chatAnswerMetadataGenerationService.generate(any())).thenReturn(metadata);
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(6001L),
@@ -365,12 +374,14 @@ class AppChatServiceTest {
                 eq(80),
                 eq(20),
                 anyInt(),
+                eq(metadata),
                 eq(retrievalResult)
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1001L,
                 "建议先处理高优先级事项。",
                 List.of(),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(80, 20)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(80, 20),
+                new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("LOW", false, false)
         ));
 
         com.ragadmin.server.chat.dto.ChatResponse response = appChatService.chat(501L, request, user(6001L));
@@ -383,6 +394,7 @@ class AppChatServiceTest {
         verify(modelService).resolveChatModelDescriptor(901L);
         verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-app-scene-general-user-6001-session-501");
         assertEquals("建议先处理高优先级事项。", response.answer());
+        assertEquals("LOW", response.metadata().confidence());
     }
 
     @Test
@@ -430,12 +442,14 @@ class AppChatServiceTest {
                 eq(96),
                 eq(26),
                 anyInt(),
+                any(),
                 eq(retrievalResult)
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1002L,
                 "可以重点关注智能体应用落地。",
                 List.of(),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(96, 26)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(96, 26),
+                null
         ));
 
         appChatService.chat(502L, request, user(6002L));
@@ -519,12 +533,14 @@ class AppChatServiceTest {
                 eq(120),
                 eq(40),
                 anyInt(),
+                any(),
                 eq(retrievalResult)
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1003L,
                 "建议优先选择高频低风险场景，并关注近期行业落地案例。",
                 List.of(),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 40)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 40),
+                null
         ));
 
         appChatService.chat(503L, request, user(6003L));

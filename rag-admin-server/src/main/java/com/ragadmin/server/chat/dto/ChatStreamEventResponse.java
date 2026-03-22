@@ -9,11 +9,12 @@ public record ChatStreamEventResponse(
         String answer,
         List<ChatReferenceResponse> references,
         ChatUsageResponse usage,
+        ChatAnswerMetadataResponse metadata,
         String errorMessage
 ) {
 
     public static ChatStreamEventResponse delta(String delta) {
-        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null);
+        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null, null);
     }
 
     public static ChatStreamEventResponse complete(ChatResponse response) {
@@ -24,11 +25,12 @@ public record ChatStreamEventResponse(
                 response.answer(),
                 response.references(),
                 response.usage(),
+                response.metadata(),
                 null
         );
     }
 
     public static ChatStreamEventResponse error(String errorMessage) {
-        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, errorMessage);
+        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, null, errorMessage);
     }
 }

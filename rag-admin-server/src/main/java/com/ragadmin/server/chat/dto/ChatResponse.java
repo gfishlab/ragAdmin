@@ -6,6 +6,7 @@ public record ChatResponse(
         Long messageId,
         String answer,
         List<ChatReferenceResponse> references,
-        ChatUsageResponse usage
+        ChatUsageResponse usage,
+        ChatAnswerMetadataResponse metadata
 ) {
 }

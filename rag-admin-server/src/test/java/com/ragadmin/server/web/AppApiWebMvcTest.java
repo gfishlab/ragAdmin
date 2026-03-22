@@ -404,7 +404,8 @@ class AppApiWebMvcTest {
                 102L,
                 "根据已选知识库，发布前需要完成回归测试。",
                 List.of(),
-                new ChatUsageResponse(180, 42)
+                new ChatUsageResponse(180, 42),
+                null
         ));
 
         protectedMockMvc.perform(post("/api/app/chat/sessions/22/messages")
@@ -431,7 +432,8 @@ class AppApiWebMvcTest {
                         103L,
                         "再确认知识库引用是否命中。",
                         List.of(),
-                        new ChatUsageResponse(156, 38)
+                        new ChatUsageResponse(156, 38),
+                        null
                 ))
         ));
 

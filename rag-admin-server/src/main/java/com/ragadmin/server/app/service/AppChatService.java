@@ -31,6 +31,9 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadataGenerationRequest;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadataGenerationService;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
 import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningService;
@@ -102,6 +105,9 @@ public class AppChatService {
 
     @Autowired
     private ChatExecutionPlanningService chatExecutionPlanningService;
+
+    @Autowired
+    private ChatAnswerMetadataGenerationService chatAnswerMetadataGenerationService;
 
     @Autowired
     private ConversationMemoryManager conversationMemoryManager;
@@ -305,6 +311,11 @@ public class AppChatService {
                 execution.historyMessages()
         );
         int latencyMs = (int) Duration.between(start, Instant.now()).toMillis();
+        ChatAnswerMetadata answerMetadata = generateAnswerMetadata(
+                execution,
+                request.getQuestion(),
+                completion.content()
+        );
 
         ChatResponse response = chatExchangePersistenceService.persistExchange(
                 execution.session(),
@@ -315,6 +326,7 @@ public class AppChatService {
                 completion.promptTokens(),
                 completion.completionTokens(),
                 latencyMs,
+                answerMetadata,
                 execution.retrievalResult()
         );
         conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
@@ -347,6 +359,11 @@ public class AppChatService {
                             })
                             .filter(Objects::nonNull)
                             .concatWith(Mono.fromSupplier(() -> {
+                                ChatAnswerMetadata answerMetadata = generateAnswerMetadata(
+                                        execution,
+                                        request.getQuestion(),
+                                        answerBuilder.toString()
+                                );
                                 ChatResponse response = chatExchangePersistenceService.persistExchange(
                                         execution.session(),
                                         user.getUserId(),
@@ -356,6 +373,7 @@ public class AppChatService {
                                         promptTokensRef.get(),
                                         completionTokensRef.get(),
                                         (int) Duration.between(start, Instant.now()).toMillis(),
+                                        answerMetadata,
                                         execution.retrievalResult()
                                 );
                                 conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
@@ -363,6 +381,20 @@ public class AppChatService {
                             }));
                 })
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
+    }
+
+    private ChatAnswerMetadata generateAnswerMetadata(
+            PreparedChatExecution execution,
+            String question,
+            String answer
+    ) {
+        return chatAnswerMetadataGenerationService.generate(new ChatAnswerMetadataGenerationRequest(
+                execution.chatModel().providerCode(),
+                execution.chatModel().modelCode(),
+                question,
+                answer,
+                execution.retrievalResult().chunks().size()
+        ));
     }
 
     @Transactional

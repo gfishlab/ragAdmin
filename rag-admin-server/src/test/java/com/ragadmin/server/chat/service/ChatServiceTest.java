@@ -16,6 +16,8 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadataGenerationService;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatExecutionPlan;
 import com.ragadmin.server.infra.ai.chat.ChatExecutionPlanningRequest;
@@ -28,6 +30,10 @@ import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.service.RetrievalService;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.Generation;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -51,6 +57,7 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import reactor.core.publisher.Flux;
 
 @ExtendWith(MockitoExtension.class)
 class ChatServiceTest {
@@ -81,6 +88,9 @@ class ChatServiceTest {
 
     @Mock
     private ChatExecutionPlanningService chatExecutionPlanningService;
+
+    @Mock
+    private ChatAnswerMetadataGenerationService chatAnswerMetadataGenerationService;
 
     @Mock
     private ConversationMemoryRefreshDispatcher conversationMemoryRefreshDispatcher;
@@ -114,6 +124,8 @@ class ChatServiceTest {
                     "RULE_BASED"
             );
         }).when(chatExecutionPlanningService).plan(any());
+        lenient().when(chatAnswerMetadataGenerationService.generate(any()))
+                .thenReturn(new ChatAnswerMetadata("LOW", false, false));
     }
 
     @Test
@@ -195,6 +207,8 @@ class ChatServiceTest {
         when(modelService.resolveChatModelDescriptor(501L)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
                 .thenReturn(new ChatCompletionResult("制度要求按时提交周报。", 120, 30));
+        ChatAnswerMetadata metadata = new ChatAnswerMetadata("HIGH", true, false);
+        when(chatAnswerMetadataGenerationService.generate(any())).thenReturn(metadata);
         when(chatExchangePersistenceService.persistExchange(
                 eq(session),
                 eq(100L),
@@ -204,6 +218,7 @@ class ChatServiceTest {
                 eq(120),
                 eq(30),
                 anyInt(),
+                eq(metadata),
                 eq(retrievalResult)
         )).thenReturn(new ChatResponse(
                 901L,
@@ -217,7 +232,8 @@ class ChatServiceTest {
                         0.91D,
                         "制度要求员工按时提交周报。"
                 )),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 30)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 30),
+                new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("HIGH", true, false)
         ));
 
         ChatResponse response = chatService.chat(31L, request, user(100L));
@@ -232,6 +248,7 @@ class ChatServiceTest {
                 eq(120),
                 eq(30),
                 anyInt(),
+                eq(metadata),
                 eq(retrievalResult)
         );
 
@@ -239,6 +256,7 @@ class ChatServiceTest {
         assertEquals(1, response.references().size());
         assertEquals(120, response.usage().promptTokens());
         assertEquals(30, response.usage().completionTokens());
+        assertEquals("HIGH", response.metadata().confidence());
         verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-admin-scene-knowledge_base-user-100-session-31");
     }
 
@@ -284,12 +302,14 @@ class ChatServiceTest {
                 eq(64),
                 eq(18),
                 anyInt(),
+                any(),
                 eq(retrievalResult)
         )).thenReturn(new ChatResponse(
                 902L,
                 "当前无法从知识库确认答案。",
                 List.of(),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18),
+                null
         ));
 
         ChatResponse response = chatService.chat(32L, request, user(100L));
@@ -305,6 +325,7 @@ class ChatServiceTest {
                 eq(64),
                 eq(18),
                 anyInt(),
+                any(),
                 eq(retrievalResult)
         );
         assertEquals("当前无法从知识库确认答案。", response.answer());
@@ -360,12 +381,14 @@ class ChatServiceTest {
                 eq(100),
                 eq(20),
                 anyInt(),
+                any(),
                 eq(retrievalResult)
         )).thenReturn(new ChatResponse(
                 903L,
                 "制度要求按时提交周报。",
                 List.of(),
-                new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20)
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
+                null
         ));
 
         chatService.chat(33L, request, user(100L));
@@ -412,6 +435,91 @@ class ChatServiceTest {
         assertEquals(1, events.size());
         assertEquals("ERROR", events.getFirst().eventType());
         assertEquals("会话不存在", events.getFirst().errorMessage());
+    }
+
+    @Test
+    void shouldIncludeMetadataInStreamCompleteEvent() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(34L);
+        session.setKbId(404L);
+        session.setUserId(100L);
+
+        ChatRequest request = new ChatRequest();
+        request.setKbId(404L);
+        request.setQuestion("请总结制度里和周报有关的要求");
+
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(404L);
+        knowledgeBase.setChatModelId(504L);
+
+        RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "片段1:\n周报需按时提交。");
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                804L,
+                "qwen2.5:7b",
+                "OLLAMA",
+                "Ollama"
+        );
+        ChatAnswerMetadata metadata = new ChatAnswerMetadata("MEDIUM", true, false);
+
+        when(chatSessionMapper.selectById(34L)).thenReturn(session);
+        when(knowledgeBaseService.requireById(404L)).thenReturn(knowledgeBase);
+        when(modelService.resolveChatModelDescriptor(504L)).thenReturn(modelDescriptor);
+        when(retrievalService.retrieve(knowledgeBase, "请总结制度里和周报有关的要求")).thenReturn(retrievalResult);
+        when(conversationChatClient.stream(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
+                .thenReturn(Flux.just(chatChunk("制度要求", 100, 20), chatChunk("按时提交周报。", 100, 20)));
+        when(chatAnswerMetadataGenerationService.generate(any())).thenReturn(metadata);
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(100L),
+                eq("请总结制度里和周报有关的要求"),
+                eq("制度要求按时提交周报。"),
+                eq(804L),
+                eq(100),
+                eq(20),
+                anyInt(),
+                eq(metadata),
+                eq(retrievalResult)
+        )).thenReturn(new ChatResponse(
+                904L,
+                "制度要求按时提交周报。",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
+                new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("MEDIUM", true, false)
+        ));
+
+        List<ChatStreamEventResponse> events = chatService.streamChat(34L, request, user(100L)).collectList().block();
+
+        assertNotNull(events);
+        assertEquals(3, events.size());
+        assertEquals("DELTA", events.get(0).eventType());
+        assertEquals("制度要求", events.get(0).delta());
+        assertEquals("COMPLETE", events.get(2).eventType());
+        assertEquals("MEDIUM", events.get(2).metadata().confidence());
+        assertEquals(true, events.get(2).metadata().hasKnowledgeBaseEvidence());
+    }
+
+    private org.springframework.ai.chat.model.ChatResponse chatChunk(String text, int promptTokens, int completionTokens) {
+        return org.springframework.ai.chat.model.ChatResponse.builder()
+                .metadata(ChatResponseMetadata.builder()
+                        .usage(new Usage() {
+                            @Override
+                            public Integer getPromptTokens() {
+                                return promptTokens;
+                            }
+
+                            @Override
+                            public Integer getCompletionTokens() {
+                                return completionTokens;
+                            }
+
+                            @Override
+                            public Object getNativeUsage() {
+                                return null;
+                            }
+                        })
+                        .build())
+                .generations(List.of(new Generation(new AssistantMessage(text))))
+                .build();
     }
 
     private AuthenticatedUser user(Long userId) {

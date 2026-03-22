@@ -1,5 +1,6 @@
 package com.ragadmin.server.chat.service;
 
+import com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
@@ -10,6 +11,7 @@ import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.DocumentMapper;
+import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
 import com.ragadmin.server.retrieval.service.RetrievalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -45,6 +47,7 @@ public class ChatExchangePersistenceService {
             Integer promptTokens,
             Integer completionTokens,
             int latencyMs,
+            ChatAnswerMetadata answerMetadata,
             RetrievalService.RetrievalResult retrievalResult
     ) {
         ChatMessageEntity message = new ChatMessageEntity();
@@ -88,7 +91,19 @@ public class ChatExchangePersistenceService {
                 message.getId(),
                 answer,
                 references,
-                new ChatUsageResponse(promptTokens, completionTokens)
+                new ChatUsageResponse(promptTokens, completionTokens),
+                toMetadataResponse(answerMetadata)
+        );
+    }
+
+    private ChatAnswerMetadataResponse toMetadataResponse(ChatAnswerMetadata answerMetadata) {
+        if (answerMetadata == null) {
+            return null;
+        }
+        return new ChatAnswerMetadataResponse(
+                answerMetadata.confidence(),
+                answerMetadata.hasKnowledgeBaseEvidence(),
+                answerMetadata.needFollowUp()
         );
     }
 }
