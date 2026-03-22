@@ -113,17 +113,8 @@ const workspaceTitle = computed(() => {
     ? (activeKnowledgeBase.value?.kbName || '知识库问答')
     : '通用问答'
 })
-const workspaceDescription = computed(() => {
-  if (!isKnowledgeBaseScene.value) {
-    return '先和模型对话，需要时再把知识库临时拉进来。'
-  }
-  return activeKnowledgeBase.value?.description || '围绕当前知识库进行问答，回答会优先使用这里的内容。'
-})
 const sessionPanelTitle = computed(() => {
   return isKnowledgeBaseScene.value ? '知识库会话' : '首页会话'
-})
-const sessionPanelHint = computed(() => {
-  return isKnowledgeBaseScene.value ? '切换同一知识库内的历史上下文' : '切换首页里的独立对话线程'
 })
 const sessionEmptyText = computed(() => {
   return isKnowledgeBaseScene.value ? '当前知识库还没有聊天会话' : '还没有首页会话，发送第一条问题后会自动创建'
@@ -1230,7 +1221,6 @@ onUnmounted(() => {
         <div class="sidebar-section-head">
           <div>
             <p>知识库</p>
-            <span>进入单知识库问答</span>
           </div>
           <small v-if="sidebarKnowledgeBases.length > 0">{{ sidebarKnowledgeBases.length }}</small>
         </div>
@@ -1258,7 +1248,6 @@ onUnmounted(() => {
         <div class="sidebar-section-head">
           <div>
             <p>{{ sessionPanelTitle }}</p>
-            <span>{{ sessionPanelHint }}</span>
           </div>
           <small>{{ sessions.length }}</small>
         </div>
@@ -1311,10 +1300,7 @@ onUnmounted(() => {
     <section class="workspace-main app-shell-panel">
       <header class="workspace-toolbar">
         <div class="toolbar-copy">
-          <div class="toolbar-title-row">
-            <h1>{{ workspaceTitle }}</h1>
-          </div>
-          <p class="toolbar-description">{{ workspaceDescription }}</p>
+          <h1>{{ workspaceTitle }}</h1>
         </div>
         <div class="toolbar-actions">
           <el-button text :icon="ChatDotRound" :disabled="streaming" @click="handleClearView">清空视图</el-button>
@@ -1449,7 +1435,7 @@ onUnmounted(() => {
 
         <div v-else class="conversation-empty">
           <h2>{{ workspaceTitle }}</h2>
-          <p>{{ composerPlaceholder }}</p>
+          <p>{{ isKnowledgeBaseScene ? '围绕当前知识库开始提问' : '开始一轮新的提问' }}</p>
         </div>
       </div>
 
@@ -1635,7 +1621,7 @@ onUnmounted(() => {
                 @{{ knowledgeBase.kbName }}
               </el-tag>
               <span v-if="selectedKnowledgeBases.length === 0" class="composer-footer-hint">
-                输入 @ 可接入知识库，Enter 发送，Shift + Enter 换行
+                输入 @ 接入知识库，Enter 发送
               </span>
             </div>
           </div>
@@ -1715,24 +1701,24 @@ onUnmounted(() => {
 
 .sidebar-section-head {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 0 10px;
+  padding: 0 8px;
 }
 
 .sidebar-section-head p {
   margin: 0;
   color: var(--text-secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.sidebar-section-head span,
 .sidebar-section-head small {
   color: var(--text-muted);
   font-size: 12px;
-  line-height: 1.6;
 }
 
 .sidebar-list {
@@ -1807,16 +1793,16 @@ onUnmounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .sidebar-entry span,
 .session-entry-main span {
-  margin-top: 4px;
+  margin-top: 2px;
   color: var(--text-muted);
-  font-size: 12px;
-  line-height: 1.6;
+  font-size: 11px;
+  line-height: 1.5;
 }
 
 .session-entry {
@@ -1864,43 +1850,29 @@ onUnmounted(() => {
 
 .workspace-toolbar {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
-  padding: 22px 24px 14px;
+  padding: 20px 24px 12px;
 }
 
 .toolbar-copy {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 0;
   max-width: 760px;
 }
 
-.toolbar-title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.toolbar-title-row h1 {
+.toolbar-copy h1 {
   margin: 0;
-  font-size: clamp(26px, 3vw, 38px);
+  font-size: clamp(24px, 3vw, 34px);
   line-height: 1.04;
-}
-
-.toolbar-description {
-  margin: 0;
-  color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.7;
 }
 
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 6px;
 }
 
 .range-picker {
@@ -1992,8 +1964,8 @@ onUnmounted(() => {
 .workspace-status {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 0 24px 14px;
+  gap: 8px;
+  padding: 0 24px 12px;
 }
 
 .status-pill {
@@ -2049,7 +2021,7 @@ onUnmounted(() => {
   gap: 22px;
   min-height: 0;
   overflow-y: auto;
-  padding: 26px 32px;
+  padding: 22px 28px;
 }
 
 .conversation-placeholder,
@@ -2061,22 +2033,22 @@ onUnmounted(() => {
 }
 
 .conversation-empty {
-  gap: 8px;
+  gap: 6px;
   padding: 24px;
   text-align: center;
 }
 
 .conversation-empty h2 {
   margin: 0;
-  font-size: clamp(24px, 3vw, 34px);
+  font-size: clamp(22px, 3vw, 30px);
   line-height: 1.06;
 }
 
 .conversation-empty p:last-child {
-  max-width: 520px;
+  max-width: 420px;
   color: var(--text-secondary);
-  font-size: 14px;
-  line-height: 1.75;
+  font-size: 13px;
+  line-height: 1.7;
 }
 
 .message-thread {
@@ -2099,8 +2071,8 @@ onUnmounted(() => {
 
 .message-card {
   max-width: min(88%, 860px);
-  padding: 16px 18px;
-  border-radius: 22px;
+  padding: 14px 16px;
+  border-radius: 20px;
   line-height: 1.8;
 }
 
@@ -2127,9 +2099,9 @@ onUnmounted(() => {
 
 .message-role {
   display: inline-flex;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   opacity: 0.78;
-  font-size: 11px;
+  font-size: 10px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -2278,28 +2250,28 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 16px 24px 20px;
+  padding: 14px 20px 18px;
   border-top: 1px solid var(--border-soft);
   background: rgba(255, 252, 248, 0.92);
 }
 
 .composer-input-shell {
   position: relative;
-  padding: 8px 10px 10px;
-  border: 1px solid var(--border-medium);
-  border-radius: 20px;
+  padding: 8px 10px 8px;
+  border: 1px solid rgba(122, 89, 53, 0.12);
+  border-radius: 18px;
   background: rgba(255, 255, 255, 0.94);
 }
 
 .composer-input-shell :deep(.el-textarea__inner) {
-  min-height: 96px;
+  min-height: 88px;
   padding: 6px 4px 0;
   border: none;
   box-shadow: none;
   background: transparent;
   color: inherit;
   font-size: 14px;
-  line-height: 1.8;
+  line-height: 1.75;
 }
 
 .composer-input-shell :deep(.el-textarea__inner:focus) {
@@ -2413,7 +2385,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 10px;
 }
 
 .composer-footer-left {
@@ -2421,13 +2393,13 @@ onUnmounted(() => {
   flex: 1;
   min-width: 0;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .composer-toolbelt {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-wrap: wrap;
 }
 
@@ -2435,10 +2407,10 @@ onUnmounted(() => {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 11px;
-  border: 1px solid var(--border-medium);
+  padding: 6px 10px;
+  border: 1px solid rgba(122, 89, 53, 0.12);
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.9);
+  background: rgba(255, 255, 255, 0.84);
   color: inherit;
   cursor: pointer;
   transition:
@@ -2450,7 +2422,7 @@ onUnmounted(() => {
 .composer-tool-button:hover {
   border-color: var(--accent-medium);
   color: var(--brand-strong);
-  background: rgba(255, 248, 240, 0.96);
+  background: rgba(255, 248, 240, 0.92);
 }
 
 .composer-tool-button:disabled {
@@ -2460,7 +2432,7 @@ onUnmounted(() => {
 
 .composer-tool-button.is-active {
   border-color: var(--accent-medium);
-  background: rgba(255, 244, 232, 0.96);
+  background: rgba(255, 244, 232, 0.92);
   color: var(--brand-strong);
 }
 
@@ -2475,7 +2447,7 @@ onUnmounted(() => {
 }
 
 .composer-tool-button strong {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -2549,12 +2521,12 @@ onUnmounted(() => {
   flex: 1;
   flex-wrap: wrap;
   gap: 6px;
-  min-height: 32px;
+  min-height: 28px;
 }
 
 .composer-footer-hint {
   color: var(--text-muted);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.6;
 }
 
@@ -2611,7 +2583,6 @@ onUnmounted(() => {
     border-radius: 22px;
   }
 
-  .toolbar-title-row,
   .sidebar-section-head,
   .range-picker-head,
   .composer-mention-head {

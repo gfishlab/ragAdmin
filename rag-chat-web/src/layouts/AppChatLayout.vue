@@ -21,7 +21,7 @@ async function handleLogout(): Promise<void> {
 <template>
   <div class="chat-layout-shell">
     <div class="layout-actions">
-      <el-button text type="danger" :icon="SwitchButton" @click="handleLogout">退出</el-button>
+      <el-button circle text type="danger" :icon="SwitchButton" @click="handleLogout" />
     </div>
     <main class="chat-main">
       <router-view />
@@ -31,16 +31,18 @@ async function handleLogout(): Promise<void> {
 
 <style scoped>
 .chat-layout-shell {
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 12px;
   min-height: 100vh;
   padding: 20px;
 }
 
 .layout-actions {
-  display: flex;
-  justify-content: space-between;
+  position: absolute;
+  top: 28px;
+  right: 28px;
+  z-index: 5;
 }
 
 .chat-main {
