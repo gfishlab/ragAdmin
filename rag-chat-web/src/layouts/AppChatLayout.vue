@@ -1,7 +1,9 @@
 <template>
   <div class="chat-layout-shell">
     <main class="chat-main">
-      <router-view />
+      <div class="chat-route">
+        <router-view />
+      </div>
     </main>
   </div>
 </template>
@@ -18,6 +20,13 @@
   min-width: 0;
   flex: 1;
   display: flex;
+  min-height: 0;
+}
+
+.chat-route {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
   min-height: 0;
 }
 </style>

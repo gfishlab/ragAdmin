@@ -125,8 +125,11 @@ onMounted(async () => {
 <style scoped>
 .kb-chat-shell {
   display: flex;
+  flex: 1;
   flex-direction: column;
   gap: 16px;
+  width: 100%;
+  min-width: 0;
 }
 
 .kb-page-placeholder {
