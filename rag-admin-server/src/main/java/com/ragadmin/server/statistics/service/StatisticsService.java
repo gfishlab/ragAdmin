@@ -133,11 +133,21 @@ public class StatisticsService {
 
         Map<Long, EmbeddingModelDescriptor> descriptorMap = new HashMap<>();
         for (VectorIndexOverviewResponse item : overviews) {
+            if (item.getConfiguredEmbeddingModelId() == null) {
+                item.setEmbeddingModelSource("UNSET");
+                item.setDocumentCount(defaultLong(item.getDocumentCount()));
+                item.setSuccessDocumentCount(defaultLong(item.getSuccessDocumentCount()));
+                item.setChunkCount(defaultLong(item.getChunkCount()));
+                item.setVectorRefCount(0L);
+                item.setMilvusStatus("DOWN");
+                item.setMilvusMessage("知识库未绑定向量模型，无法继续校验向量索引。");
+                continue;
+            }
             try {
                 EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(item.getConfiguredEmbeddingModelId());
                 descriptorMap.put(item.getKbId(), descriptor);
             } catch (Exception ex) {
-                item.setEmbeddingModelSource(item.getConfiguredEmbeddingModelId() == null ? "DEFAULT" : "CUSTOM");
+                item.setEmbeddingModelSource("CUSTOM");
                 item.setDocumentCount(defaultLong(item.getDocumentCount()));
                 item.setSuccessDocumentCount(defaultLong(item.getSuccessDocumentCount()));
                 item.setChunkCount(defaultLong(item.getChunkCount()));
@@ -166,7 +176,7 @@ public class StatisticsService {
             }
 
             item.setEffectiveEmbeddingModelId(descriptor.modelId());
-            item.setEmbeddingModelSource(item.getConfiguredEmbeddingModelId() == null ? "DEFAULT" : "CUSTOM");
+            item.setEmbeddingModelSource("CUSTOM");
             item.setEmbeddingModelCode(descriptor.modelCode());
             AiModelEntity model = modelMap.get(descriptor.modelId());
             item.setEmbeddingModelName(model == null ? descriptor.modelCode() : model.getModelName());

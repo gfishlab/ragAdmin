@@ -3,14 +3,11 @@ package com.ragadmin.server.model.service;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
-import com.ragadmin.server.infra.ai.AiProperties;
-import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
-import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.dto.CreateModelRequest;
 import com.ragadmin.server.model.dto.ModelHealthCheckResponse;
@@ -73,10 +70,6 @@ class ModelServiceTest {
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
 
-    private final AiProperties aiProperties = new AiProperties();
-    private final BailianProperties bailianProperties = new BailianProperties();
-    private final OllamaProperties ollamaProperties = new OllamaProperties();
-
     private ModelService modelService;
 
     @BeforeEach
@@ -91,9 +84,6 @@ class ModelServiceTest {
         ReflectionTestUtils.setField(modelService, "modelProviderService", modelProviderService);
         ReflectionTestUtils.setField(modelService, "conversationChatClient", conversationChatClient);
         ReflectionTestUtils.setField(modelService, "embeddingClientRegistry", embeddingClientRegistry);
-        ReflectionTestUtils.setField(modelService, "aiProperties", aiProperties);
-        ReflectionTestUtils.setField(modelService, "bailianProperties", bailianProperties);
-        ReflectionTestUtils.setField(modelService, "ollamaProperties", ollamaProperties);
     }
 
     @Test
@@ -159,7 +149,6 @@ class ModelServiceTest {
 
         when(aiModelMapper.selectById(11L)).thenReturn(entity);
         when(modelProviderService.requireProvider(11L)).thenReturn(provider);
-        when(knowledgeBaseMapper.selectCount(any())).thenReturn(0L);
 
         ModelResponse response = modelService.update(11L, request);
 
@@ -360,32 +349,13 @@ class ModelServiceTest {
     }
 
     @Test
-    void shouldResolveDefaultEmbeddingModelDescriptorForOllama() {
-        AiProviderEntity provider = new AiProviderEntity();
-        provider.setId(60L);
-        provider.setProviderCode("OLLAMA");
-        provider.setProviderName("Ollama");
+    void shouldRequireExplicitEmbeddingModelWhenResolvingDescriptor() {
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.resolveEmbeddingModelDescriptor(null)
+        );
 
-        AiModelEntity model = new AiModelEntity();
-        model.setId(6L);
-        model.setProviderId(60L);
-        model.setModelCode("nomic-embed-text");
-
-        aiProperties.setDefaultProvider("OLLAMA");
-        ollamaProperties.setDefaultEmbeddingModel("nomic-embed-text");
-
-        when(aiProviderMapper.selectOne(any())).thenReturn(provider);
-        when(aiModelMapper.selectOne(any())).thenReturn(model);
-        when(aiModelMapper.selectById(6L)).thenReturn(model);
-        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(6L)))
-                .thenReturn(List.of(capability(6L, "EMBEDDING")));
-
-        EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(null);
-
-        assertEquals(6L, descriptor.modelId());
-        assertEquals("nomic-embed-text", descriptor.modelCode());
-        assertEquals("OLLAMA", descriptor.providerCode());
-        assertEquals("Ollama", descriptor.providerName());
+        assertEquals("EMBEDDING_MODEL_REQUIRED", exception.getCode());
     }
 
     @Test

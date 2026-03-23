@@ -84,11 +84,9 @@ rag:
     bailian:
       enabled: true
       api-key:
-      default-embedding-model: text-embedding-v3
       timeout-seconds: 60
     ollama:
       enabled: false
-      default-embedding-model: nomic-embed-text
       timeout-seconds: 30
   storage:
     minio:

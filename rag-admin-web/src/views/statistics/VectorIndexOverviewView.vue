@@ -97,8 +97,8 @@ function milvusStatusLabel(status: string): string {
 }
 
 function modelSourceLabel(source?: string | null): string {
-  if (source === 'DEFAULT') {
-    return '平台默认'
+  if (source === 'UNSET') {
+    return '未绑定'
   }
   return '知识库绑定'
 }
@@ -267,8 +267,8 @@ onMounted(async () => {
           <el-table-column label="向量模型" min-width="220">
             <template #default="{ row }">
               <div class="model-cell">
-                <strong>{{ row.embeddingModelName || '未解析' }}</strong>
-                <small>{{ row.embeddingModelCode || '暂无模型编码' }}</small>
+                <strong>{{ row.embeddingModelSource === 'UNSET' ? '未绑定向量模型' : (row.embeddingModelName || '未解析') }}</strong>
+                <small>{{ row.embeddingModelSource === 'UNSET' ? '请先在知识库中绑定向量模型' : (row.embeddingModelCode || '暂无模型编码') }}</small>
                 <el-tag size="small" effect="plain">
                   {{ modelSourceLabel(row.embeddingModelSource) }}
                 </el-tag>

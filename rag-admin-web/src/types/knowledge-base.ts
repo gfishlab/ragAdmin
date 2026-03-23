@@ -9,8 +9,6 @@ export interface KnowledgeBase {
   description: string | null
   embeddingModelId: number | null
   embeddingModelName: string | null
-  chatModelId: number | null
-  chatModelName: string | null
   retrieveTopK: number
   rerankEnabled: boolean
   status: string
@@ -21,7 +19,6 @@ export interface KnowledgeBaseUpsertRequest {
   kbName: string
   description: string | null
   embeddingModelId: number | null
-  chatModelId: number | null
   retrieveTopK: number
   rerankEnabled: boolean
   status: string

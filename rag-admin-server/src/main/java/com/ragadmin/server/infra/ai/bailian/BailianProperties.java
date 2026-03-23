@@ -8,7 +8,6 @@ public class BailianProperties {
     private boolean enabled = true;
     private String baseUrl;
     private String apiKey;
-    private String defaultEmbeddingModel;
     private int timeoutSeconds = 60;
 
     public boolean isEnabled() {
@@ -33,14 +32,6 @@ public class BailianProperties {
 
     public void setApiKey(String apiKey) {
         this.apiKey = apiKey;
-    }
-
-    public String getDefaultEmbeddingModel() {
-        return defaultEmbeddingModel;
-    }
-
-    public void setDefaultEmbeddingModel(String defaultEmbeddingModel) {
-        this.defaultEmbeddingModel = defaultEmbeddingModel;
     }
 
     public int getTimeoutSeconds() {

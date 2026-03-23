@@ -515,7 +515,6 @@ class AppChatServiceTest {
 
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(88L);
-        knowledgeBase.setChatModelId(903L);
 
         AppChatRequest request = new AppChatRequest();
         request.setQuestion("最近智能体应用有什么值得关注的实践？");
@@ -542,7 +541,7 @@ class AppChatServiceTest {
         when(chatSessionMapper.selectById(503L)).thenReturn(session);
         when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of(rel));
         when(knowledgeBaseService.requireById(88L)).thenReturn(knowledgeBase);
-        when(modelService.resolveChatModelDescriptor(903L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
         doReturn(new ChatExecutionPlan(
                 "KNOWLEDGE_BASE_AND_WEB_SEARCH",
                 true,

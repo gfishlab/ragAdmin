@@ -15,6 +15,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
@@ -35,10 +36,9 @@ class ModelBootstrapInitializerTest {
     private AiModelCapabilityMapper aiModelCapabilityMapper;
 
     @Test
-    void shouldBootstrapConfiguredDefaultEmbeddingModelWhenItDiffersFromBaseline() throws Exception {
+    void shouldBootstrapOnlyBaselineEmbeddingModelWhenProviderEnabled() throws Exception {
         BailianProperties bailianProperties = new BailianProperties();
         bailianProperties.setEnabled(true);
-        bailianProperties.setDefaultEmbeddingModel("text-embedding-v2");
 
         OllamaProperties ollamaProperties = new OllamaProperties();
         ollamaProperties.setEnabled(false);
@@ -72,6 +72,7 @@ class ModelBootstrapInitializerTest {
         verify(aiModelMapper, atLeastOnce()).insert(modelCaptor.capture());
 
         assertTrue(modelCaptor.getAllValues().stream()
-                .anyMatch(model -> "text-embedding-v2".equals(model.getModelCode())));
+                .anyMatch(model -> "text-embedding-v3".equals(model.getModelCode())));
+        assertEquals(2, modelCaptor.getAllValues().size());
     }
 }

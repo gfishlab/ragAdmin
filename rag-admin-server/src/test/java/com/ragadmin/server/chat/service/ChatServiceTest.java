@@ -212,7 +212,6 @@ class ChatServiceTest {
 
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(401L);
-        knowledgeBase.setChatModelId(501L);
 
         ChunkEntity chunk = new ChunkEntity();
         chunk.setId(601L);
@@ -236,7 +235,7 @@ class ChatServiceTest {
         when(chatSessionMapper.selectById(31L)).thenReturn(session);
         when(knowledgeBaseService.requireById(401L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "请总结制度要点")).thenReturn(retrievalResult);
-        when(modelService.resolveChatModelDescriptor(501L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
                 .thenReturn(new ChatCompletionResult("制度要求按时提交周报。", 120, 30));
         ChatAnswerMetadata metadata = new ChatAnswerMetadata("HIGH", true, false);
@@ -305,7 +304,6 @@ class ChatServiceTest {
 
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(402L);
-        knowledgeBase.setChatModelId(502L);
 
         RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(
                 List.of(),
@@ -322,7 +320,7 @@ class ChatServiceTest {
         when(chatSessionMapper.selectById(32L)).thenReturn(session);
         when(knowledgeBaseService.requireById(402L)).thenReturn(knowledgeBase);
         when(retrievalService.retrieve(knowledgeBase, "没有命中时应该怎么回答")).thenReturn(retrievalResult);
-        when(modelService.resolveChatModelDescriptor(502L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
         when(conversationChatClient.chat(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
                 .thenReturn(new ChatCompletionResult("当前无法从知识库确认答案。", 64, 18));
         when(chatExchangePersistenceService.persistExchange(
@@ -379,7 +377,6 @@ class ChatServiceTest {
 
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(403L);
-        knowledgeBase.setChatModelId(503L);
 
         RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "片段1:\n周报需按时提交。");
         ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
@@ -391,7 +388,7 @@ class ChatServiceTest {
 
         when(chatSessionMapper.selectById(33L)).thenReturn(session);
         when(knowledgeBaseService.requireById(403L)).thenReturn(knowledgeBase);
-        when(modelService.resolveChatModelDescriptor(503L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
         doReturn(new ChatExecutionPlan(
                 "KNOWLEDGE_BASE_QA",
                 true,
@@ -482,7 +479,6 @@ class ChatServiceTest {
 
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(404L);
-        knowledgeBase.setChatModelId(504L);
 
         RetrievalService.RetrievalResult retrievalResult = new RetrievalService.RetrievalResult(List.of(), "片段1:\n周报需按时提交。");
         ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
@@ -495,7 +491,7 @@ class ChatServiceTest {
 
         when(chatSessionMapper.selectById(34L)).thenReturn(session);
         when(knowledgeBaseService.requireById(404L)).thenReturn(knowledgeBase);
-        when(modelService.resolveChatModelDescriptor(504L)).thenReturn(modelDescriptor);
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
         when(retrievalService.retrieve(knowledgeBase, "请总结制度里和周报有关的要求")).thenReturn(retrievalResult);
         when(conversationChatClient.stream(eq("OLLAMA"), eq("qwen2.5:7b"), any(), any(), any()))
                 .thenReturn(Flux.just(chatChunk("制度要求", 100, 20), chatChunk("按时提交周报。", 100, 20)));

@@ -7,7 +7,6 @@ public class OllamaProperties {
 
     private boolean enabled = false;
     private String baseUrl;
-    private String defaultEmbeddingModel;
     private int timeoutSeconds = 30;
 
     public boolean isEnabled() {
@@ -24,14 +23,6 @@ public class OllamaProperties {
 
     public void setBaseUrl(String baseUrl) {
         this.baseUrl = baseUrl;
-    }
-
-    public String getDefaultEmbeddingModel() {
-        return defaultEmbeddingModel;
-    }
-
-    public void setDefaultEmbeddingModel(String defaultEmbeddingModel) {
-        this.defaultEmbeddingModel = defaultEmbeddingModel;
     }
 
     public int getTimeoutSeconds() {

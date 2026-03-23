@@ -554,7 +554,7 @@ public class AppChatService {
         }
 
         refreshSessionPreferences(session, request.getChatModelId(), request.getWebSearchEnabled());
-        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, effectiveSelectedKbIds, request.getChatModelId());
+        ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, request.getChatModelId());
         var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
                 chatModel.providerCode(),
                 chatModel.modelCode(),
@@ -753,7 +753,6 @@ public class AppChatService {
 
     private ModelService.ChatModelDescriptor resolveChatModel(
             ChatSessionEntity session,
-            List<Long> selectedKbIds,
             Long requestChatModelId
     ) {
         if (requestChatModelId != null) {
@@ -761,10 +760,6 @@ public class AppChatService {
         }
         if (session.getModelId() != null) {
             return modelService.resolveChatModelDescriptor(session.getModelId());
-        }
-        if (!selectedKbIds.isEmpty()) {
-            KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(selectedKbIds.get(0));
-            return modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
         }
         return modelService.resolveChatModelDescriptor(null);
     }

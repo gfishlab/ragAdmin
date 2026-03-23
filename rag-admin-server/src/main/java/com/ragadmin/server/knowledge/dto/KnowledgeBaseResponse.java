@@ -7,8 +7,6 @@ public record KnowledgeBaseResponse(
         String description,
         Long embeddingModelId,
         String embeddingModelName,
-        Long chatModelId,
-        String chatModelName,
         Integer retrieveTopK,
         Boolean rerankEnabled,
         String status

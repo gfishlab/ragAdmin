@@ -16,7 +16,6 @@ const router = useRouter()
 const submitting = ref(false)
 const modelLoading = ref(false)
 const modelFallback = ref(false)
-const chatModelOptions = ref<ModelDefinition[]>([])
 const embeddingModelOptions = ref<ModelDefinition[]>([])
 
 const form = reactive<KnowledgeBaseUpsertRequest>(createEmptyKnowledgeBaseForm())
@@ -31,11 +30,9 @@ async function loadModelOptions(): Promise<void> {
       status: 'ENABLED',
     })
     const options = buildKnowledgeBaseModelOptions(response.list)
-    chatModelOptions.value = options.chatModelOptions
     embeddingModelOptions.value = options.embeddingModelOptions
   } catch {
     modelFallback.value = true
-    chatModelOptions.value = []
     embeddingModelOptions.value = []
   } finally {
     modelLoading.value = false
@@ -82,13 +79,12 @@ onMounted(async () => {
   <section class="create-page">
     <KnowledgeBaseForm
       v-model="form"
-      :chat-model-options="chatModelOptions"
       :embedding-model-options="embeddingModelOptions"
       :model-fallback="modelFallback"
       :model-loading="modelLoading"
       :submitting="submitting"
       title="新建知识库"
-      description="创建知识库并配置检索参数、聊天模型和向量模型。"
+      description="创建知识库并配置检索参数与向量模型。问答生成统一使用平台默认聊天模型。"
       submit-text="创建知识库"
       @submit="handleSubmit"
       @cancel="handleCancel"

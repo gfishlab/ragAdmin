@@ -191,7 +191,6 @@ $KbBody = @"
   "kbName": "演示知识库",
   "description": "用于 API 验收",
   "embeddingModelId": $EmbeddingModelId,
-  "chatModelId": $ChatModelId,
   "retrieveTopK": 5,
   "rerankEnabled": false,
   "status": "ENABLED"
@@ -208,6 +207,12 @@ $KbResponse = Invoke-RestMethod `
 $KbId = $KbResponse.data.id
 $KbId
 ```
+
+判定要点：
+
+- 创建知识库时必须显式传入 `embeddingModelId`
+- 知识库请求体中不再包含 `chatModelId`
+- 后续问答生成统一依赖平台默认聊天模型或前台显式覆盖模型
 
 ### 5.7 获取上传地址
 

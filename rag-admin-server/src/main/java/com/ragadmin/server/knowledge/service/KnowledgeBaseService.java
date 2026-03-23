@@ -95,7 +95,8 @@ public class KnowledgeBaseService {
         }
 
         Map<Long, AiModelEntity> modelMap = modelService.findByIds(page.getRecords().stream()
-                        .flatMap(item -> java.util.stream.Stream.of(item.getEmbeddingModelId(), item.getChatModelId()))
+                        .map(KnowledgeBaseEntity::getEmbeddingModelId)
+                        .filter(java.util.Objects::nonNull)
                         .distinct()
                         .toList())
                 .stream()
@@ -117,19 +118,16 @@ public class KnowledgeBaseService {
             throw new BusinessException("KB_CODE_EXISTS", "知识库编码已存在", HttpStatus.BAD_REQUEST);
         }
 
-        if (request.getEmbeddingModelId() != null) {
-            modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
+        if (request.getEmbeddingModelId() == null) {
+            throw new BusinessException("KB_EMBEDDING_MODEL_REQUIRED", "知识库必须绑定一个向量模型", HttpStatus.BAD_REQUEST);
         }
-        if (request.getChatModelId() != null) {
-            modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
-        }
+        modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
 
         KnowledgeBaseEntity entity = new KnowledgeBaseEntity();
         entity.setKbCode(request.getKbCode());
         entity.setKbName(request.getKbName());
         entity.setDescription(request.getDescription());
         entity.setEmbeddingModelId(request.getEmbeddingModelId());
-        entity.setChatModelId(request.getChatModelId());
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
         entity.setStatus(request.getStatus());
@@ -148,18 +146,15 @@ public class KnowledgeBaseService {
             throw new BusinessException("KB_CODE_EXISTS", "知识库编码已存在", HttpStatus.BAD_REQUEST);
         }
 
-        if (request.getEmbeddingModelId() != null) {
-            modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
+        if (request.getEmbeddingModelId() == null) {
+            throw new BusinessException("KB_EMBEDDING_MODEL_REQUIRED", "知识库必须绑定一个向量模型", HttpStatus.BAD_REQUEST);
         }
-        if (request.getChatModelId() != null) {
-            modelService.requireModelWithCapability(request.getChatModelId(), "TEXT_GENERATION");
-        }
+        modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
 
         entity.setKbCode(request.getKbCode());
         entity.setKbName(request.getKbName());
         entity.setDescription(request.getDescription());
         entity.setEmbeddingModelId(request.getEmbeddingModelId());
-        entity.setChatModelId(request.getChatModelId());
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
         entity.setStatus(request.getStatus());
@@ -177,8 +172,8 @@ public class KnowledgeBaseService {
 
     public KnowledgeBaseResponse getDetail(Long kbId) {
         KnowledgeBaseEntity entity = requireById(kbId);
-        Map<Long, AiModelEntity> modelMap = modelService.findByIds(
-                        java.util.stream.Stream.of(entity.getEmbeddingModelId(), entity.getChatModelId()).toList())
+        List<Long> modelIds = entity.getEmbeddingModelId() == null ? List.of() : List.of(entity.getEmbeddingModelId());
+        Map<Long, AiModelEntity> modelMap = modelService.findByIds(modelIds)
                 .stream()
                 .collect(Collectors.toMap(AiModelEntity::getId, Function.identity()));
         return toResponse(entity, modelMap);
@@ -258,7 +253,6 @@ public class KnowledgeBaseService {
 
     private KnowledgeBaseResponse toResponse(KnowledgeBaseEntity entity, Map<Long, AiModelEntity> modelMap) {
         AiModelEntity embeddingModel = modelMap.get(entity.getEmbeddingModelId());
-        AiModelEntity chatModel = modelMap.get(entity.getChatModelId());
         return new KnowledgeBaseResponse(
                 entity.getId(),
                 entity.getKbCode(),
@@ -266,8 +260,6 @@ public class KnowledgeBaseService {
                 entity.getDescription(),
                 entity.getEmbeddingModelId(),
                 embeddingModel == null ? null : embeddingModel.getModelName(),
-                entity.getChatModelId(),
-                chatModel == null ? null : chatModel.getModelName(),
                 entity.getRetrieveTopK(),
                 entity.getRerankEnabled(),
                 entity.getStatus()

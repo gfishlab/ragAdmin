@@ -383,7 +383,8 @@ public class ChatService {
                 throw new BusinessException("CHAT_KB_MISMATCH", "会话与知识库不匹配", HttpStatus.BAD_REQUEST);
             }
             KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(kbId);
-            chatModel = modelService.resolveChatModelDescriptor(knowledgeBase.getChatModelId());
+            // 知识库只负责绑定向量模型，问答生成统一走平台默认聊天模型。
+            chatModel = modelService.resolveChatModelDescriptor(null);
             var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
                     chatModel.providerCode(),
                     chatModel.modelCode(),

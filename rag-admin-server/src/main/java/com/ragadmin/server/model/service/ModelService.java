@@ -9,14 +9,11 @@ import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
-import com.ragadmin.server.infra.ai.AiProperties;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
-import com.ragadmin.server.infra.ai.bailian.BailianProperties;
 import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
-import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.dto.CreateModelRequest;
@@ -77,15 +74,6 @@ public class ModelService {
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
-
-    @Autowired
-    private AiProperties aiProperties;
-
-    @Autowired
-    private BailianProperties bailianProperties;
-
-    @Autowired
-    private OllamaProperties ollamaProperties;
 
     public PageResponse<ModelResponse> list(String providerCode, String capabilityType, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
@@ -267,7 +255,10 @@ public class ModelService {
     }
 
     public EmbeddingModelDescriptor resolveEmbeddingModelDescriptor(Long modelId) {
-        return modelId != null ? requireEmbeddingModelDescriptor(modelId) : resolveDefaultEmbeddingModelDescriptor();
+        if (modelId == null) {
+            throw new BusinessException("EMBEDDING_MODEL_REQUIRED", "请先为知识库绑定向量模型", HttpStatus.BAD_REQUEST);
+        }
+        return requireEmbeddingModelDescriptor(modelId);
     }
 
     public ChatModelDescriptor requireChatModelDescriptor(Long modelId) {
@@ -444,11 +435,7 @@ public class ModelService {
             }
         }
         if (!hasChatCapability) {
-            Long chatRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
-                    .eq(KnowledgeBaseEntity::getChatModelId, modelId));
-            if (chatRefCount != null && chatRefCount > 0) {
-                throw new BusinessException("MODEL_CAPABILITY_IN_USE", "当前模型已被知识库作为对话模型使用，不能移除文本生成能力", HttpStatus.BAD_REQUEST);
-            }
+            return;
         }
     }
 
@@ -473,9 +460,7 @@ public class ModelService {
 
     private void validateDeleteReference(Long modelId, String modelName) {
         Long kbRefCount = knowledgeBaseMapper.selectCount(new LambdaQueryWrapper<KnowledgeBaseEntity>()
-                .and(wrapper -> wrapper.eq(KnowledgeBaseEntity::getEmbeddingModelId, modelId)
-                        .or()
-                        .eq(KnowledgeBaseEntity::getChatModelId, modelId)));
+                .eq(KnowledgeBaseEntity::getEmbeddingModelId, modelId));
         if (kbRefCount != null && kbRefCount > 0) {
             throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已被知识库引用，不能删除", HttpStatus.BAD_REQUEST);
         }
@@ -491,17 +476,6 @@ public class ModelService {
         if (messageRefCount != null && messageRefCount > 0) {
             throw new BusinessException("MODEL_IN_USE", "模型 " + modelName + " 已存在历史对话记录引用，不能删除", HttpStatus.BAD_REQUEST);
         }
-    }
-
-    private EmbeddingModelDescriptor resolveDefaultEmbeddingModelDescriptor() {
-        String providerCode = resolveDefaultProviderCode();
-        if ("BAILIAN".equalsIgnoreCase(providerCode)) {
-            return requireEmbeddingDescriptorByProviderAndCode(providerCode, bailianProperties.getDefaultEmbeddingModel());
-        }
-        if ("OLLAMA".equalsIgnoreCase(providerCode)) {
-            return requireEmbeddingDescriptorByProviderAndCode(providerCode, ollamaProperties.getDefaultEmbeddingModel());
-        }
-        throw new BusinessException("DEFAULT_EMBEDDING_MODEL_UNSUPPORTED", "当前默认提供方未配置 Embedding 默认模型", HttpStatus.SERVICE_UNAVAILABLE);
     }
 
     private ChatModelDescriptor resolveDefaultChatModelDescriptor() {
@@ -554,44 +528,6 @@ public class ModelService {
         return "ENABLED".equalsIgnoreCase(status)
                 && "CHAT".equalsIgnoreCase(modelType)
                 && capabilityTypes.contains("TEXT_GENERATION");
-    }
-
-    private EmbeddingModelDescriptor requireEmbeddingDescriptorByProviderAndCode(String providerCode, String modelCode) {
-        AiProviderEntity provider = requireProviderByCode(providerCode);
-        AiModelEntity model = requireModelByProviderAndCapability(provider.getId(), modelCode, "EMBEDDING");
-        return toEmbeddingDescriptor(model, provider);
-    }
-
-    private String resolveDefaultProviderCode() {
-        if (!StringUtils.hasText(aiProperties.getDefaultProvider())) {
-            throw new BusinessException("DEFAULT_PROVIDER_NOT_CONFIGURED", "未配置默认模型提供方", HttpStatus.SERVICE_UNAVAILABLE);
-        }
-        return aiProperties.getDefaultProvider();
-    }
-
-    private AiProviderEntity requireProviderByCode(String providerCode) {
-        AiProviderEntity provider = aiProviderMapper.selectOne(new LambdaQueryWrapper<AiProviderEntity>()
-                .eq(AiProviderEntity::getProviderCode, providerCode)
-                .last("LIMIT 1"));
-        if (provider == null) {
-            throw new BusinessException("PROVIDER_NOT_FOUND", "默认模型提供方不存在", HttpStatus.NOT_FOUND);
-        }
-        return provider;
-    }
-
-    private AiModelEntity requireModelByProviderAndCapability(Long providerId, String modelCode, String capabilityType) {
-        if (!StringUtils.hasText(modelCode)) {
-            throw new BusinessException("DEFAULT_MODEL_NOT_CONFIGURED", "未配置默认模型编码", HttpStatus.SERVICE_UNAVAILABLE);
-        }
-        AiModelEntity model = aiModelMapper.selectOne(new LambdaQueryWrapper<AiModelEntity>()
-                .eq(AiModelEntity::getProviderId, providerId)
-                .eq(AiModelEntity::getModelCode, modelCode)
-                .last("LIMIT 1"));
-        if (model == null) {
-            throw new BusinessException("MODEL_NOT_FOUND", "默认模型不存在，请先在后台模型管理中维护", HttpStatus.NOT_FOUND);
-        }
-        requireModelWithCapability(model.getId(), capabilityType);
-        return model;
     }
 
     private EmbeddingModelDescriptor toEmbeddingDescriptor(AiModelEntity model, AiProviderEntity provider) {

@@ -28,8 +28,8 @@ function statusType(status: string): 'success' | 'info' | 'warning' {
   return 'warning'
 }
 
-function modelLabel(name: string | null): string {
-  return name || '平台默认模型'
+function embeddingModelLabel(name: string | null): string {
+  return name || '已绑定模型待解析'
 }
 
 async function loadList(): Promise<void> {
@@ -164,12 +164,7 @@ onMounted(async () => {
         <el-table-column prop="kbName" label="知识库名称" min-width="180" />
         <el-table-column label="向量模型" min-width="180">
           <template #default="{ row }">
-            {{ modelLabel(row.embeddingModelName) }}
-          </template>
-        </el-table-column>
-        <el-table-column label="聊天模型" min-width="180">
-          <template #default="{ row }">
-            {{ modelLabel(row.chatModelName) }}
+            {{ embeddingModelLabel(row.embeddingModelName) }}
           </template>
         </el-table-column>
         <el-table-column prop="retrieveTopK" label="检索数量" width="100" />

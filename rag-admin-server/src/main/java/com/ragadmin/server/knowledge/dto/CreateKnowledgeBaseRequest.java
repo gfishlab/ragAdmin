@@ -15,9 +15,8 @@ public class CreateKnowledgeBaseRequest {
 
     private String description;
 
+    @NotNull(message = "embeddingModelId 不能为空")
     private Long embeddingModelId;
-
-    private Long chatModelId;
 
     @NotNull(message = "retrieveTopK 不能为空")
     private Integer retrieveTopK;

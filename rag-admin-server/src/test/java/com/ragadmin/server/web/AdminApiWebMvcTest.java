@@ -373,8 +373,6 @@ class AdminApiWebMvcTest {
                 "用于测试",
                 2L,
                 "nomic-embed-text",
-                1L,
-                "qwen2.5:7b",
                 5,
                 false,
                 "ENABLED"
@@ -389,7 +387,6 @@ class AdminApiWebMvcTest {
                                   "kbName": "演示知识库",
                                   "description": "用于测试",
                                   "embeddingModelId": 2,
-                                  "chatModelId": 1,
                                   "retrieveTopK": 5,
                                   "rerankEnabled": false,
                                   "status": "ENABLED"

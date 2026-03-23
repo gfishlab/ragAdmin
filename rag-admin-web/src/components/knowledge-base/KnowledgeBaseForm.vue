@@ -6,7 +6,6 @@ import type { KnowledgeBaseUpsertRequest, ModelDefinition } from '@/types/knowle
 const formModel = defineModel<KnowledgeBaseUpsertRequest>({ required: true })
 
 const props = defineProps<{
-  chatModelOptions: ModelDefinition[]
   embeddingModelOptions: ModelDefinition[]
   modelFallback: boolean
   modelLoading: boolean
@@ -24,9 +23,7 @@ const emit = defineEmits<{
 
 const formRef = ref<FormInstance>()
 
-const hasRealModelOptions = computed(() => {
-  return props.chatModelOptions.length > 0 || props.embeddingModelOptions.length > 0
-})
+const hasEmbeddingModelOptions = computed(() => props.embeddingModelOptions.length > 0)
 
 const rules: FormRules<KnowledgeBaseUpsertRequest> = {
   kbCode: [
@@ -38,6 +35,7 @@ const rules: FormRules<KnowledgeBaseUpsertRequest> = {
     },
   ],
   kbName: [{ required: true, message: '请输入知识库名称', trigger: 'blur' }],
+  embeddingModelId: [{ required: true, message: '请选择向量模型', trigger: 'change' }],
   retrieveTopK: [
     { required: true, message: '请输入检索数量', trigger: 'change' },
     {
@@ -78,7 +76,9 @@ async function handleSubmit(): Promise<void> {
       type="warning"
       :closable="false"
       show-icon
-      title="模型列表暂不可用，当前仍可创建知识库；若未显式选择聊天模型，将使用模型管理中设置的默认聊天模型。"
+      :title="hasEmbeddingModelOptions
+        ? '模型列表加载失败，当前仅保留已绑定的向量模型；如需切换其他向量模型，请先恢复模型列表。'
+        : '模型列表加载失败，知识库必须绑定一个向量模型，请先恢复模型列表后再提交。'"
     />
 
     <el-form
@@ -117,38 +117,12 @@ async function handleSubmit(): Promise<void> {
       </el-form-item>
 
       <div class="form-grid two-columns">
-        <el-form-item label="聊天模型">
-          <el-select
-            v-model="formModel.chatModelId"
-            clearable
-            filterable
-            :loading="modelLoading"
-            placeholder="留空时使用模型管理中设置的默认聊天模型"
-          >
-            <el-option
-              v-for="item in chatModelOptions"
-              :key="item.id"
-              :label="item.modelName"
-              :value="item.id"
-            >
-              <div class="option-row">
-                <span>{{ item.modelName }}</span>
-                <small>{{ item.modelCode }}</small>
-              </div>
-            </el-option>
-          </el-select>
-          <p class="field-tip">
-            {{ hasRealModelOptions ? '不选择时由模型管理中设置的默认聊天模型兜底。' : '当前无可用聊天模型，可先到模型管理中维护并设置默认聊天模型。' }}
-          </p>
-        </el-form-item>
-
-        <el-form-item label="向量模型">
+        <el-form-item label="向量模型" prop="embeddingModelId">
           <el-select
             v-model="formModel.embeddingModelId"
-            clearable
             filterable
             :loading="modelLoading"
-            placeholder="留空时使用平台默认向量模型"
+            placeholder="请选择知识库使用的向量模型"
           >
             <el-option
               v-for="item in embeddingModelOptions"
@@ -163,7 +137,18 @@ async function handleSubmit(): Promise<void> {
             </el-option>
           </el-select>
           <p class="field-tip">
-            {{ hasRealModelOptions ? '不选择时由平台默认向量模型兜底。' : '当前无可用向量模型，留空即可。' }}
+            {{ hasEmbeddingModelOptions ? '知识库创建后将使用该向量模型执行切片向量化与检索。' : '当前无可用向量模型，请先到模型管理中维护至少一个启用中的向量模型。' }}
+          </p>
+        </el-form-item>
+
+        <el-form-item label="回答模型策略">
+          <el-input
+            model-value="平台默认聊天模型"
+            readonly
+            placeholder="平台默认聊天模型"
+          />
+          <p class="field-tip">
+            知识库不再单独配置聊天模型；问答生成统一使用模型管理中设置的默认聊天模型，前台会话或请求仍可显式覆盖。
           </p>
         </el-form-item>
       </div>

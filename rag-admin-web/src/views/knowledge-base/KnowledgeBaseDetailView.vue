@@ -155,8 +155,8 @@ const uploadOcrAlertType = computed<'success' | 'warning' | 'info'>(() => {
   return uploadCapability.value.ocrAvailable ? 'success' : 'warning'
 })
 
-function modelLabel(name: string | null): string {
-  return name || '平台默认模型'
+function embeddingModelLabel(name: string | null): string {
+  return name || '已绑定模型待解析'
 }
 
 function statusType(status: string): 'success' | 'info' | 'warning' {
@@ -877,18 +877,18 @@ onUnmounted(() => {
         </article>
         <article class="overview-card soft-panel">
           <div class="overview-card-head">
-            <span>聊天模型</span>
+            <span>回答模型策略</span>
             <el-tag size="small" effect="plain" type="warning">问答生成</el-tag>
           </div>
-          <strong class="overview-card-value">{{ modelLabel(knowledgeBase.chatModelName) }}</strong>
-          <p>未显式绑定时走平台默认模型。</p>
+          <strong class="overview-card-value">平台默认聊天模型</strong>
+          <p>知识库不再单独配置聊天模型；前台会话或单次提问可显式覆盖。</p>
         </article>
         <article class="overview-card soft-panel">
           <div class="overview-card-head">
             <span>向量模型</span>
             <el-tag size="small" effect="plain" type="success">检索构建</el-tag>
           </div>
-          <strong class="overview-card-value">{{ modelLabel(knowledgeBase.embeddingModelName) }}</strong>
+          <strong class="overview-card-value">{{ embeddingModelLabel(knowledgeBase.embeddingModelName) }}</strong>
           <p>用于文本切片向量化和检索。</p>
         </article>
       </section>

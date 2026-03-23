@@ -26,7 +26,6 @@ const modelLoading = ref(false)
 const modelFallback = ref(false)
 const loadError = ref('')
 const knowledgeBase = ref<KnowledgeBase | null>(null)
-const chatModelOptions = ref<ModelDefinition[]>([])
 const embeddingModelOptions = ref<ModelDefinition[]>([])
 const form = reactive<KnowledgeBaseUpsertRequest>(createEmptyKnowledgeBaseForm())
 
@@ -34,7 +33,6 @@ const knowledgeBaseId = computed(() => Number(route.params.id))
 
 function applyModelOptions(models: ModelDefinition[]): void {
   const options = buildKnowledgeBaseModelOptions(models, knowledgeBase.value)
-  chatModelOptions.value = options.chatModelOptions
   embeddingModelOptions.value = options.embeddingModelOptions
 }
 
@@ -120,13 +118,12 @@ onMounted(async () => {
     <KnowledgeBaseForm
       v-else
       v-model="form"
-      :chat-model-options="chatModelOptions"
       :embedding-model-options="embeddingModelOptions"
       :model-fallback="modelFallback"
       :model-loading="modelLoading"
       :submitting="submitting"
       title="编辑知识库"
-      description="更新知识库基础信息、检索参数和模型配置。"
+      description="更新知识库基础信息、检索参数与向量模型。问答生成统一使用平台默认聊天模型。"
       submit-text="保存修改"
       @submit="handleSubmit"
       @cancel="handleCancel"

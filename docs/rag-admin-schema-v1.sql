@@ -152,8 +152,8 @@ CREATE TABLE IF NOT EXISTS kb_knowledge_base (
     kb_code             VARCHAR(100) NOT NULL,
     kb_name             VARCHAR(100) NOT NULL,
     description         TEXT,
-    embedding_model_id  BIGINT,
-    chat_model_id       BIGINT,
+    embedding_model_id  BIGINT NOT NULL,
+    chat_model_id       BIGINT, -- 兼容历史数据保留，运行时不再作为知识库问答模型来源
     retrieve_top_k      INTEGER NOT NULL DEFAULT 5,
     rerank_enabled      BOOLEAN NOT NULL DEFAULT FALSE,
     status              VARCHAR(16) NOT NULL DEFAULT 'ENABLED',

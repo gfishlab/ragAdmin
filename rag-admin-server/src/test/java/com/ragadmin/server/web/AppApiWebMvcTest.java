@@ -215,8 +215,6 @@ class AppApiWebMvcTest {
                         "制度与流程",
                         2L,
                         "bge-m3",
-                        1L,
-                        "qwen-max",
                         5,
                         false,
                         "ENABLED"

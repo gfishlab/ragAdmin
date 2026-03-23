@@ -10,7 +10,6 @@ export function createEmptyKnowledgeBaseForm(): KnowledgeBaseUpsertRequest {
     kbName: '',
     description: null,
     embeddingModelId: null,
-    chatModelId: null,
     retrieveTopK: 5,
     rerankEnabled: true,
     status: 'ENABLED',
@@ -25,7 +24,6 @@ export function fillKnowledgeBaseForm(
   target.kbName = source.kbName
   target.description = source.description
   target.embeddingModelId = source.embeddingModelId
-  target.chatModelId = source.chatModelId
   target.retrieveTopK = source.retrieveTopK
   target.rerankEnabled = source.rerankEnabled
   target.status = source.status
@@ -37,7 +35,6 @@ export function mapKnowledgeBaseToForm(source: KnowledgeBase): KnowledgeBaseUpse
     kbName: source.kbName,
     description: source.description,
     embeddingModelId: source.embeddingModelId,
-    chatModelId: source.chatModelId,
     retrieveTopK: source.retrieveTopK,
     rerankEnabled: source.rerankEnabled,
     status: source.status,
@@ -50,7 +47,6 @@ export function normalizeKnowledgeBaseForm(form: KnowledgeBaseUpsertRequest): Kn
     kbName: form.kbName.trim(),
     description: form.description?.trim() ? form.description.trim() : null,
     embeddingModelId: form.embeddingModelId ?? null,
-    chatModelId: form.chatModelId ?? null,
     retrieveTopK: Number(form.retrieveTopK),
     rerankEnabled: form.rerankEnabled,
     status: form.status,
@@ -63,11 +59,6 @@ function capabilitySet(model: ModelDefinition): Set<string> {
       .filter((item): item is string => Boolean(item))
       .map((item) => item.toUpperCase()),
   )
-}
-
-function isChatModel(model: ModelDefinition): boolean {
-  const capabilities = capabilitySet(model)
-  return model.modelType === 'CHAT' || capabilities.has('TEXT_GENERATION')
 }
 
 function isEmbeddingModel(model: ModelDefinition): boolean {
@@ -107,17 +98,9 @@ export function buildKnowledgeBaseModelOptions(
   models: ModelDefinition[],
   currentKnowledgeBase?: KnowledgeBase | null,
 ): {
-  chatModelOptions: ModelDefinition[]
   embeddingModelOptions: ModelDefinition[]
 } {
   const enabledModels = models.filter((item) => item.status === 'ENABLED' || !item.status)
-
-  const chatModelOptions = appendSelectedModel(
-    enabledModels.filter(isChatModel),
-    currentKnowledgeBase?.chatModelId ?? null,
-    currentKnowledgeBase?.chatModelName ?? null,
-    'CHAT',
-  )
 
   const embeddingModelOptions = appendSelectedModel(
     enabledModels.filter(isEmbeddingModel),
@@ -127,7 +110,6 @@ export function buildKnowledgeBaseModelOptions(
   )
 
   return {
-    chatModelOptions,
     embeddingModelOptions,
   }
 }
