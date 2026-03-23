@@ -160,11 +160,15 @@ public class ChatService {
                 .flatMap(List::stream)
                 .map(ChatAnswerReferenceEntity::getChunkId)
                 .toList());
-        Map<Long, ChunkEntity> chunkMap = chunkMapper.selectBatchIds(refsByMessageId.values().stream()
-                        .flatMap(List::stream)
-                        .map(ChatAnswerReferenceEntity::getChunkId)
-                        .distinct()
-                        .toList())
+        List<Long> chunkIds = refsByMessageId.values().stream()
+                .flatMap(List::stream)
+                .map(ChatAnswerReferenceEntity::getChunkId)
+                .distinct()
+                .toList();
+        // MyBatis Plus 在 PostgreSQL 上会把空集合拼成 IN ()，这里必须提前短路。
+        Map<Long, ChunkEntity> chunkMap = chunkIds.isEmpty()
+                ? Map.of()
+                : chunkMapper.selectBatchIds(chunkIds)
                 .stream()
                 .collect(Collectors.toMap(ChunkEntity::getId, java.util.function.Function.identity()));
         Map<Long, ChatFeedbackEntity> feedbackByMessageId = chatFeedbackMapper.selectList(new LambdaQueryWrapper<ChatFeedbackEntity>()
@@ -533,10 +537,15 @@ public class ChatService {
         Map<Long, ChunkEntity> chunkMap = chunkMapper.selectBatchIds(chunkIds)
                 .stream()
                 .collect(Collectors.toMap(ChunkEntity::getId, java.util.function.Function.identity()));
-        return documentMapper.selectBatchIds(chunkMap.values().stream()
-                        .map(ChunkEntity::getDocumentId)
-                        .distinct()
-                        .toList())
+        List<Long> documentIds = chunkMap.values().stream()
+                .map(ChunkEntity::getDocumentId)
+                .distinct()
+                .toList();
+        // 分段已被删或引用失效时，这里可能拿不到任何文档 ID，避免继续触发空批量查询。
+        if (documentIds.isEmpty()) {
+            return Map.of();
+        }
+        return documentMapper.selectBatchIds(documentIds)
                 .stream()
                 .collect(Collectors.toMap(DocumentEntity::getId, DocumentEntity::getDocName));
     }

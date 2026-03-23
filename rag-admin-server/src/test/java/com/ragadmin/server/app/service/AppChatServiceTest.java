@@ -357,7 +357,6 @@ class AppChatServiceTest {
         when(chatSessionMapper.selectById(450L)).thenReturn(session);
         when(chatMessageMapper.selectList(any())).thenReturn(List.of(message));
         when(chatAnswerReferenceMapper.selectList(any())).thenReturn(List.of());
-        when(chunkMapper.selectBatchIds(List.of())).thenReturn(List.of());
         when(chatFeedbackMapper.selectList(any())).thenReturn(List.of());
 
         List<ChatMessageResponse> messages = appChatService.listMessages(450L, user(5002L));
@@ -367,6 +366,8 @@ class AppChatServiceTest {
         assertEquals("LOW", messages.getFirst().metadata().confidence());
         assertEquals(false, messages.getFirst().metadata().hasKnowledgeBaseEvidence());
         assertEquals(true, messages.getFirst().metadata().needFollowUp());
+        verify(chunkMapper, never()).selectBatchIds(any());
+        verify(documentMapper, never()).selectBatchIds(any());
     }
 
     @Test
