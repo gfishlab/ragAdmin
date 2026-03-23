@@ -7,6 +7,8 @@ import com.ragadmin.server.auth.dto.RefreshTokenResponse;
 import com.ragadmin.server.auth.model.AuthenticatedUser;
 import com.ragadmin.server.auth.service.AuthService;
 import com.ragadmin.server.common.model.PageResponse;
+import com.ragadmin.server.infra.search.NoopWebSearchProvider;
+import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.dto.ModelResponse;
@@ -26,8 +28,18 @@ public class AppPortalService {
     @Autowired
     private ModelService modelService;
 
+    /**
+     * 前台联网能力属于可选基础设施，未接入真实 Provider 时显式回退为不可用状态。
+     */
+    @Autowired(required = false)
+    private WebSearchProvider webSearchProvider = new NoopWebSearchProvider();
+
     public LoginResponse login(LoginRequest request) {
-        return authService.loginForAppPortal(request);
+        LoginResponse response = authService.loginForAppPortal(request);
+        if (response != null && response.getUser() != null) {
+            response.getUser().setWebSearchAvailable(isWebSearchAvailable());
+        }
+        return response;
     }
 
     public RefreshTokenResponse refresh(String refreshToken) {
@@ -35,7 +47,11 @@ public class AppPortalService {
     }
 
     public CurrentUserResponse getCurrentUser(Long userId) {
-        return authService.getCurrentUserForAppPortal(userId);
+        CurrentUserResponse currentUser = authService.getCurrentUserForAppPortal(userId);
+        if (currentUser != null) {
+            currentUser.setWebSearchAvailable(isWebSearchAvailable());
+        }
+        return currentUser;
     }
 
     public void logout(AuthenticatedUser authenticatedUser) {
@@ -54,5 +70,9 @@ public class AppPortalService {
      */
     public PageResponse<ModelResponse> listAvailableChatModels(String providerCode, long pageNo, long pageSize) {
         return modelService.list(providerCode, "TEXT_GENERATION", "ENABLED", pageNo, pageSize);
+    }
+
+    private boolean isWebSearchAvailable() {
+        return webSearchProvider != null && webSearchProvider.isAvailable();
     }
 }

@@ -124,7 +124,8 @@
       "username": "admin",
       "displayName": "系统管理员",
       "roles": ["ADMIN"],
-      "permissions": ["DASHBOARD_VIEW", "USER_MANAGE"]
+      "permissions": ["DASHBOARD_VIEW", "USER_MANAGE"],
+      "webSearchAvailable": false
     }
   }
 }
@@ -138,7 +139,7 @@
 响应体补充约定：
 
 - 后台 `GET /api/admin/auth/me` 必须返回 `roles + permissions`
-- 前台 `GET /api/app/auth/me` 至少返回用户基本信息与角色信息
+- 前台 `GET /api/app/auth/me` 至少返回用户基本信息、角色信息，以及运行时能力位 `webSearchAvailable`
 - 后台前端的菜单、路由和关键高风险按钮统一基于 `permissions` 渲染
 
 ### 3.3 刷新 Token

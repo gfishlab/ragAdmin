@@ -133,6 +133,7 @@ class AppChatServiceTest {
 
     @BeforeEach
     void setUp() {
+        lenient().when(webSearchProvider.isAvailable()).thenReturn(true);
         lenient().doAnswer(invocation -> {
             ChatExecutionPlanningRequest planningRequest = invocation.getArgument(0);
             boolean needRetrieval = planningRequest.retrievalAvailable();
@@ -500,6 +501,62 @@ class AppChatServiceTest {
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));
         assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
+    }
+
+    @Test
+    void shouldSkipWebSearchPlanningWhenProviderIsUnavailable() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(520L);
+        session.setUserId(6020L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("今天无锡天气如何？");
+        request.setChatModelId(920L);
+        request.setWebSearchEnabled(Boolean.TRUE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                920L,
+                "qwen-plus",
+                "BAILIAN",
+                "百炼"
+        );
+
+        when(webSearchProvider.isAvailable()).thenReturn(false);
+        when(chatSessionMapper.selectById(520L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(modelService.resolveChatModelDescriptor(920L)).thenReturn(modelDescriptor);
+        when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
+                .thenReturn(new ChatCompletionResult("当前环境未接入联网搜索能力。", 48, 12));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(6020L),
+                eq("今天无锡天气如何？"),
+                eq("当前环境未接入联网搜索能力。"),
+                eq(920L),
+                eq(48),
+                eq(12),
+                anyInt(),
+                any(),
+                any(RetrievalService.RetrievalResult.class)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                1020L,
+                "当前环境未接入联网搜索能力。",
+                "text/markdown",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(48, 12),
+                null
+        ));
+
+        appChatService.chat(520L, request, user(6020L));
+
+        ArgumentCaptor<ChatExecutionPlanningRequest> planningCaptor = ArgumentCaptor.forClass(ChatExecutionPlanningRequest.class);
+        verify(chatExecutionPlanningService).plan(planningCaptor.capture());
+        assertTrue(!planningCaptor.getValue().webSearchAvailable());
+        verify(webSearchProvider, never()).search(any(), anyInt());
     }
 
     @Test

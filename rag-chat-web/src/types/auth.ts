@@ -9,6 +9,7 @@ export interface CurrentUser {
   displayName: string
   mobile: string
   roles: string[]
+  webSearchAvailable: boolean
 }
 
 export interface LoginResponse {

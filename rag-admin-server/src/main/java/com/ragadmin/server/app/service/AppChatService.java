@@ -677,6 +677,7 @@ public class AppChatService {
             replaceSessionKnowledgeBaseRelations(session.getId(), effectiveSelectedKbIds);
         }
 
+        boolean effectiveWebSearchAvailable = isWebSearchAvailable(requestedWebSearchEnabled);
         refreshSessionPreferences(session, requestedChatModelId, requestedWebSearchEnabled);
         ModelService.ChatModelDescriptor chatModel = resolveChatModel(session, requestedChatModelId);
         var executionPlan = chatExecutionPlanningService.plan(new ChatExecutionPlanningRequest(
@@ -684,14 +685,14 @@ public class AppChatService {
                 chatModel.modelCode(),
                 question,
                 !effectiveSelectedKbIds.isEmpty(),
-                Boolean.TRUE.equals(requestedWebSearchEnabled),
+                effectiveWebSearchAvailable,
                 effectiveSelectedKbIds.size(),
                 ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)
         ));
 
         List<WebSearchSnippet> webSearchSnippets = loadWebSearchSnippets(
                 executionPlan.webSearchQuery(),
-                executionPlan.needWebSearch()
+                effectiveWebSearchAvailable && executionPlan.needWebSearch()
         );
 
         RetrievalService.RetrievalResult retrievalResult = !executionPlan.needRetrieval() || effectiveSelectedKbIds.isEmpty()
@@ -918,6 +919,12 @@ public class AppChatService {
             log.warn("联网搜索已降级为空结果，question={}", question, ex);
             return List.of();
         }
+    }
+
+    private boolean isWebSearchAvailable(Boolean requestedWebSearchEnabled) {
+        return Boolean.TRUE.equals(requestedWebSearchEnabled)
+                && webSearchProvider != null
+                && webSearchProvider.isAvailable();
     }
 
     private record PreparedChatExecution(

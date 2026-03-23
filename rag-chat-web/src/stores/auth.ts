@@ -24,6 +24,10 @@ function parseStoredUser(): CurrentUser | null {
   }
 }
 
+function hasPortalCapabilities(user: CurrentUser | null): user is CurrentUser {
+  return user !== null && typeof user.webSearchAvailable === 'boolean'
+}
+
 export const useAuthStore = defineStore('app-auth', () => {
   const accessToken = ref(getAccessToken())
   const refreshToken = ref(getRefreshToken())
@@ -65,7 +69,7 @@ export const useAuthStore = defineStore('app-auth', () => {
       bootstrapFinished.value = true
       return
     }
-    if (currentUser.value) {
+    if (hasPortalCapabilities(currentUser.value)) {
       bootstrapFinished.value = true
       return
     }

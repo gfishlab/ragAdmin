@@ -131,7 +131,8 @@ class AppApiWebMvcTest {
                 .setId(2L)
                 .setUsername("app-user")
                 .setDisplayName("问答前台用户")
-                .setRoles(List.of("APP_USER"));
+                .setRoles(List.of("APP_USER"))
+                .setWebSearchAvailable(false);
 
         LoginResponse response = new LoginResponse()
                 .setAccessToken("app-access-token")
@@ -153,7 +154,8 @@ class AppApiWebMvcTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.accessToken").value("app-access-token"))
-                .andExpect(jsonPath("$.data.user.roles[0]").value("APP_USER"));
+                .andExpect(jsonPath("$.data.user.roles[0]").value("APP_USER"))
+                .andExpect(jsonPath("$.data.user.webSearchAvailable").value(false));
 
         verify(authService, never()).authenticateAccessToken(any(), any());
     }
@@ -195,13 +197,15 @@ class AppApiWebMvcTest {
                 .setId(2L)
                 .setUsername("app-user")
                 .setDisplayName("问答前台用户")
-                .setRoles(List.of("APP_USER")));
+                .setRoles(List.of("APP_USER"))
+                .setWebSearchAvailable(true));
 
         protectedMockMvc.perform(get("/api/app/auth/me")
-                        .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
+                .header(HttpHeaders.AUTHORIZATION, "Bearer access-token"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.code").value("OK"))
-                .andExpect(jsonPath("$.data.username").value("app-user"));
+                .andExpect(jsonPath("$.data.username").value("app-user"))
+                .andExpect(jsonPath("$.data.webSearchAvailable").value(true));
     }
 
     @Test

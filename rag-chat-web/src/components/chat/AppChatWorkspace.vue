@@ -211,10 +211,22 @@ const currentModelName = computed(() => {
   }
   return availableModels.value.find((item) => item.id === selectedModelId.value)?.modelName || '指定模型'
 })
+const webSearchAvailable = computed(() => Boolean(authStore.currentUser?.webSearchAvailable))
+const webSearchButtonLabel = computed(() => {
+  if (!webSearchAvailable.value) {
+    return '未接入'
+  }
+  return webSearchEnabled.value ? '开启' : '关闭'
+})
+const webSearchToggleDisabled = computed(() => streaming.value || !webSearchAvailable.value)
 const accountInitial = computed(() => {
   const source = authStore.displayName || authStore.currentUser?.username || 'U'
   return source.slice(0, 1).toUpperCase()
 })
+
+function normalizeWebSearchEnabled(value?: boolean | null): boolean {
+  return webSearchAvailable.value && Boolean(value)
+}
 
 function handleOpenGeneralChat(): void {
   if (streaming.value || !isKnowledgeBaseScene.value) {
@@ -459,7 +471,7 @@ function applySessionPreferences(session: ChatSession | null): void {
     }
     selectedKbIds.value = normalizeSelectedKbIds(session.selectedKbIds)
     selectedModelId.value = session.chatModelId ?? undefined
-    webSearchEnabled.value = Boolean(session.webSearchEnabled)
+    webSearchEnabled.value = normalizeWebSearchEnabled(session.webSearchEnabled)
   })
 }
 
@@ -520,7 +532,7 @@ function buildSessionMetadataPayload(): SessionMetadataPayload | null {
     sessionId: session.id,
     sessionName: session.sessionName,
     chatModelId: selectedModelId.value ?? null,
-    webSearchEnabled: webSearchEnabled.value,
+    webSearchEnabled: normalizeWebSearchEnabled(webSearchEnabled.value),
   }
 }
 
@@ -740,7 +752,7 @@ async function ensureSession(question: string): Promise<number> {
     sceneType: props.sceneType,
     sessionName: buildSessionName(question),
     chatModelId: selectedModelId.value,
-    webSearchEnabled: webSearchEnabled.value,
+    webSearchEnabled: normalizeWebSearchEnabled(webSearchEnabled.value),
     selectedKbIds: selectedKbIds.value,
   })
   sessions.value = [created, ...sessions.value.filter((item) => item.id !== created.id)]
@@ -804,7 +816,7 @@ async function sendQuestion(rawQuestion: string): Promise<void> {
       question,
       chatModelId: selectedModelId.value,
       selectedKbIds: selectedKbIds.value,
-      webSearchEnabled: webSearchEnabled.value,
+      webSearchEnabled: normalizeWebSearchEnabled(webSearchEnabled.value),
     },
     {
       onEvent(event) {
@@ -1150,7 +1162,7 @@ async function handleRegenerateMessage(message: ChatExchange): Promise<void> {
     {
       chatModelId: selectedModelId.value,
       selectedKbIds: [...selectedKbIds.value],
-      webSearchEnabled: webSearchEnabled.value,
+      webSearchEnabled: normalizeWebSearchEnabled(webSearchEnabled.value),
     },
     {
       onEvent(event) {
@@ -1252,7 +1264,9 @@ async function handleRenameSession(session: ChatSession): Promise<void> {
     const updated = await updateChatSession(session.id, {
       sessionName: normalizedName,
       chatModelId: session.id === activeSessionId.value ? (selectedModelId.value ?? null) : session.chatModelId,
-      webSearchEnabled: session.id === activeSessionId.value ? webSearchEnabled.value : session.webSearchEnabled,
+      webSearchEnabled: session.id === activeSessionId.value
+        ? normalizeWebSearchEnabled(webSearchEnabled.value)
+        : normalizeWebSearchEnabled(session.webSearchEnabled),
     })
     replaceSessionLocal(session.id, {
       sessionName: updated.sessionName,
@@ -1369,6 +1383,13 @@ watch(
     queueSessionMetadataPersistence()
   },
 )
+
+watch(webSearchAvailable, (available) => {
+  if (available || !webSearchEnabled.value) {
+    return
+  }
+  webSearchEnabled.value = false
+})
 
 watch(
   selectedKbIds,
@@ -1942,12 +1963,15 @@ onUnmounted(() => {
                 <button
                   type="button"
                   class="composer-tool-button"
-                  :class="{ 'is-active': webSearchEnabled }"
-                  :disabled="streaming"
+                  :class="{
+                    'is-active': webSearchAvailable && webSearchEnabled,
+                    'is-unavailable': !webSearchAvailable,
+                  }"
+                  :disabled="webSearchToggleDisabled"
                   @click="webSearchEnabled = !webSearchEnabled"
                 >
                   <span>联网</span>
-                  <strong>{{ webSearchEnabled ? '开启' : '关闭' }}</strong>
+                  <strong>{{ webSearchButtonLabel }}</strong>
                 </button>
               </div>
 
@@ -1969,6 +1993,13 @@ onUnmounted(() => {
             </div>
 
             <div class="composer-footer-actions">
+              <el-tag
+                v-if="!webSearchAvailable"
+                effect="plain"
+                type="info"
+              >
+                当前环境未接入真实联网搜索能力
+              </el-tag>
               <el-tag
                 v-if="isKnowledgeBaseScene"
                 effect="plain"
@@ -2998,6 +3029,10 @@ onUnmounted(() => {
   border-color: var(--accent-medium);
   background: rgba(255, 244, 232, 0.92);
   color: var(--brand-strong);
+}
+
+.composer-tool-button.is-unavailable {
+  border-style: dashed;
 }
 
 .composer-tool-button span,

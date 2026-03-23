@@ -21,4 +21,9 @@ public class NoopWebSearchProvider implements WebSearchProvider {
         }
         return List.of();
     }
+
+    @Override
+    public boolean isAvailable() {
+        return false;
+    }
 }

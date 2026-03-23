@@ -15,4 +15,5 @@ public class CurrentUserResponse {
     private String mobile;
     private List<String> roles;
     private List<String> permissions;
+    private boolean webSearchAvailable;
 }
