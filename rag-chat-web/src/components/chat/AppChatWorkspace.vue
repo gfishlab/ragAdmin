@@ -1474,6 +1474,15 @@ onUnmounted(() => {
                       <span v-if="reference.chunkNo" class="reference-meta">定位切片 #{{ reference.chunkNo }}</span>
                     </div>
                   </div>
+                  <div class="reference-footer">
+                    <button
+                      type="button"
+                      class="reference-collapse-action"
+                      @click="toggleReferencePanel(message.id)"
+                    >
+                      收起引用文件
+                    </button>
+                  </div>
                 </div>
 
                 <p v-if="message.feedbackType" class="feedback-hint">
@@ -2407,6 +2416,36 @@ onUnmounted(() => {
 
 .reference-actions {
   margin-top: 10px;
+}
+
+.reference-footer {
+  display: flex;
+  justify-content: center;
+  padding-top: 4px;
+}
+
+.reference-collapse-action {
+  min-width: 140px;
+  padding: 8px 18px;
+  border: 1px solid rgba(157, 91, 47, 0.18);
+  border-radius: 999px;
+  background: rgba(255, 249, 240, 0.92);
+  color: var(--brand-strong);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 180ms ease,
+    transform 180ms ease,
+    background 180ms ease,
+    box-shadow 180ms ease;
+}
+
+.reference-collapse-action:hover {
+  border-color: rgba(157, 91, 47, 0.32);
+  background: rgba(255, 244, 228, 0.98);
+  box-shadow: 0 10px 20px rgba(157, 91, 47, 0.08);
+  transform: translateY(-1px);
 }
 
 .feedback-hint,
