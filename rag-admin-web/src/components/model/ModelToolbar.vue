@@ -48,12 +48,6 @@ const emit = defineEmits<{
           <span>异步文本与视觉向量暂不可进入运行链路</span>
         </article>
       </div>
-
-      <div class="toolbar-actions">
-        <el-button @click="emit('refresh')">刷新页面</el-button>
-        <el-button plain @click="emit('openProviderDrawer')">提供方维护</el-button>
-        <el-button type="primary" @click="emit('openCreateModel')">新增模型</el-button>
-      </div>
     </div>
 
     <section class="architecture-banner">
@@ -121,6 +115,12 @@ const emit = defineEmits<{
         <el-button @click="emit('reset')">重置</el-button>
         <el-button type="primary" :loading="loading" @click="emit('search')">查询模型</el-button>
       </div>
+
+      <div class="toolbar-actions">
+        <el-button @click="emit('refresh')">刷新页面</el-button>
+        <el-button plain @click="emit('openProviderDrawer')">提供方维护</el-button>
+        <el-button type="primary" @click="emit('openCreateModel')">新增模型</el-button>
+      </div>
     </section>
   </section>
 </template>
@@ -134,10 +134,7 @@ const emit = defineEmits<{
 }
 
 .toolbar-top {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
+  display: block;
 }
 
 .metric-strip {
@@ -270,10 +267,6 @@ const emit = defineEmits<{
 }
 
 @media (max-width: 1100px) {
-  .toolbar-top {
-    flex-direction: column;
-  }
-
   .metric-strip,
   .filter-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
