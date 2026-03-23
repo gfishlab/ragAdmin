@@ -128,8 +128,11 @@ onMounted(async () => {
   flex: 1;
   flex-direction: column;
   gap: 16px;
+  height: 100%;
   width: 100%;
   min-width: 0;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .kb-page-placeholder {
@@ -147,6 +150,7 @@ onMounted(async () => {
 
 .reference-focus-card {
   display: flex;
+  flex: none;
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;

@@ -12,8 +12,10 @@
 .chat-layout-shell {
   display: flex;
   flex-direction: column;
+  height: 100vh;
   min-height: 100vh;
   padding: 20px;
+  overflow: hidden;
 }
 
 .chat-main {
@@ -21,6 +23,7 @@
   flex: 1;
   display: flex;
   min-height: 0;
+  overflow: hidden;
 }
 
 .chat-route {
@@ -28,5 +31,6 @@
   width: 100%;
   min-width: 0;
   min-height: 0;
+  overflow: hidden;
 }
 </style>

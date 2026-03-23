@@ -1756,8 +1756,9 @@ onUnmounted(() => {
   grid-template-columns: 260px minmax(0, 1fr);
   gap: 16px;
   flex: 1;
-  height: calc(100vh - 40px);
-  min-height: calc(100vh - 40px);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .workspace-sidebar,
@@ -1771,6 +1772,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  min-height: 0;
   padding: 16px 12px 14px;
   background:
     linear-gradient(180deg, rgba(252, 248, 242, 0.96), rgba(248, 243, 236, 0.92));
@@ -1824,6 +1826,8 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
 }
 
 .sidebar-knowledge .sidebar-list {
@@ -2238,6 +2242,8 @@ onUnmounted(() => {
   min-height: 0;
   overflow-y: auto;
   padding: 22px 28px;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
 }
 
 .conversation-placeholder,
