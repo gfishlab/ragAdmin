@@ -99,27 +99,29 @@ const emit = defineEmits<{
         </el-select>
       </div>
 
-      <div class="filter-actions">
-        <span class="selection-tip" :class="{ 'is-active': selectedCount > 0 }">
-          已选择 {{ selectedCount }} 项
-        </span>
-        <el-button
-          type="danger"
-          plain
-          :disabled="selectedCount === 0"
-          :loading="batchDeleteSubmitting"
-          @click="emit('batchDelete')"
-        >
-          批量删除
-        </el-button>
-        <el-button @click="emit('reset')">重置</el-button>
-        <el-button type="primary" :loading="loading" @click="emit('search')">查询模型</el-button>
-      </div>
+      <div class="action-bar">
+        <div class="action-bar-left">
+          <span class="selection-tip" :class="{ 'is-active': selectedCount > 0 }">
+            已选择 {{ selectedCount }} 项
+          </span>
+          <el-button
+            type="danger"
+            plain
+            :disabled="selectedCount === 0"
+            :loading="batchDeleteSubmitting"
+            @click="emit('batchDelete')"
+          >
+            批量删除
+          </el-button>
+        </div>
 
-      <div class="toolbar-actions">
-        <el-button @click="emit('refresh')">刷新页面</el-button>
-        <el-button plain @click="emit('openProviderDrawer')">提供方维护</el-button>
-        <el-button type="primary" @click="emit('openCreateModel')">新增模型</el-button>
+        <div class="action-bar-right">
+          <el-button @click="emit('reset')">重置</el-button>
+          <el-button type="primary" :loading="loading" @click="emit('search')">查询模型</el-button>
+          <el-button @click="emit('refresh')">刷新页面</el-button>
+          <el-button plain @click="emit('openProviderDrawer')">提供方维护</el-button>
+          <el-button type="primary" @click="emit('openCreateModel')">新增模型</el-button>
+        </div>
       </div>
     </section>
   </section>
@@ -183,10 +185,20 @@ const emit = defineEmits<{
   font-size: 13px;
 }
 
-.toolbar-actions {
+.action-bar,
+.action-bar-left,
+.action-bar-right {
   display: flex;
   gap: 12px;
   flex-wrap: wrap;
+  align-items: center;
+}
+
+.action-bar {
+  justify-content: space-between;
+}
+
+.action-bar-right {
   justify-content: flex-end;
 }
 
@@ -272,7 +284,13 @@ const emit = defineEmits<{
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .toolbar-actions {
+  .action-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .action-bar-left,
+  .action-bar-right {
     width: 100%;
     justify-content: flex-start;
   }
@@ -289,11 +307,13 @@ const emit = defineEmits<{
     grid-template-columns: 1fr;
   }
 
-  .filter-actions {
+  .action-bar-left,
+  .action-bar-right {
     justify-content: stretch;
   }
 
-  .filter-actions :deep(.el-button) {
+  .action-bar-left :deep(.el-button),
+  .action-bar-right :deep(.el-button) {
     flex: 1 1 140px;
   }
 
