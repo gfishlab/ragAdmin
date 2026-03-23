@@ -4,6 +4,7 @@ import com.ragadmin.server.document.entity.ChunkEntity;
 import com.ragadmin.server.document.entity.ChunkVectorRefEntity;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -52,8 +53,8 @@ class ChunkVectorizationServiceTest {
         knowledgeBase.setId(8L);
         knowledgeBase.setEmbeddingModelId(3L);
 
-        when(modelService.resolveEmbeddingModelDescriptor(3L))
-                .thenReturn(new EmbeddingModelDescriptor(3L, "text-embedding-v3", "BAILIAN", "阿里百炼"));
+        when(modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(3L))
+                .thenReturn(new EmbeddingModelDescriptor(3L, "text-embedding-v3", "BAILIAN", "阿里百炼", EmbeddingExecutionMode.SYNC_TEXT));
         when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(embeddingModelClient);
         when(embeddingModelClient.embed(eq("text-embedding-v3"), anyList()))
                 .thenAnswer(invocation -> {

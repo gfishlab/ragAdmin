@@ -7,6 +7,7 @@ import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -90,8 +91,8 @@ class RetrievalServiceTest {
         ChunkEntity chunk3 = chunk(103L, 3, "第三段内容。");
 
         when(chunkVectorRefMapper.selectOne(any())).thenReturn(sampleRef);
-        when(modelService.resolveEmbeddingModelDescriptor(10L))
-                .thenReturn(new EmbeddingModelDescriptor(10L, "text-embedding-v3", "BAILIAN", "百炼"));
+        when(modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(10L))
+                .thenReturn(new EmbeddingModelDescriptor(10L, "text-embedding-v3", "BAILIAN", "百炼", EmbeddingExecutionMode.SYNC_TEXT));
         when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(new EmbeddingModelClient() {
             @Override
             public boolean supports(String providerCode) {

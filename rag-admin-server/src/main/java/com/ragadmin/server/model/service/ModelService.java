@@ -14,6 +14,7 @@ import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.dto.CreateModelRequest;
@@ -263,6 +264,25 @@ public class ModelService {
         return requireEmbeddingModelDescriptor(modelId);
     }
 
+    public EmbeddingModelDescriptor requireKnowledgeBaseEmbeddingModelDescriptor(Long modelId) {
+        EmbeddingModelDescriptor descriptor = requireEmbeddingModelDescriptor(modelId);
+        if (descriptor.executionMode() != EmbeddingExecutionMode.SYNC_TEXT) {
+            throw new BusinessException(
+                    "EMBEDDING_MODEL_EXECUTION_MODE_UNSUPPORTED",
+                    "当前知识库文档解析与检索链路仅支持同步文本 Embedding 模型；异步批量向量模型已预留接入扩展点，但暂未实现运行链路。",
+                    HttpStatus.BAD_REQUEST
+            );
+        }
+        return descriptor;
+    }
+
+    public EmbeddingModelDescriptor resolveKnowledgeBaseEmbeddingModelDescriptor(Long modelId) {
+        if (modelId == null) {
+            throw new BusinessException("EMBEDDING_MODEL_REQUIRED", "请先为知识库绑定向量模型", HttpStatus.BAD_REQUEST);
+        }
+        return requireKnowledgeBaseEmbeddingModelDescriptor(modelId);
+    }
+
     public ChatModelDescriptor requireChatModelDescriptor(Long modelId) {
         AiModelEntity model = requireModelWithCapability(modelId, "TEXT_GENERATION");
         AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
@@ -350,9 +370,16 @@ public class ModelService {
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "聊天能力可用");
             }
             if ("EMBEDDING".equals(capabilityType)) {
-                String modelCode = resolveEmbeddingModelCode(provider, model);
+                EmbeddingModelDescriptor descriptor = toEmbeddingDescriptor(model, provider);
+                if (descriptor.executionMode() != EmbeddingExecutionMode.SYNC_TEXT) {
+                    return new ModelCapabilityHealthResponse(
+                            capabilityType,
+                            "DOWN",
+                            "当前平台已登记异步批量向量模型，但尚未接入运行与探活链路"
+                    );
+                }
                 embeddingClientRegistry.getClient(provider.getProviderCode())
-                        .embed(modelCode, List.of("health check"));
+                        .embed(descriptor.modelCode(), List.of("health check"));
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "向量能力可用");
             }
             return new ModelCapabilityHealthResponse(capabilityType, "DOWN", "当前未实现该能力探活");
@@ -430,7 +457,7 @@ public class ModelService {
         }
         String resolvedModelCode = modelCode.trim();
         if ("EMBEDDING".equalsIgnoreCase(modelType) && "BAILIAN".equalsIgnoreCase(provider.getProviderCode())) {
-            return SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(resolvedModelCode);
+            return SpringAiModelSupport.normalizeSupportedDashScopeEmbeddingModel(resolvedModelCode);
         }
         return resolvedModelCode;
     }
@@ -551,15 +578,23 @@ public class ModelService {
                 model.getId(),
                 resolveEmbeddingModelCode(provider, model),
                 provider.getProviderCode(),
-                provider.getProviderName()
+                provider.getProviderName(),
+                resolveEmbeddingExecutionMode(provider, model)
         );
     }
 
     private String resolveEmbeddingModelCode(AiProviderEntity provider, AiModelEntity model) {
         if ("BAILIAN".equalsIgnoreCase(provider.getProviderCode())) {
-            return SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(model.getModelCode());
+            return SpringAiModelSupport.normalizeSupportedDashScopeEmbeddingModel(model.getModelCode());
         }
         return model.getModelCode();
+    }
+
+    private EmbeddingExecutionMode resolveEmbeddingExecutionMode(AiProviderEntity provider, AiModelEntity model) {
+        if ("BAILIAN".equalsIgnoreCase(provider.getProviderCode())) {
+            return SpringAiModelSupport.resolveDashScopeEmbeddingExecutionMode(model.getModelCode());
+        }
+        return EmbeddingExecutionMode.SYNC_TEXT;
     }
 
     private ModelResponse toResponse(

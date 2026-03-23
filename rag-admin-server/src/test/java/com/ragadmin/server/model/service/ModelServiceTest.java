@@ -7,6 +7,7 @@ import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
+import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.dto.CreateModelRequest;
@@ -202,6 +203,7 @@ class ModelServiceTest {
         assertEquals("nomic-embed-text", descriptor.modelCode());
         assertEquals("OLLAMA", descriptor.providerCode());
         assertEquals("Ollama", descriptor.providerName());
+        assertEquals(EmbeddingExecutionMode.SYNC_TEXT, descriptor.executionMode());
     }
 
     @Test
@@ -227,7 +229,7 @@ class ModelServiceTest {
         );
 
         assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
-        assertTrue(exception.getMessage().contains("text-embedding-v3"));
+        assertTrue(exception.getMessage().contains("input.url"));
     }
 
     @Test
@@ -254,6 +256,81 @@ class ModelServiceTest {
 
         assertEquals("EMBEDDING_MODEL_UNSUPPORTED", exception.getCode());
         verify(aiModelMapper, never()).insert(any(AiModelEntity.class));
+    }
+
+    @Test
+    void shouldAllowDashScopeAsyncEmbeddingModelWhenCreating() {
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(72L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        CreateModelRequest request = new CreateModelRequest();
+        request.setProviderId(72L);
+        request.setModelCode(" text-embedding-async-v2 ");
+        request.setModelName("通义异步文本向量");
+        request.setCapabilityTypes(List.of("EMBEDDING"));
+        request.setModelType("EMBEDDING");
+        request.setStatus("ENABLED");
+
+        when(modelProviderService.requireProvider(72L)).thenReturn(provider);
+        doAnswer(invocation -> {
+            AiModelEntity entity = invocation.getArgument(0);
+            entity.setId(172L);
+            return 1;
+        }).when(aiModelMapper).insert(any(AiModelEntity.class));
+
+        ModelResponse response = modelService.create(request);
+
+        assertEquals("text-embedding-async-v2", response.modelCode());
+    }
+
+    @Test
+    void shouldReturnAsyncBatchDescriptorForDashScopeAsyncEmbeddingModel() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(73L);
+        model.setProviderId(173L);
+        model.setModelCode("text-embedding-async-v2");
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(173L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        when(aiModelMapper.selectById(73L)).thenReturn(model);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(73L)))
+                .thenReturn(List.of(capability(73L, "EMBEDDING")));
+        when(aiProviderMapper.selectById(173L)).thenReturn(provider);
+
+        EmbeddingModelDescriptor descriptor = modelService.requireEmbeddingModelDescriptor(73L);
+
+        assertEquals("text-embedding-async-v2", descriptor.modelCode());
+        assertEquals(EmbeddingExecutionMode.ASYNC_BATCH, descriptor.executionMode());
+    }
+
+    @Test
+    void shouldRejectAsyncEmbeddingModelForKnowledgeBasePipeline() {
+        AiModelEntity model = new AiModelEntity();
+        model.setId(74L);
+        model.setProviderId(174L);
+        model.setModelCode("text-embedding-async-v2");
+
+        AiProviderEntity provider = new AiProviderEntity();
+        provider.setId(174L);
+        provider.setProviderCode("BAILIAN");
+        provider.setProviderName("百炼");
+
+        when(aiModelMapper.selectById(74L)).thenReturn(model);
+        when(aiModelCapabilityMapper.selectEnabledByModelIds(List.of(74L)))
+                .thenReturn(List.of(capability(74L, "EMBEDDING")));
+        when(aiProviderMapper.selectById(174L)).thenReturn(provider);
+
+        BusinessException exception = assertThrows(
+                BusinessException.class,
+                () -> modelService.requireKnowledgeBaseEmbeddingModelDescriptor(74L)
+        );
+
+        assertEquals("EMBEDDING_MODEL_EXECUTION_MODE_UNSUPPORTED", exception.getCode());
     }
 
     @Test

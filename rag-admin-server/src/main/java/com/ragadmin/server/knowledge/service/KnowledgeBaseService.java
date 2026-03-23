@@ -121,7 +121,7 @@ public class KnowledgeBaseService {
         if (request.getEmbeddingModelId() == null) {
             throw new BusinessException("KB_EMBEDDING_MODEL_REQUIRED", "知识库必须绑定一个向量模型", HttpStatus.BAD_REQUEST);
         }
-        modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
+        modelService.requireKnowledgeBaseEmbeddingModelDescriptor(request.getEmbeddingModelId());
 
         KnowledgeBaseEntity entity = new KnowledgeBaseEntity();
         entity.setKbCode(request.getKbCode());
@@ -149,7 +149,7 @@ public class KnowledgeBaseService {
         if (request.getEmbeddingModelId() == null) {
             throw new BusinessException("KB_EMBEDDING_MODEL_REQUIRED", "知识库必须绑定一个向量模型", HttpStatus.BAD_REQUEST);
         }
-        modelService.requireEmbeddingModelDescriptor(request.getEmbeddingModelId());
+        modelService.requireKnowledgeBaseEmbeddingModelDescriptor(request.getEmbeddingModelId());
 
         entity.setKbCode(request.getKbCode());
         entity.setKbName(request.getKbName());

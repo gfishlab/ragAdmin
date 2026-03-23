@@ -47,7 +47,7 @@ public class ChunkVectorizationService {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        EmbeddingModelDescriptor descriptor = modelService.resolveEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
+        EmbeddingModelDescriptor descriptor = modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
         EmbeddingModelClient client = embeddingClientRegistry.getClient(descriptor.providerCode());
         List<List<Float>> embeddings = java.util.stream.IntStream.iterate(0, index -> index < chunks.size(), index -> index + EMBEDDING_BATCH_SIZE)
                 .mapToObj(start -> embedBatch(client, descriptor.modelCode(), chunks, start))
