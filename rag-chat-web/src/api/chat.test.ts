@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
-import { streamChatMessage } from '@/api/chat'
+import { resolveChatStreamError, streamChatMessage } from '@/api/chat'
 import { getAccessToken } from '@/utils/token-storage'
 
 vi.mock('@microsoft/fetch-event-source', () => ({
@@ -158,5 +158,13 @@ describe('streamChatMessage', () => {
       errorMessage: null,
     })
     expect(onError).not.toHaveBeenCalled()
+  })
+
+  it('应将供应商欠费错误转换为友好提示', () => {
+    const message = resolveChatStreamError(new Error(
+      '400 - {"code":"Arrearage","message":"Access denied, please make sure your account is in good standing. For details, see: https://help.aliyun.com/zh/model-studio/error-code#overdue-payment"}',
+    ))
+
+    expect(message).toBe('当前模型提供方账户可能已欠费或额度异常，请联系管理员处理后重试。')
   })
 })

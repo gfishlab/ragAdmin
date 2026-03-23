@@ -1,6 +1,7 @@
 package com.ragadmin.server.infra.ai.embedding;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.infra.ai.SpringAiModelFactory;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import org.springframework.ai.embedding.Embedding;
@@ -30,15 +31,19 @@ public class BailianEmbeddingClient implements EmbeddingModelClient {
 
     @Override
     public List<List<Float>> embed(String modelCode, List<String> inputs) {
-        String resolvedModelCode = SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(modelCode);
-        EmbeddingResponse response = springAiModelFactory.createEmbeddingModel("BAILIAN", resolvedModelCode)
-                .call(new EmbeddingRequest(inputs, null));
-        if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
-            throw new BusinessException("EMBEDDING_FAILED", "百炼 Embedding 返回为空", HttpStatus.BAD_GATEWAY);
+        try {
+            String resolvedModelCode = SpringAiModelSupport.requireSupportedDashScopeTextEmbeddingModel(modelCode);
+            EmbeddingResponse response = springAiModelFactory.createEmbeddingModel("BAILIAN", resolvedModelCode)
+                    .call(new EmbeddingRequest(inputs, null));
+            if (response == null || response.getResults() == null || response.getResults().isEmpty()) {
+                throw new BusinessException("EMBEDDING_FAILED", "百炼 Embedding 返回为空", HttpStatus.BAD_GATEWAY);
+            }
+            return response.getResults().stream()
+                    .sorted(Comparator.comparingInt(Embedding::getIndex))
+                    .map(embedding -> SpringAiModelSupport.toFloatList(embedding.getOutput()))
+                    .toList();
+        } catch (Exception ex) {
+            throw AiProviderExceptionSupport.toBusinessException(ex, "EMBEDDING_PROVIDER_UNAVAILABLE", "向量检索模型");
         }
-        return response.getResults().stream()
-                .sorted(Comparator.comparingInt(Embedding::getIndex))
-                .map(embedding -> SpringAiModelSupport.toFloatList(embedding.getOutput()))
-                .toList();
     }
 }

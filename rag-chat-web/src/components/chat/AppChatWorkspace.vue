@@ -316,6 +316,14 @@ const pendingStreamRecoveryNotice = computed<StreamRecoveryNotice | null>(() => 
     }
   }
 
+  if (isProviderAccountIssueMessage(errorMessage)) {
+    return {
+      tone: 'model',
+      title: '模型账户异常',
+      description: '当前聊天模型或向量模型提供方账户可能已欠费或额度异常，需要管理员处理后才能恢复问答。',
+    }
+  }
+
   return {
     tone: 'model',
     title: '模型返回失败',
@@ -453,6 +461,10 @@ function closeStream(): void {
 
 function isConnectionInterruptedMessage(message: string): boolean {
   return /流式连接已中断|连接已中断|网络|network|fetch|timeout|timed out|连接失败|断开/i.test(message)
+}
+
+function isProviderAccountIssueMessage(message: string): boolean {
+  return /欠费|额度异常|arrearage|overdue-payment|good standing/i.test(message)
 }
 
 function isSameNumberArray(left: number[], right: number[]): boolean {

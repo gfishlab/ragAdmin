@@ -43,6 +43,22 @@ interface StreamChatOptions {
   onError?: (error: unknown) => void
 }
 
+function normalizeChatErrorMessage(message: string): string {
+  const normalized = message.trim()
+  if (!normalized) {
+    return '请求失败，请稍后重试'
+  }
+  const lowered = normalized.toLowerCase()
+  if (
+    lowered.includes('arrearage')
+    || lowered.includes('overdue-payment')
+    || lowered.includes('good standing')
+  ) {
+    return '当前模型提供方账户可能已欠费或额度异常，请联系管理员处理后重试。'
+  }
+  return normalized
+}
+
 function normalizeAnswerContentType(value?: string | null): ChatContentType {
   return value === 'text/plain' ? 'text/plain' : 'text/markdown'
 }
@@ -141,12 +157,12 @@ export function streamChatMessage(
       const raw = await response.text()
       try {
         const errorPayload = JSON.parse(raw) as { message?: string }
-        throw new Error(errorPayload.message || raw || `流式问答失败，状态码 ${response.status}`)
+        throw new Error(normalizeChatErrorMessage(errorPayload.message || raw || `流式问答失败，状态码 ${response.status}`))
       } catch (error) {
         if (error instanceof Error) {
           throw error
         }
-        throw new Error(raw || `流式问答失败，状态码 ${response.status}`)
+        throw new Error(normalizeChatErrorMessage(raw || `流式问答失败，状态码 ${response.status}`))
       }
     },
     onmessage(message) {
@@ -183,5 +199,5 @@ export function streamChatMessage(
 }
 
 export function resolveChatStreamError(error: unknown): string {
-  return resolveErrorMessage(error)
+  return normalizeChatErrorMessage(resolveErrorMessage(error))
 }

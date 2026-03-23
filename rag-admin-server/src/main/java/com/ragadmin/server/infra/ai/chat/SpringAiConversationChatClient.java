@@ -1,6 +1,7 @@
 package com.ragadmin.server.infra.ai.chat;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.infra.ai.SpringAiModelFactory;
 import com.ragadmin.server.infra.ai.SpringAiModelSupport;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -46,14 +47,17 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
             List<ChatPromptMessage> promptMessages
     ) {
         validatePromptMessages(promptMessages);
-
-        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
-        ChatClient chatClient = buildStatelessChatClient(chatModel);
-        ChatResponse response = chatClient.prompt()
-                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
-                .call()
-                .chatResponse();
-        return SpringAiModelSupport.toChatCompletionResult(response);
+        try {
+            var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+            ChatClient chatClient = buildStatelessChatClient(chatModel);
+            ChatResponse response = chatClient.prompt()
+                    .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                    .call()
+                    .chatResponse();
+            return SpringAiModelSupport.toChatCompletionResult(response);
+        } catch (Exception ex) {
+            throw AiProviderExceptionSupport.toBusinessException(ex, "CHAT_PROVIDER_UNAVAILABLE", "聊天模型");
+        }
     }
 
     @Override
@@ -67,13 +71,16 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
         if (responseType == null) {
             throw new BusinessException("CHAT_RESPONSE_TYPE_EMPTY", "结构化输出目标类型不能为空", HttpStatus.BAD_REQUEST);
         }
-
-        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
-        ChatClient chatClient = buildStatelessChatClient(chatModel);
-        return chatClient.prompt()
-                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
-                .call()
-                .entity(responseType);
+        try {
+            var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+            ChatClient chatClient = buildStatelessChatClient(chatModel);
+            return chatClient.prompt()
+                    .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                    .call()
+                    .entity(responseType);
+        } catch (Exception ex) {
+            throw AiProviderExceptionSupport.toBusinessException(ex, "CHAT_PROVIDER_UNAVAILABLE", "聊天模型");
+        }
     }
 
     @Override
@@ -91,16 +98,19 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
 
         // 已有历史业务消息的旧会话首次切到 memory 链路时，需要先补种，避免上下文突然丢失。
         seedConversationMemoryIfNecessary(conversationId, historyMessages);
-
-        var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
-        ChatClient chatClient = buildChatClient(chatModel);
-        var response = chatClient.prompt()
-                .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
-                .advisors(spec -> spec
-                        .param(ChatMemory.CONVERSATION_ID, conversationId))
-                .call()
-                .chatResponse();
-        return SpringAiModelSupport.toChatCompletionResult(response);
+        try {
+            var chatModel = springAiModelFactory.createChatModel(providerCode, modelCode);
+            ChatClient chatClient = buildChatClient(chatModel);
+            var response = chatClient.prompt()
+                    .messages(SpringAiModelSupport.toSpringMessages(promptMessages))
+                    .advisors(spec -> spec
+                            .param(ChatMemory.CONVERSATION_ID, conversationId))
+                    .call()
+                    .chatResponse();
+            return SpringAiModelSupport.toChatCompletionResult(response);
+        } catch (Exception ex) {
+            throw AiProviderExceptionSupport.toBusinessException(ex, "CHAT_PROVIDER_UNAVAILABLE", "聊天模型");
+        }
     }
 
     @Override
@@ -125,7 +135,12 @@ public class SpringAiConversationChatClient implements ConversationChatClient {
                 .advisors(spec -> spec
                         .param(ChatMemory.CONVERSATION_ID, conversationId))
                 .stream()
-                .chatResponse();
+                .chatResponse()
+                .onErrorMap(ex -> AiProviderExceptionSupport.toBusinessException(
+                        ex,
+                        "CHAT_PROVIDER_UNAVAILABLE",
+                        "聊天模型"
+                ));
     }
 
     ChatClient buildChatClient(org.springframework.ai.chat.model.ChatModel chatModel) {

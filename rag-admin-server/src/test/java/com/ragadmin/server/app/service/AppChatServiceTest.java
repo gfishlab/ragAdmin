@@ -603,6 +603,49 @@ class AppChatServiceTest {
     }
 
     @Test
+    void shouldReturnFriendlyErrorEventWhenKnowledgeBaseRetrievalProviderAccountIssue() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(602L);
+        session.setKbId(8L);
+        session.setUserId(8101L);
+        session.setSceneType(ChatSceneTypes.KNOWLEDGE_BASE);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("典型相关分析 (Canonical-Correlation Analysis, CCA)");
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                901L,
+                "qwen-max",
+                "BAILIAN",
+                "百炼"
+        );
+        KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
+        knowledgeBase.setId(8L);
+
+        when(chatSessionMapper.selectById(602L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(modelService.resolveChatModelDescriptor(null)).thenReturn(modelDescriptor);
+        when(knowledgeBaseService.requireById(8L)).thenReturn(knowledgeBase);
+        when(retrievalService.retrieveAcrossKnowledgeBases(
+                List.of(knowledgeBase),
+                "典型相关分析 (Canonical-Correlation Analysis, CCA)"
+        )).thenThrow(new RuntimeException("""
+                400 - {"code":"Arrearage","message":"Access denied, please make sure your account is in good standing. For details, see: https://help.aliyun.com/zh/model-studio/error-code#overdue-payment"}
+                """));
+
+        List<ChatStreamEventResponse> events = appChatService.streamChat(602L, request, user(8101L))
+                .collectList()
+                .block();
+
+        assertNotNull(events);
+        assertEquals(1, events.size());
+        assertEquals("ERROR", events.getFirst().eventType());
+        assertEquals("当前问答服务提供方账户可能已欠费或额度异常，请联系管理员处理后重试。", events.getFirst().errorMessage());
+    }
+
+    @Test
     void shouldIgnoreEmptyStreamChunkAndStillCompleteInAppChat() {
         ChatSessionEntity session = new ChatSessionEntity();
         session.setId(601L);

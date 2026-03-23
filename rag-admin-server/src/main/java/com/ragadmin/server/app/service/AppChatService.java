@@ -43,6 +43,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
+import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchSnippet;
@@ -642,8 +643,7 @@ public class AppChatService {
     }
 
     private String resolveStreamErrorMessage(Throwable ex) {
-        String message = ex.getMessage();
-        return StringUtils.hasText(message) ? message : "流式问答失败";
+        return AiProviderExceptionSupport.resolveUserMessage(ex, "问答服务");
     }
 
     private com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse toMetadataResponse(ChatMessageEntity message) {

@@ -1,5 +1,6 @@
 package com.ragadmin.server.infra.ai.chat;
 
+import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -55,14 +56,25 @@ public class DefaultChatExecutionPlanningService implements ChatExecutionPlannin
             logPlan(request, plan);
             return plan;
         } catch (Exception ex) {
-            log.warn(
-                    "问答规划模型调用失败，已回退规则规划，providerCode={}, modelCode={}, retrievalAvailable={}, webSearchAvailable={}",
-                    request.providerCode(),
-                    request.modelCode(),
-                    request.retrievalAvailable(),
-                    request.webSearchAvailable(),
-                    ex
-            );
+            if (AiProviderExceptionSupport.isProviderAccountIssue(ex)) {
+                log.warn(
+                        "问答规划模型调用失败，已回退规则规划，providerCode={}, modelCode={}, retrievalAvailable={}, webSearchAvailable={}, reason={}",
+                        request.providerCode(),
+                        request.modelCode(),
+                        request.retrievalAvailable(),
+                        request.webSearchAvailable(),
+                        AiProviderExceptionSupport.summarize(ex)
+                );
+            } else {
+                log.warn(
+                        "问答规划模型调用失败，已回退规则规划，providerCode={}, modelCode={}, retrievalAvailable={}, webSearchAvailable={}",
+                        request.providerCode(),
+                        request.modelCode(),
+                        request.retrievalAvailable(),
+                        request.webSearchAvailable(),
+                        ex
+                );
+            }
             logPlan(request, fallbackPlan);
             return fallbackPlan;
         }
