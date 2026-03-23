@@ -46,6 +46,7 @@ export function useModelManagement() {
   const modelLoading = ref(false)
   const modelSubmitting = ref(false)
   const batchDeleteSubmitting = ref(false)
+  const batchDeleteResultDialogVisible = ref(false)
   const modelDialogVisible = ref(false)
   const modelDialogMode = ref<'create' | 'edit'>('create')
   const editingModelId = ref<number | null>(null)
@@ -57,6 +58,7 @@ export function useModelManagement() {
   const activeModelHealthId = ref<number | null>(null)
   const modelLoadError = ref('')
   const modelDialogDraft = ref<ModelCreateRequest>(createEmptyModelForm())
+  const batchDeleteResult = ref<ModelBatchDeleteResult | null>(null)
 
   const pagination = reactive({
     pageNo: 1,
@@ -336,13 +338,8 @@ export function useModelManagement() {
       }
 
       await loadModels()
-
-      if (response.failedCount === 0) {
-        ElMessage.success(`已删除 ${response.successCount} 个模型`)
-        return
-      }
-
-      ElMessage.warning(buildBatchDeleteSummary(response))
+      batchDeleteResult.value = response
+      batchDeleteResultDialogVisible.value = true
     } finally {
       batchDeleteSubmitting.value = false
     }
@@ -404,6 +401,7 @@ export function useModelManagement() {
     modelLoading,
     modelSubmitting,
     batchDeleteSubmitting,
+    batchDeleteResultDialogVisible,
     modelDialogVisible,
     modelDialogMode,
     editingModelId,
@@ -415,6 +413,7 @@ export function useModelManagement() {
     activeModelHealthId,
     modelLoadError,
     modelDialogDraft,
+    batchDeleteResult,
     pagination,
     modelQuery,
     hasModelData,
@@ -445,15 +444,4 @@ export function useModelManagement() {
     handleCurrentChange,
     handleSizeChange,
   }
-}
-
-function buildBatchDeleteSummary(result: ModelBatchDeleteResult): string {
-  if (result.failedCount === 0) {
-    return `已删除 ${result.successCount} 个模型`
-  }
-  const detail = result.failedItems
-    .slice(0, 2)
-    .map((item) => `${item.modelName}：${item.message}`)
-    .join('；')
-  return `批量删除完成，成功 ${result.successCount} 个，失败 ${result.failedCount} 个${detail ? `。${detail}` : ''}`
 }
