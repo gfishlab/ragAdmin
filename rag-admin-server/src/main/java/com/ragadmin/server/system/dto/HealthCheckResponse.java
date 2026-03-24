@@ -8,6 +8,7 @@ public record HealthCheckResponse(
         DependencyHealthResponse bailian,
         DependencyHealthResponse ollama,
         DependencyHealthResponse milvus,
+        DependencyHealthResponse tavily,
         DependencyHealthResponse ocr
 ) {
 }

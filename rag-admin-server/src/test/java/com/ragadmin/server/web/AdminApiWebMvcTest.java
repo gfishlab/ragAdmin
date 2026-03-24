@@ -530,6 +530,7 @@ class AdminApiWebMvcTest {
                 new DependencyHealthResponse("UP", "百炼正常"),
                 new DependencyHealthResponse("UP", "Ollama 正常"),
                 new DependencyHealthResponse("UP", "Milvus 正常"),
+                new DependencyHealthResponse("UP", "Tavily 已就绪"),
                 new DependencyHealthResponse("UNKNOWN", "OCR 已禁用")
         ));
 
@@ -540,7 +541,8 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.status").value("UP"))
                 .andExpect(jsonPath("$.data.postgres.status").value("UP"))
                 .andExpect(jsonPath("$.data.bailian.status").value("UP"))
-                .andExpect(jsonPath("$.data.milvus.status").value("UP"));
+                .andExpect(jsonPath("$.data.milvus.status").value("UP"))
+                .andExpect(jsonPath("$.data.tavily.status").value("UP"));
     }
 
     @Test

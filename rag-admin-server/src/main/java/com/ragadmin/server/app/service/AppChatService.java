@@ -46,6 +46,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
 import com.ragadmin.server.infra.ai.AiProviderExceptionSupport;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
+import com.ragadmin.server.infra.search.WebSearchProperties;
 import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -76,8 +77,6 @@ import java.util.stream.Collectors;
 public class AppChatService {
 
     private static final Logger log = LoggerFactory.getLogger(AppChatService.class);
-
-    private static final int WEB_SEARCH_TOP_K = 5;
 
     @Autowired
     private ChatSessionMapper chatSessionMapper;
@@ -135,6 +134,9 @@ public class AppChatService {
      */
     @Autowired(required = false)
     private WebSearchProvider webSearchProvider = new NoopWebSearchProvider();
+
+    @Autowired(required = false)
+    private WebSearchProperties webSearchProperties = new WebSearchProperties();
 
     @Transactional
     public AppChatSessionResponse createSession(AppCreateChatSessionRequest request, AuthenticatedUser user) {
@@ -602,26 +604,38 @@ public class AppChatService {
         if (snippets == null || snippets.isEmpty()) {
             return "";
         }
+        int maxChars = Math.max(200, webSearchProperties.getContextMaxChars());
         StringBuilder builder = new StringBuilder();
         for (int index = 0; index < snippets.size(); index++) {
             WebSearchSnippet snippet = snippets.get(index);
             if (snippet == null) {
                 continue;
             }
-            builder.append("结果").append(index + 1).append("：\n");
+            StringBuilder sectionBuilder = new StringBuilder();
+            sectionBuilder.append("结果").append(index + 1).append("：\n");
             if (StringUtils.hasText(snippet.title())) {
-                builder.append("标题：").append(snippet.title()).append("\n");
+                sectionBuilder.append("标题：").append(snippet.title()).append("\n");
             }
             if (StringUtils.hasText(snippet.snippet())) {
-                builder.append("摘要：").append(snippet.snippet()).append("\n");
+                sectionBuilder.append("摘要：").append(snippet.snippet()).append("\n");
             }
             if (StringUtils.hasText(snippet.url())) {
-                builder.append("链接：").append(snippet.url()).append("\n");
+                sectionBuilder.append("链接：").append(snippet.url()).append("\n");
             }
             if (snippet.publishedAt() != null) {
-                builder.append("时间：").append(snippet.publishedAt()).append("\n");
+                sectionBuilder.append("时间：").append(snippet.publishedAt()).append("\n");
             }
-            builder.append("\n");
+            sectionBuilder.append("\n");
+            String section = sectionBuilder.toString();
+            if (builder.length() + section.length() > maxChars) {
+                int remain = maxChars - builder.length();
+                if (remain <= 0) {
+                    break;
+                }
+                builder.append(abbreviateForContext(section, remain));
+                break;
+            }
+            builder.append(section);
         }
         return builder.toString().trim();
     }
@@ -689,6 +703,14 @@ public class AppChatService {
                 effectiveSelectedKbIds.size(),
                 ChatSceneTypes.KNOWLEDGE_BASE.equals(sceneType)
         ));
+        logWebSearchDecision(
+                session.getId(),
+                sceneType,
+                requestedWebSearchEnabled,
+                effectiveWebSearchAvailable,
+                executionPlan.needWebSearch(),
+                executionPlan.webSearchQuery()
+        );
 
         List<WebSearchSnippet> webSearchSnippets = loadWebSearchSnippets(
                 executionPlan.webSearchQuery(),
@@ -912,19 +934,88 @@ public class AppChatService {
         if (!webSearchEnabled || !StringUtils.hasText(question)) {
             return List.of();
         }
+        int resolvedTopK = resolveWebSearchTopK();
+        long startNanos = System.nanoTime();
         try {
-            List<WebSearchSnippet> snippets = webSearchProvider.search(question, WEB_SEARCH_TOP_K);
-            return snippets == null ? List.of() : snippets.stream().filter(Objects::nonNull).toList();
+            List<WebSearchSnippet> snippets = webSearchProvider.search(question, resolvedTopK);
+            List<WebSearchSnippet> safeSnippets = snippets == null ? List.of() : snippets.stream().filter(Objects::nonNull).toList();
+            log.info(
+                    "前台联网搜索摘要已加载，query={}, queryLength={}, topK={}, resultCount={}, latencyMs={}",
+                    abbreviateForLog(question),
+                    question.trim().length(),
+                    resolvedTopK,
+                    safeSnippets.size(),
+                    (System.nanoTime() - startNanos) / 1_000_000
+            );
+            return safeSnippets;
         } catch (Exception ex) {
-            log.warn("联网搜索已降级为空结果，question={}", question, ex);
+            log.warn(
+                    "前台联网搜索已降级为空结果，query={}, queryLength={}, topK={}, reason={}",
+                    abbreviateForLog(question),
+                    question.trim().length(),
+                    resolvedTopK,
+                    ex.getClass().getSimpleName(),
+                    ex
+            );
             return List.of();
         }
     }
 
     private boolean isWebSearchAvailable(Boolean requestedWebSearchEnabled) {
-        return Boolean.TRUE.equals(requestedWebSearchEnabled)
+        boolean available = Boolean.TRUE.equals(requestedWebSearchEnabled)
                 && webSearchProvider != null
                 && webSearchProvider.isAvailable();
+        if (Boolean.TRUE.equals(requestedWebSearchEnabled) && !available) {
+            log.info("前台联网搜索当前不可用，reason=provider_unavailable");
+        }
+        return available;
+    }
+
+    private int resolveWebSearchTopK() {
+        return Math.max(1, webSearchProperties.getDefaultTopK());
+    }
+
+    private void logWebSearchDecision(
+            Long sessionId,
+            String sceneType,
+            Boolean requestedWebSearchEnabled,
+            boolean providerAvailable,
+            boolean needWebSearch,
+            String webSearchQuery
+    ) {
+        if (!Boolean.TRUE.equals(requestedWebSearchEnabled)) {
+            return;
+        }
+        log.info(
+                "前台问答联网决策，sessionId={}, sceneType={}, providerAvailable={}, needWebSearch={}, searchQuery={}",
+                sessionId,
+                sceneType,
+                providerAvailable,
+                needWebSearch,
+                abbreviateForLog(webSearchQuery)
+        );
+    }
+
+    private String abbreviateForLog(String text) {
+        return abbreviate(text, Math.max(20, webSearchProperties.getLogQueryMaxChars()));
+    }
+
+    private String abbreviateForContext(String text, int maxChars) {
+        return abbreviate(text, Math.max(1, maxChars));
+    }
+
+    private String abbreviate(String text, int maxChars) {
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        String normalized = text.trim();
+        if (normalized.length() <= maxChars) {
+            return normalized;
+        }
+        if (maxChars <= 3) {
+            return normalized.substring(0, maxChars);
+        }
+        return normalized.substring(0, maxChars - 3) + "...";
     }
 
     private record PreparedChatExecution(

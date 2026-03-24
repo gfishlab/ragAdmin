@@ -6,6 +6,10 @@ import com.ragadmin.server.document.parser.OcrCapability;
 import com.ragadmin.server.document.parser.TesseractOcrService;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
+import com.ragadmin.server.infra.search.NoopWebSearchProvider;
+import com.ragadmin.server.infra.search.TavilyProperties;
+import com.ragadmin.server.infra.search.WebSearchProperties;
+import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.vector.MilvusProperties;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
@@ -49,10 +53,19 @@ public class SystemHealthService {
     private MilvusProperties milvusProperties;
 
     @Autowired
+    private WebSearchProperties webSearchProperties;
+
+    @Autowired
+    private TavilyProperties tavilyProperties;
+
+    @Autowired
     private TesseractOcrService tesseractOcrService;
 
     @Autowired
     private ChunkVectorRefMapper chunkVectorRefMapper;
+
+    @Autowired(required = false)
+    private WebSearchProvider webSearchProvider = new NoopWebSearchProvider();
 
     public HealthCheckResponse check() {
         DependencyHealthResponse postgres = checkPostgres();
@@ -61,9 +74,10 @@ public class SystemHealthService {
         DependencyHealthResponse bailian = checkBailian();
         DependencyHealthResponse ollama = checkOllama();
         DependencyHealthResponse milvus = checkMilvus();
+        DependencyHealthResponse tavily = checkTavily();
         DependencyHealthResponse ocr = checkOcr();
-        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, ocr) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, ocr);
+        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, tavily, ocr) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, tavily, ocr);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -207,6 +221,25 @@ public class SystemHealthService {
         } catch (Exception ex) {
             return new DependencyHealthResponse("DOWN", buildMessage("Milvus 检查失败", ex));
         }
+    }
+
+    private DependencyHealthResponse checkTavily() {
+        if (!webSearchProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "联网搜索已全局禁用");
+        }
+        if (!tavilyProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "Tavily 已禁用");
+        }
+        if (!StringUtils.hasText(tavilyProperties.getBaseUrl())) {
+            return new DependencyHealthResponse("UNKNOWN", "Tavily 未配置地址");
+        }
+        if (!StringUtils.hasText(tavilyProperties.getApiKey())) {
+            return new DependencyHealthResponse("UNKNOWN", "Tavily 未配置 API Key");
+        }
+        if (webSearchProvider != null && webSearchProvider.isAvailable()) {
+            return new DependencyHealthResponse("UP", "Tavily 配置已就绪");
+        }
+        return new DependencyHealthResponse("DOWN", "Tavily Provider 未就绪");
     }
 
     private DependencyHealthResponse checkOcr() {

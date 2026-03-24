@@ -17,7 +17,7 @@ public class NoopWebSearchProvider implements WebSearchProvider {
     @Override
     public List<WebSearchSnippet> search(String query, int topK) {
         if (StringUtils.hasText(query)) {
-            log.debug("联网搜索已跳过，当前未配置真实搜索提供方，query={}, topK={}", query, topK);
+            log.info("联网搜索已跳过，provider=noop，queryLength={}, topK={}", query.trim().length(), topK);
         }
         return List.of();
     }

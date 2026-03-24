@@ -100,6 +100,13 @@ rag:
     max-context-chunks: 5
     max-context-chars: 4000
     reference-snippet-chars: 200
+  search:
+    enabled: true
+    default-top-k: 5
+    context-max-chars: 2000
+    log-query-max-chars: 120
+    result-title-max-chars: 120
+    result-snippet-max-chars: 320
   chat:
     memory:
       max-messages: 20

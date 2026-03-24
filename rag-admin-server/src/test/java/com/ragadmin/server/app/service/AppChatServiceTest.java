@@ -35,6 +35,7 @@ import com.ragadmin.server.infra.ai.chat.ConversationIdCodec;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryManager;
 import com.ragadmin.server.infra.ai.chat.ConversationMemoryRefreshDispatcher;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
+import com.ragadmin.server.infra.search.WebSearchProperties;
 import com.ragadmin.server.infra.search.WebSearchProvider;
 import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
@@ -501,6 +502,82 @@ class AppChatServiceTest {
         assertTrue(promptMessages.get(1).content().contains("联网搜索摘要"));
         assertTrue(promptMessages.get(1).content().contains("行业快讯"));
         assertTrue(promptMessages.get(1).content().contains("https://example.com/news"));
+    }
+
+    @Test
+    void shouldUseConfiguredTopKWhenWebSearchEnabled() {
+        ChatSessionEntity session = new ChatSessionEntity();
+        session.setId(521L);
+        session.setUserId(6021L);
+        session.setSceneType(ChatSceneTypes.GENERAL);
+        session.setTerminalType(ChatTerminalTypes.APP);
+        session.setSessionName("首页会话");
+        session.setStatus("ENABLED");
+
+        AppChatRequest request = new AppChatRequest();
+        request.setQuestion("帮我看看今天有哪些重要动态");
+        request.setChatModelId(921L);
+        request.setWebSearchEnabled(Boolean.TRUE);
+
+        ModelService.ChatModelDescriptor modelDescriptor = new ModelService.ChatModelDescriptor(
+                921L,
+                "qwen-plus",
+                "BAILIAN",
+                "百炼"
+        );
+        WebSearchProperties properties = new WebSearchProperties();
+        properties.setDefaultTopK(2);
+        properties.setContextMaxChars(40);
+        ReflectionTestUtils.setField(appChatService, "webSearchProperties", properties);
+
+        when(chatSessionMapper.selectById(521L)).thenReturn(session);
+        when(chatSessionKnowledgeBaseRelMapper.selectList(any())).thenReturn(List.of());
+        when(modelService.resolveChatModelDescriptor(921L)).thenReturn(modelDescriptor);
+        when(webSearchProvider.search("帮我看看今天有哪些重要动态", 2)).thenReturn(List.of(
+                new WebSearchSnippet(
+                        "结果一",
+                        "这是一段很长很长的联网摘要，用来验证 prompt 在进入模型前会被裁剪，不会无限膨胀。",
+                        "https://example.com/one",
+                        null
+                ),
+                new WebSearchSnippet(
+                        "结果二",
+                        "第二段联网摘要理论上会被整体上下文长度限制裁掉。",
+                        "https://example.com/two",
+                        null
+                )
+        ));
+        when(conversationChatClient.chat(eq("BAILIAN"), eq("qwen-plus"), any(), any(), any()))
+                .thenReturn(new ChatCompletionResult("建议先关注第一条重要动态。", 64, 18));
+        when(chatExchangePersistenceService.persistExchange(
+                eq(session),
+                eq(6021L),
+                eq("帮我看看今天有哪些重要动态"),
+                eq("建议先关注第一条重要动态。"),
+                eq(921L),
+                eq(64),
+                eq(18),
+                anyInt(),
+                any(),
+                any(RetrievalService.RetrievalResult.class)
+        )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
+                1021L,
+                "建议先关注第一条重要动态。",
+                "text/markdown",
+                List.of(),
+                new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18),
+                null
+        ));
+
+        appChatService.chat(521L, request, user(6021L));
+
+        @SuppressWarnings("unchecked")
+        ArgumentCaptor<List<ChatPromptMessage>> promptCaptor = ArgumentCaptor.forClass(List.class);
+        verify(conversationChatClient).chat(eq("BAILIAN"), eq("qwen-plus"), any(), promptCaptor.capture(), any());
+        verify(webSearchProvider).search("帮我看看今天有哪些重要动态", 2);
+        String userPrompt = promptCaptor.getValue().get(1).content();
+        assertTrue(userPrompt.contains("联网搜索摘要"));
+        assertTrue(userPrompt.contains("结果一"));
     }
 
     @Test
