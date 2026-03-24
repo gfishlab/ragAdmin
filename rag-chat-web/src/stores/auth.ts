@@ -24,10 +24,6 @@ function parseStoredUser(): CurrentUser | null {
   }
 }
 
-function hasPortalCapabilities(user: CurrentUser | null): user is CurrentUser {
-  return user !== null && typeof user.webSearchAvailable === 'boolean'
-}
-
 export const useAuthStore = defineStore('app-auth', () => {
   const accessToken = ref(getAccessToken())
   const refreshToken = ref(getRefreshToken())
@@ -69,11 +65,8 @@ export const useAuthStore = defineStore('app-auth', () => {
       bootstrapFinished.value = true
       return
     }
-    if (hasPortalCapabilities(currentUser.value)) {
-      bootstrapFinished.value = true
-      return
-    }
     try {
+      // 联网能力、角色等前台能力可能在服务端运行时调整，启动时仍要主动刷新一次当前用户。
       currentUser.value = await authApi.getCurrentUser()
       setCurrentUserRaw(JSON.stringify(currentUser.value))
     } catch {
