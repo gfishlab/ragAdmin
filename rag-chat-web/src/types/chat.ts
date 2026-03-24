@@ -14,6 +14,13 @@ export interface ChatReference {
   contentSnippet: string
 }
 
+export interface WebSearchSource {
+  title: string | null
+  url: string | null
+  publishedAt: string | null
+  snippet: string | null
+}
+
 export interface ChatUsage {
   promptTokens: number | null
   completionTokens: number | null
@@ -25,6 +32,7 @@ export interface ChatExchange {
   answerText: string
   answerContentType: ChatContentType
   references: ChatReference[]
+  webSearchSources: WebSearchSource[]
   feedbackType: ChatFeedbackType | null
   feedbackComment: string | null
   usage?: ChatUsage | null
@@ -72,6 +80,7 @@ export interface ChatResponse {
   answer: string
   answerContentType: ChatContentType
   references: ChatReference[]
+  webSearchSources: WebSearchSource[]
   usage: ChatUsage | null
 }
 
@@ -82,6 +91,7 @@ export interface ChatStreamEvent {
   answer: string | null
   answerContentType: ChatContentType | null
   references: ChatReference[] | null
+  webSearchSources: WebSearchSource[] | null
   usage: ChatUsage | null
   errorMessage: string | null
 }

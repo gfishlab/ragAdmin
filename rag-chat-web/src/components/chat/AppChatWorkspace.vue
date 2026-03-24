@@ -79,6 +79,7 @@ interface RegenerationSnapshot {
   answerText: string
   answerContentType: ChatContentType
   references: ChatReference[]
+  webSearchSources: ChatExchange['webSearchSources']
   usage: ChatExchange['usage']
   feedbackType: ChatFeedbackType | null
   feedbackComment: string | null
@@ -109,6 +110,7 @@ const streaming = ref(false)
 const sessionActionLoadingId = ref<number | null>(null)
 const feedbackSubmittingMessageIds = ref<number[]>([])
 const expandedReferenceMessageIds = ref<number[]>([])
+const expandedWebSearchSourceMessageIds = ref<number[]>([])
 const regeneratingMessageId = ref<number | null>(null)
 const knowledgeBasePickerVisible = ref(false)
 const modelPickerVisible = ref(false)
@@ -388,6 +390,7 @@ function resetPreferenceInputs(): void {
 
 function resetConversationViewState(): void {
   expandedReferenceMessageIds.value = []
+  expandedWebSearchSourceMessageIds.value = []
   regeneratingMessageId.value = null
   regenerationSnapshot = null
 }
@@ -770,11 +773,26 @@ function applyStreamComplete(question: string, event: ChatStreamEvent): void {
       answerText: event.answer ?? pendingExchange.value?.answer ?? '',
       answerContentType: event.answerContentType ?? pendingExchange.value?.answerContentType ?? 'text/markdown',
       references: event.references ?? [],
+      webSearchSources: event.webSearchSources ?? [],
       feedbackType: null,
       feedbackComment: null,
       usage: event.usage,
     },
   ]
+}
+
+function formatWebSearchPublishedAt(value: string | null): string {
+  if (!value) {
+    return '发布时间未知'
+  }
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) {
+    return value
+  }
+  return new Intl.DateTimeFormat('zh-CN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date)
 }
 
 // 统一收口问题发送入口，避免按钮点击事件对象误入字符串处理链路。
@@ -1103,6 +1121,18 @@ function toggleReferencePanel(messageId: number): void {
   expandedReferenceMessageIds.value = [...expandedReferenceMessageIds.value, messageId]
 }
 
+function isWebSearchSourceExpanded(messageId: number): boolean {
+  return expandedWebSearchSourceMessageIds.value.includes(messageId)
+}
+
+function toggleWebSearchSourcePanel(messageId: number): void {
+  if (isWebSearchSourceExpanded(messageId)) {
+    expandedWebSearchSourceMessageIds.value = expandedWebSearchSourceMessageIds.value.filter((id) => id !== messageId)
+    return
+  }
+  expandedWebSearchSourceMessageIds.value = [...expandedWebSearchSourceMessageIds.value, messageId]
+}
+
 function restoreRegenerationSnapshot(): void {
   if (!regenerationSnapshot) {
     regeneratingMessageId.value = null
@@ -1113,6 +1143,7 @@ function restoreRegenerationSnapshot(): void {
     targetMessage.answerText = regenerationSnapshot.answerText
     targetMessage.answerContentType = regenerationSnapshot.answerContentType
     targetMessage.references = [...regenerationSnapshot.references]
+    targetMessage.webSearchSources = [...regenerationSnapshot.webSearchSources]
     targetMessage.usage = regenerationSnapshot.usage
     targetMessage.feedbackType = regenerationSnapshot.feedbackType
     targetMessage.feedbackComment = regenerationSnapshot.feedbackComment
@@ -1143,6 +1174,7 @@ async function handleRegenerateMessage(message: ChatExchange): Promise<void> {
     answerText: targetMessage.answerText,
     answerContentType: targetMessage.answerContentType,
     references: [...targetMessage.references],
+    webSearchSources: [...targetMessage.webSearchSources],
     usage: targetMessage.usage,
     feedbackType: targetMessage.feedbackType,
     feedbackComment: targetMessage.feedbackComment,
@@ -1151,6 +1183,7 @@ async function handleRegenerateMessage(message: ChatExchange): Promise<void> {
   targetMessage.answerText = ''
   targetMessage.answerContentType = 'text/markdown'
   targetMessage.references = []
+  targetMessage.webSearchSources = []
   targetMessage.usage = null
   targetMessage.feedbackType = null
   targetMessage.feedbackComment = null
@@ -1182,6 +1215,7 @@ async function handleRegenerateMessage(message: ChatExchange): Promise<void> {
             currentMessage.answerText = event.answer ?? currentMessage.answerText
             currentMessage.answerContentType = event.answerContentType ?? currentMessage.answerContentType
             currentMessage.references = event.references ?? []
+            currentMessage.webSearchSources = event.webSearchSources ?? []
             currentMessage.usage = event.usage ?? null
             currentMessage.feedbackType = null
             currentMessage.feedbackComment = null
@@ -1677,6 +1711,16 @@ onUnmounted(() => {
                       <span>{{ isReferenceExpanded(message.id) ? '收起引用' : '查看引用' }}</span>
                       <strong>{{ message.references.length }}</strong>
                     </button>
+                    <button
+                      v-if="message.webSearchSources.length > 0"
+                      type="button"
+                      class="assistant-action assistant-reference-toggle"
+                      :disabled="streaming"
+                      @click="toggleWebSearchSourcePanel(message.id)"
+                    >
+                      <span>{{ isWebSearchSourceExpanded(message.id) ? '收起联网来源' : '查看联网来源' }}</span>
+                      <strong>{{ message.webSearchSources.length }}</strong>
+                    </button>
                   </div>
                   <div class="assistant-feedback">
                     <el-button
@@ -1728,6 +1772,41 @@ onUnmounted(() => {
                       @click="toggleReferencePanel(message.id)"
                     >
                       收起引用文件
+                    </button>
+                  </div>
+                </div>
+
+                <div
+                  v-if="message.webSearchSources.length > 0 && isWebSearchSourceExpanded(message.id)"
+                  class="web-search-source-block"
+                >
+                  <div
+                    v-for="(source, sourceIndex) in message.webSearchSources"
+                    :key="`${message.id}-${source.url ?? sourceIndex}`"
+                    class="web-search-source-item"
+                  >
+                    <div class="web-search-source-head">
+                      <strong>{{ source.title || '未命名网页来源' }}</strong>
+                      <span>{{ formatWebSearchPublishedAt(source.publishedAt) }}</span>
+                    </div>
+                    <p v-if="source.snippet">{{ source.snippet }}</p>
+                    <a
+                      v-if="source.url"
+                      class="web-search-source-link"
+                      :href="source.url"
+                      target="_blank"
+                      rel="noreferrer noopener"
+                    >
+                      {{ source.url }}
+                    </a>
+                  </div>
+                  <div class="reference-footer">
+                    <button
+                      type="button"
+                      class="reference-collapse-action"
+                      @click="toggleWebSearchSourcePanel(message.id)"
+                    >
+                      收起联网来源
                     </button>
                   </div>
                 </div>
@@ -2732,10 +2811,32 @@ onUnmounted(() => {
   background: rgba(243, 234, 222, 0.86);
 }
 
+.web-search-source-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid rgba(122, 89, 53, 0.1);
+}
+
+.web-search-source-item {
+  padding: 12px 14px;
+  border-radius: 16px;
+  background: rgba(248, 241, 232, 0.92);
+}
+
 .reference-head,
 .reference-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.web-search-source-head {
+  display: flex;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -2745,7 +2846,13 @@ onUnmounted(() => {
   color: var(--text-secondary);
 }
 
+.web-search-source-item p {
+  margin-top: 8px;
+  color: var(--text-secondary);
+}
+
 .reference-head span,
+.web-search-source-head span,
 .reference-meta,
 .feedback-hint,
 .message-usage,
@@ -2756,6 +2863,15 @@ onUnmounted(() => {
 
 .reference-actions {
   margin-top: 10px;
+}
+
+.web-search-source-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--brand-strong);
+  font-size: 12px;
+  line-height: 1.6;
+  word-break: break-all;
 }
 
 .reference-footer {

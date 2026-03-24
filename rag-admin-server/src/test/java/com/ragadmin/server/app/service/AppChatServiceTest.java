@@ -17,11 +17,13 @@ import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.entity.ChatSessionKnowledgeBaseRelEntity;
+import com.ragadmin.server.chat.entity.ChatWebSearchSourceEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionKnowledgeBaseRelMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
+import com.ragadmin.server.chat.mapper.ChatWebSearchSourceMapper;
 import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
@@ -89,6 +91,9 @@ class AppChatServiceTest {
 
     @Mock
     private ChatFeedbackMapper chatFeedbackMapper;
+
+    @Mock
+    private ChatWebSearchSourceMapper chatWebSearchSourceMapper;
 
     @Mock
     private KnowledgeBaseService knowledgeBaseService;
@@ -332,6 +337,7 @@ class AppChatServiceTest {
         appChatService.deleteSession(401L, user(5001L));
 
         verify(chatAnswerReferenceMapper).delete(any());
+        verify(chatWebSearchSourceMapper).delete(any());
         verify(chatFeedbackMapper).delete(any());
         verify(chatMessageMapper).delete(any());
         verify(chatSessionKnowledgeBaseRelMapper).delete(any());
@@ -356,10 +362,16 @@ class AppChatServiceTest {
         message.setAnswerConfidence("LOW");
         message.setHasKnowledgeBaseEvidence(Boolean.FALSE);
         message.setNeedFollowUp(Boolean.TRUE);
+        ChatWebSearchSourceEntity webSearchSource = new ChatWebSearchSourceEntity();
+        webSearchSource.setMessageId(801L);
+        webSearchSource.setTitle("待办清单");
+        webSearchSource.setSourceUrl("https://example.com/todo");
+        webSearchSource.setSnippet("这里列出了今天优先级最高的待办事项。");
 
         when(chatSessionMapper.selectById(450L)).thenReturn(session);
         when(chatMessageMapper.selectList(any())).thenReturn(List.of(message));
         when(chatAnswerReferenceMapper.selectList(any())).thenReturn(List.of());
+        when(chatWebSearchSourceMapper.selectList(any())).thenReturn(List.of(webSearchSource));
         when(chatFeedbackMapper.selectList(any())).thenReturn(List.of());
 
         List<ChatMessageResponse> messages = appChatService.listMessages(450L, user(5002L));
@@ -369,6 +381,8 @@ class AppChatServiceTest {
         assertEquals("LOW", messages.getFirst().metadata().confidence());
         assertEquals(false, messages.getFirst().metadata().hasKnowledgeBaseEvidence());
         assertEquals(true, messages.getFirst().metadata().needFollowUp());
+        assertEquals(1, messages.getFirst().webSearchSources().size());
+        assertEquals("https://example.com/todo", messages.getFirst().webSearchSources().getFirst().url());
         verify(chunkMapper, never()).selectBatchIds(any());
         verify(documentMapper, never()).selectBatchIds(any());
     }
@@ -414,11 +428,13 @@ class AppChatServiceTest {
                 eq(20),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1001L,
                 "建议先处理高优先级事项。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(80, 20),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("LOW", false, false)
@@ -483,11 +499,13 @@ class AppChatServiceTest {
                 eq(26),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1002L,
                 "可以重点关注智能体应用落地。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(96, 26),
                 null
@@ -559,11 +577,13 @@ class AppChatServiceTest {
                 eq(18),
                 anyInt(),
                 any(),
-                any(RetrievalService.RetrievalResult.class)
+                any(RetrievalService.RetrievalResult.class),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1021L,
                 "建议先关注第一条重要动态。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18),
                 null
@@ -618,11 +638,13 @@ class AppChatServiceTest {
                 eq(12),
                 anyInt(),
                 any(),
-                any(RetrievalService.RetrievalResult.class)
+                any(RetrievalService.RetrievalResult.class),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1020L,
                 "当前环境未接入联网搜索能力。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(48, 12),
                 null
@@ -706,11 +728,13 @@ class AppChatServiceTest {
                 eq(40),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 1003L,
                 "建议优先选择高频低风险场景，并关注近期行业落地案例。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 40),
                 null
@@ -819,11 +843,13 @@ class AppChatServiceTest {
                 eq(18),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 3001L,
                 "先给出结论。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(30, 18),
                 null
@@ -904,11 +930,13 @@ class AppChatServiceTest {
                 eq(12),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new com.ragadmin.server.chat.dto.ChatResponse(
                 9902L,
                 "新的回答。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(40, 12),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("LOW", false, false)
@@ -939,7 +967,8 @@ class AppChatServiceTest {
                 eq(12),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         );
         verify(conversationMemoryRefreshDispatcher).dispatchRefresh("chat-terminal-app-scene-general-user-9201-session-901");
     }

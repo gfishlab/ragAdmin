@@ -6,22 +6,28 @@ import com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
+import com.ragadmin.server.chat.dto.WebSearchSourceResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
+import com.ragadmin.server.chat.entity.ChatWebSearchSourceEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
+import com.ragadmin.server.chat.mapper.ChatWebSearchSourceMapper;
 import com.ragadmin.server.document.entity.DocumentEntity;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
+import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.retrieval.service.RetrievalService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -37,6 +43,9 @@ public class ChatExchangePersistenceService {
 
     @Autowired
     private ChatFeedbackMapper chatFeedbackMapper;
+
+    @Autowired
+    private ChatWebSearchSourceMapper chatWebSearchSourceMapper;
 
     @Autowired
     private DocumentMapper documentMapper;
@@ -55,7 +64,8 @@ public class ChatExchangePersistenceService {
             Integer completionTokens,
             int latencyMs,
             ChatAnswerMetadata answerMetadata,
-            RetrievalService.RetrievalResult retrievalResult
+            RetrievalService.RetrievalResult retrievalResult,
+            List<WebSearchSnippet> webSearchSnippets
     ) {
         ChatMessageEntity message = new ChatMessageEntity();
         message.setSessionId(session.getId());
@@ -73,7 +83,8 @@ public class ChatExchangePersistenceService {
         chatMessageMapper.insert(message);
 
         persistReferences(message.getId(), retrievalResult);
-        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult);
+        persistWebSearchSources(message.getId(), webSearchSnippets);
+        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult, webSearchSnippets);
     }
 
     /**
@@ -88,7 +99,8 @@ public class ChatExchangePersistenceService {
             Integer completionTokens,
             int latencyMs,
             ChatAnswerMetadata answerMetadata,
-            RetrievalService.RetrievalResult retrievalResult
+            RetrievalService.RetrievalResult retrievalResult,
+            List<WebSearchSnippet> webSearchSnippets
     ) {
         message.setAnswerText(answer);
         message.setModelId(modelId);
@@ -104,8 +116,11 @@ public class ChatExchangePersistenceService {
                 .eq(ChatAnswerReferenceEntity::getMessageId, message.getId()));
         chatFeedbackMapper.delete(new LambdaQueryWrapper<ChatFeedbackEntity>()
                 .eq(ChatFeedbackEntity::getMessageId, message.getId()));
+        chatWebSearchSourceMapper.delete(new LambdaQueryWrapper<ChatWebSearchSourceEntity>()
+                .eq(ChatWebSearchSourceEntity::getMessageId, message.getId()));
         persistReferences(message.getId(), retrievalResult);
-        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult);
+        persistWebSearchSources(message.getId(), webSearchSnippets);
+        return buildChatResponse(message.getId(), answer, promptTokens, completionTokens, answerMetadata, retrievalResult, webSearchSnippets);
     }
 
     private void persistReferences(Long messageId, RetrievalService.RetrievalResult retrievalResult) {
@@ -120,13 +135,37 @@ public class ChatExchangePersistenceService {
         }
     }
 
+    /**
+     * 联网来源与知识库引用分表持久化，保证历史回放时能明确区分证据来源。
+     */
+    private void persistWebSearchSources(Long messageId, List<WebSearchSnippet> webSearchSnippets) {
+        if (webSearchSnippets == null || webSearchSnippets.isEmpty()) {
+            return;
+        }
+        for (int i = 0; i < webSearchSnippets.size(); i++) {
+            WebSearchSnippet snippet = webSearchSnippets.get(i);
+            if (snippet == null) {
+                continue;
+            }
+            ChatWebSearchSourceEntity entity = new ChatWebSearchSourceEntity();
+            entity.setMessageId(messageId);
+            entity.setTitle(snippet.title());
+            entity.setSourceUrl(snippet.url());
+            entity.setPublishedAt(snippet.publishedAt() == null ? null : LocalDateTime.ofInstant(snippet.publishedAt(), ZoneOffset.UTC));
+            entity.setSnippet(snippet.snippet());
+            entity.setRankNo(i + 1);
+            chatWebSearchSourceMapper.insert(entity);
+        }
+    }
+
     private ChatResponse buildChatResponse(
             Long messageId,
             String answer,
             Integer promptTokens,
             Integer completionTokens,
             ChatAnswerMetadata answerMetadata,
-            RetrievalService.RetrievalResult retrievalResult
+            RetrievalService.RetrievalResult retrievalResult,
+            List<WebSearchSnippet> webSearchSnippets
     ) {
         List<Long> documentIds = retrievalResult.chunks().stream()
                 .map(item -> item.chunk().getDocumentId())
@@ -148,9 +187,25 @@ public class ChatExchangePersistenceService {
                 answer,
                 ChatContentTypes.MARKDOWN,
                 references,
+                toWebSearchSourceResponses(webSearchSnippets),
                 new ChatUsageResponse(promptTokens, completionTokens),
                 toMetadataResponse(answerMetadata)
         );
+    }
+
+    private List<WebSearchSourceResponse> toWebSearchSourceResponses(List<WebSearchSnippet> webSearchSnippets) {
+        if (webSearchSnippets == null || webSearchSnippets.isEmpty()) {
+            return List.of();
+        }
+        return webSearchSnippets.stream()
+                .filter(java.util.Objects::nonNull)
+                .map(item -> new WebSearchSourceResponse(
+                        item.title(),
+                        item.url(),
+                        item.publishedAt(),
+                        item.snippet()
+                ))
+                .toList();
     }
 
     private ChatAnswerMetadataResponse toMetadataResponse(ChatAnswerMetadata answerMetadata) {

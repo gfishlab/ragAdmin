@@ -87,6 +87,7 @@ describe('streamChatMessage', () => {
       delta: '第一段回答',
       messageId: 88,
       answerContentType: 'text/markdown',
+      webSearchSources: [],
     })
   })
 
@@ -125,6 +126,7 @@ describe('streamChatMessage', () => {
           messageId: 103,
           answer: '完整回答',
           references: [],
+          webSearchSources: [],
           usage: null,
           errorMessage: null,
         }),
@@ -154,6 +156,7 @@ describe('streamChatMessage', () => {
       answer: '完整回答',
       answerContentType: 'text/markdown',
       references: [],
+      webSearchSources: [],
       usage: null,
       errorMessage: null,
     })

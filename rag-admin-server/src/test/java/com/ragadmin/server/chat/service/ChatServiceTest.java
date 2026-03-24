@@ -251,7 +251,8 @@ class ChatServiceTest {
                 eq(30),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new ChatResponse(
                 901L,
                 "制度要求按时提交周报。",
@@ -265,6 +266,7 @@ class ChatServiceTest {
                         0.91D,
                         "制度要求员工按时提交周报。"
                 )),
+                List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(120, 30),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("HIGH", true, false)
         ));
@@ -282,7 +284,8 @@ class ChatServiceTest {
                 eq(30),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         );
 
         assertEquals("制度要求按时提交周报。", response.answer());
@@ -335,11 +338,13 @@ class ChatServiceTest {
                 eq(18),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new ChatResponse(
                 902L,
                 "当前无法从知识库确认答案。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(64, 18),
                 null
@@ -359,7 +364,8 @@ class ChatServiceTest {
                 eq(18),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         );
         assertEquals("当前无法从知识库确认答案。", response.answer());
         assertEquals(0, response.references().size());
@@ -414,11 +420,13 @@ class ChatServiceTest {
                 eq(20),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new ChatResponse(
                 903L,
                 "制度要求按时提交周报。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
                 null
@@ -510,11 +518,13 @@ class ChatServiceTest {
                 eq(20),
                 anyInt(),
                 eq(metadata),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new ChatResponse(
                 904L,
                 "制度要求按时提交周报。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(100, 20),
                 new com.ragadmin.server.chat.dto.ChatAnswerMetadataResponse("MEDIUM", true, false)
@@ -566,11 +576,13 @@ class ChatServiceTest {
                 eq(16),
                 anyInt(),
                 any(),
-                eq(retrievalResult)
+                eq(retrievalResult),
+                any()
         )).thenReturn(new ChatResponse(
                 2002L,
                 "先看制度要求。",
                 "text/markdown",
+                List.of(),
                 List.of(),
                 new com.ragadmin.server.chat.dto.ChatUsageResponse(12, 16),
                 null

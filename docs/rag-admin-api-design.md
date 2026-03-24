@@ -597,8 +597,11 @@
 说明：
 
 - 每条消息除 `question`、`answer`、`references`、`feedbackType`、`feedbackComment` 外，还会返回 `metadata`
+- 如果本轮回答启用了联网且成功拿到联网结果，还会额外返回 `webSearchSources`
+- `references` 只表示知识库检索引用；`webSearchSources` 只表示联网网页来源，二者必须分开处理
 - 当前 `metadata` 最小字段为：`confidence`、`hasKnowledgeBaseEvidence`、`needFollowUp`
 - 对于历史老消息或尚未补写元数据的消息，`metadata` 允许为空
+- `webSearchSources` 的最小字段为：`title`、`url`、`publishedAt`、`snippet`
 
 ### 7.4 前台更新会话元数据
 
@@ -656,7 +659,10 @@
 - `webSearchEnabled=true` 时，由后端按 `WebSearchProvider` 配置决定是否补充联网搜索上下文
 - 控制器直接返回 `Flux<ChatStreamEventResponse>`，仍通过 `text/event-stream` 传输；前端按响应体中的 `eventType` 判断事件语义，不再依赖额外的 `event:` / `id:` SSE 包装字段
 - 流式 `DELTA` 事件只承载正文增量；`COMPLETE` 事件除 `messageId`、`answer`、`references`、`usage` 外，还会补充 `metadata`
+- 如果本轮实际命中了联网结果，`COMPLETE` 事件还会返回 `webSearchSources`
+- `references` 与 `webSearchSources` 必须分开展示，避免把知识库证据与联网来源混为一类
 - 当前 `metadata` 最小字段为：`confidence`、`hasKnowledgeBaseEvidence`、`needFollowUp`
+- `webSearchSources` 的最小字段为：`title`、`url`、`publishedAt`、`snippet`
 
 ### 7.7 前台提交反馈
 

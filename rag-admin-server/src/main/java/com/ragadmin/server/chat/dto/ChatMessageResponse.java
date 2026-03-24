@@ -8,6 +8,7 @@ public record ChatMessageResponse(
         String answer,
         String answerContentType,
         List<ChatReferenceResponse> references,
+        List<WebSearchSourceResponse> webSearchSources,
         ChatAnswerMetadataResponse metadata,
         String feedbackType,
         String feedbackComment

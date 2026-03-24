@@ -193,6 +193,7 @@ public class ChatService {
                             refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
                                     .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
                                     .toList(),
+                            List.of(),
                             toMetadataResponse(message),
                             feedback == null ? null : feedback.getFeedbackType(),
                             feedback == null ? null : feedback.getCommentText()
@@ -230,7 +231,8 @@ public class ChatService {
                 completion.completionTokens(),
                 latencyMs,
                 answerMetadata,
-                execution.retrievalResult()
+                execution.retrievalResult(),
+                List.of()
         );
         conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
         return response;
@@ -276,7 +278,8 @@ public class ChatService {
                                         completionTokensRef.get(),
                                         (int) Duration.between(start, Instant.now()).toMillis(),
                                         answerMetadata,
-                                        execution.retrievalResult()
+                                        execution.retrievalResult(),
+                                        List.of()
                                 );
                                 conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
                                 return ChatStreamEventResponse.complete(response);

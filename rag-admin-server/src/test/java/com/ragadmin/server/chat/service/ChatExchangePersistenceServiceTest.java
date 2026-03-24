@@ -9,8 +9,10 @@ import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
+import com.ragadmin.server.chat.mapper.ChatWebSearchSourceMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.infra.ai.chat.ChatAnswerMetadata;
+import com.ragadmin.server.infra.search.WebSearchSnippet;
 import com.ragadmin.server.retrieval.service.RetrievalService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -20,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.time.Instant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
@@ -40,6 +43,9 @@ class ChatExchangePersistenceServiceTest {
 
     @Mock
     private ChatFeedbackMapper chatFeedbackMapper;
+
+    @Mock
+    private ChatWebSearchSourceMapper chatWebSearchSourceMapper;
 
     @Mock
     private DocumentMapper documentMapper;
@@ -75,7 +81,15 @@ class ChatExchangePersistenceServiceTest {
                 30,
                 88,
                 answerMetadata,
-                retrievalResult
+                retrievalResult,
+                List.of(
+                        new WebSearchSnippet(
+                                "制度公告",
+                                "周报需在周五下班前提交。",
+                                "https://example.com/policy",
+                                Instant.parse("2026-03-24T10:00:00Z")
+                        )
+                )
         );
 
         ArgumentCaptor<ChatMessageEntity> messageCaptor = ArgumentCaptor.forClass(ChatMessageEntity.class);
@@ -89,6 +103,8 @@ class ChatExchangePersistenceServiceTest {
         assertEquals(801L, response.messageId());
         assertEquals("text/markdown", response.answerContentType());
         assertNotNull(response.metadata());
+        assertEquals(1, response.webSearchSources().size());
+        assertEquals("https://example.com/policy", response.webSearchSources().getFirst().url());
         ChatAnswerMetadataResponse metadata = response.metadata();
         assertEquals("HIGH", metadata.confidence());
         assertEquals(true, metadata.hasKnowledgeBaseEvidence());
@@ -119,16 +135,18 @@ class ChatExchangePersistenceServiceTest {
                 10,
                 30,
                 null,
-                new RetrievalService.RetrievalResult(List.of(), "")
+                new RetrievalService.RetrievalResult(List.of(), ""),
+                List.of()
         );
 
         assertEquals(802L, response.messageId());
         assertEquals("text/markdown", response.answerContentType());
         assertEquals(null, response.metadata());
+        assertEquals(List.of(), response.webSearchSources());
     }
 
     @Test
-    void shouldReplaceExistingExchangeAndRebuildReferences() {
+    void shouldReplaceExistingExchangeAndRebuildReferencesAndWebSearchSources() {
         ChatMessageEntity message = new ChatMessageEntity();
         message.setId(9001L);
         message.setAnswerText("旧答案");
@@ -146,7 +164,15 @@ class ChatExchangePersistenceServiceTest {
                 22,
                 48,
                 answerMetadata,
-                retrievalResult
+                retrievalResult,
+                List.of(
+                        new WebSearchSnippet(
+                                "新的联网来源",
+                                "这里是更新后的联网摘要。",
+                                "https://example.com/new-source",
+                                Instant.parse("2026-03-24T11:00:00Z")
+                        )
+                )
         );
 
         ArgumentCaptor<ChatMessageEntity> messageCaptor = ArgumentCaptor.forClass(ChatMessageEntity.class);
@@ -155,10 +181,13 @@ class ChatExchangePersistenceServiceTest {
         assertEquals("新答案", updated.getAnswerText());
         assertEquals(1001L, updated.getModelId());
         verify(chatAnswerReferenceMapper).delete(any());
+        verify(chatWebSearchSourceMapper).delete(any());
 
         assertEquals(9001L, response.messageId());
         assertEquals("新答案", response.answer());
         assertNotNull(response.metadata());
         assertEquals("MEDIUM", response.metadata().confidence());
+        assertEquals(1, response.webSearchSources().size());
+        assertEquals("新的联网来源", response.webSearchSources().getFirst().title());
     }
 }

@@ -16,16 +16,19 @@ import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatReferenceResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
+import com.ragadmin.server.chat.dto.WebSearchSourceResponse;
 import com.ragadmin.server.chat.entity.ChatAnswerReferenceEntity;
 import com.ragadmin.server.chat.entity.ChatFeedbackEntity;
 import com.ragadmin.server.chat.entity.ChatMessageEntity;
 import com.ragadmin.server.chat.entity.ChatSessionEntity;
 import com.ragadmin.server.chat.entity.ChatSessionKnowledgeBaseRelEntity;
+import com.ragadmin.server.chat.entity.ChatWebSearchSourceEntity;
 import com.ragadmin.server.chat.mapper.ChatAnswerReferenceMapper;
 import com.ragadmin.server.chat.mapper.ChatFeedbackMapper;
 import com.ragadmin.server.chat.mapper.ChatMessageMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionKnowledgeBaseRelMapper;
 import com.ragadmin.server.chat.mapper.ChatSessionMapper;
+import com.ragadmin.server.chat.mapper.ChatWebSearchSourceMapper;
 import com.ragadmin.server.chat.service.ChatExchangePersistenceService;
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.common.model.PageResponse;
@@ -65,6 +68,7 @@ import reactor.core.publisher.Mono;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -92,6 +96,9 @@ public class AppChatService {
 
     @Autowired
     private ChatFeedbackMapper chatFeedbackMapper;
+
+    @Autowired
+    private ChatWebSearchSourceMapper chatWebSearchSourceMapper;
 
     @Autowired
     private KnowledgeBaseService knowledgeBaseService;
@@ -190,10 +197,20 @@ public class AppChatService {
         if (messages.isEmpty()) {
             return List.of();
         }
+        List<Long> messageIds = messages.stream().map(ChatMessageEntity::getId).toList();
         Map<Long, List<ChatAnswerReferenceEntity>> refsByMessageId = chatAnswerReferenceMapper.selectList(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
-                        .in(ChatAnswerReferenceEntity::getMessageId, messages.stream().map(ChatMessageEntity::getId).toList()))
+                        .in(ChatAnswerReferenceEntity::getMessageId, messageIds))
                 .stream()
                 .collect(Collectors.groupingBy(ChatAnswerReferenceEntity::getMessageId));
+        Map<Long, List<WebSearchSourceResponse>> webSearchSourcesByMessageId = chatWebSearchSourceMapper.selectList(
+                        new LambdaQueryWrapper<ChatWebSearchSourceEntity>()
+                                .in(ChatWebSearchSourceEntity::getMessageId, messageIds)
+                                .orderByAsc(ChatWebSearchSourceEntity::getMessageId, ChatWebSearchSourceEntity::getRankNo))
+                .stream()
+                .collect(Collectors.groupingBy(
+                        ChatWebSearchSourceEntity::getMessageId,
+                        Collectors.mapping(this::toWebSearchSourceResponse, Collectors.toList())
+                ));
         Map<Long, String> documentNameMap = resolveDocumentNames(refsByMessageId.values().stream()
                 .flatMap(List::stream)
                 .map(ChatAnswerReferenceEntity::getChunkId)
@@ -210,7 +227,7 @@ public class AppChatService {
                 .stream()
                 .collect(Collectors.toMap(ChunkEntity::getId, java.util.function.Function.identity()));
         Map<Long, ChatFeedbackEntity> feedbackByMessageId = chatFeedbackMapper.selectList(new LambdaQueryWrapper<ChatFeedbackEntity>()
-                        .in(ChatFeedbackEntity::getMessageId, messages.stream().map(ChatMessageEntity::getId).toList())
+                        .in(ChatFeedbackEntity::getMessageId, messageIds)
                         .eq(ChatFeedbackEntity::getUserId, user.getUserId()))
                 .stream()
                 .collect(Collectors.toMap(
@@ -230,6 +247,7 @@ public class AppChatService {
                             refsByMessageId.getOrDefault(message.getId(), List.of()).stream()
                                     .map(ref -> toReferenceResponse(ref, chunkMap.get(ref.getChunkId()), documentNameMap))
                                     .toList(),
+                            webSearchSourcesByMessageId.getOrDefault(message.getId(), List.of()),
                             toMetadataResponse(message),
                             feedback == null ? null : feedback.getFeedbackType(),
                             feedback == null ? null : feedback.getCommentText()
@@ -286,6 +304,8 @@ public class AppChatService {
         if (!messageIds.isEmpty()) {
             chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
                     .in(ChatAnswerReferenceEntity::getMessageId, messageIds));
+            chatWebSearchSourceMapper.delete(new LambdaQueryWrapper<ChatWebSearchSourceEntity>()
+                    .in(ChatWebSearchSourceEntity::getMessageId, messageIds));
             chatFeedbackMapper.delete(new LambdaQueryWrapper<ChatFeedbackEntity>()
                     .in(ChatFeedbackEntity::getMessageId, messageIds));
         }
@@ -338,7 +358,8 @@ public class AppChatService {
                 completion.completionTokens(),
                 latencyMs,
                 answerMetadata,
-                execution.retrievalResult()
+                execution.retrievalResult(),
+                execution.webSearchSnippets()
         );
         conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
         return response;
@@ -380,14 +401,15 @@ public class AppChatService {
                                         request.getQuestion(),
                                         answerBuilder.toString(),
                                         execution.chatModel().modelId(),
-                                        promptTokensRef.get(),
-                                        completionTokensRef.get(),
-                                        (int) Duration.between(start, Instant.now()).toMillis(),
-                                        answerMetadata,
-                                        execution.retrievalResult()
-                                );
-                                conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
-                                return ChatStreamEventResponse.complete(response);
+                                          promptTokensRef.get(),
+                                          completionTokensRef.get(),
+                                          (int) Duration.between(start, Instant.now()).toMillis(),
+                                          answerMetadata,
+                                          execution.retrievalResult(),
+                                          execution.webSearchSnippets()
+                                  );
+                                  conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
+                                  return ChatStreamEventResponse.complete(response);
                             }));
                 })
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
@@ -440,14 +462,15 @@ public class AppChatService {
                                         message,
                                         answerBuilder.toString(),
                                         execution.chatModel().modelId(),
-                                        promptTokensRef.get(),
-                                        completionTokensRef.get(),
-                                        (int) Duration.between(start, Instant.now()).toMillis(),
-                                        answerMetadata,
-                                        execution.retrievalResult()
-                                );
-                                conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
-                                return ChatStreamEventResponse.complete(response);
+                                          promptTokensRef.get(),
+                                          completionTokensRef.get(),
+                                          (int) Duration.between(start, Instant.now()).toMillis(),
+                                          answerMetadata,
+                                          execution.retrievalResult(),
+                                          execution.webSearchSnippets()
+                                  );
+                                  conversationMemoryRefreshDispatcher.dispatchRefresh(execution.conversationId());
+                                  return ChatStreamEventResponse.complete(response);
                             }));
                 })
                 .onErrorResume(ex -> Flux.just(ChatStreamEventResponse.error(resolveStreamErrorMessage(ex))));
@@ -736,6 +759,7 @@ public class AppChatService {
                 session,
                 chatModel,
                 retrievalResult,
+                webSearchSnippets,
                 promptMessages,
                 buildHistoryMessages(session.getId(), historyBeforeMessageIdExclusive),
                 conversationIdCodec.encode(session)
@@ -1022,10 +1046,20 @@ public class AppChatService {
             ChatSessionEntity session,
             ModelService.ChatModelDescriptor chatModel,
             RetrievalService.RetrievalResult retrievalResult,
+            List<WebSearchSnippet> webSearchSnippets,
             List<ChatPromptMessage> promptMessages,
             List<ChatPromptMessage> historyMessages,
             String conversationId
     ) {
+    }
+
+    private WebSearchSourceResponse toWebSearchSourceResponse(ChatWebSearchSourceEntity entity) {
+        return new WebSearchSourceResponse(
+                entity.getTitle(),
+                entity.getSourceUrl(),
+                entity.getPublishedAt() == null ? null : entity.getPublishedAt().atOffset(ZoneOffset.UTC).toInstant(),
+                entity.getSnippet()
+        );
     }
 
     private Map<Long, String> resolveDocumentNames(List<Long> chunkIds) {

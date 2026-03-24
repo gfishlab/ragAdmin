@@ -7,6 +7,7 @@ public record ChatResponse(
         String answer,
         String answerContentType,
         List<ChatReferenceResponse> references,
+        List<WebSearchSourceResponse> webSearchSources,
         ChatUsageResponse usage,
         ChatAnswerMetadataResponse metadata
 ) {

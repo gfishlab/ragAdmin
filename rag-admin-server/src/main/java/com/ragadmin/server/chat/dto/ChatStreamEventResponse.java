@@ -9,13 +9,14 @@ public record ChatStreamEventResponse(
         String answer,
         String answerContentType,
         List<ChatReferenceResponse> references,
+        List<WebSearchSourceResponse> webSearchSources,
         ChatUsageResponse usage,
         ChatAnswerMetadataResponse metadata,
         String errorMessage
 ) {
 
     public static ChatStreamEventResponse delta(String delta) {
-        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null, null, null);
+        return new ChatStreamEventResponse("DELTA", delta, null, null, null, null, null, null, null, null);
     }
 
     public static ChatStreamEventResponse complete(ChatResponse response) {
@@ -26,6 +27,7 @@ public record ChatStreamEventResponse(
                 response.answer(),
                 response.answerContentType(),
                 response.references(),
+                response.webSearchSources(),
                 response.usage(),
                 response.metadata(),
                 null
@@ -33,6 +35,6 @@ public record ChatStreamEventResponse(
     }
 
     public static ChatStreamEventResponse error(String errorMessage) {
-        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, null, null, errorMessage);
+        return new ChatStreamEventResponse("ERROR", null, null, null, null, null, null, null, null, errorMessage);
     }
 }

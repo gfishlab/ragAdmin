@@ -14,6 +14,7 @@ import type {
   CreateChatSessionRequest,
   UpdateChatSessionRequest,
   UpdateSessionKnowledgeBasesRequest,
+  WebSearchSource,
 } from '@/types/chat'
 import { getAccessToken } from '@/utils/token-storage'
 
@@ -34,6 +35,7 @@ interface ChatMessagePayload {
   answer: string
   answerContentType?: ChatContentType | string | null
   references: ChatExchange['references']
+  webSearchSources?: WebSearchSource[] | null
   feedbackType?: ChatExchange['feedbackType']
   feedbackComment?: string | null
 }
@@ -69,6 +71,18 @@ function normalizeAnswerContentType(value?: string | null): ChatContentType {
   return value === 'text/plain' ? 'text/plain' : 'text/markdown'
 }
 
+function normalizeWebSearchSources(value?: WebSearchSource[] | null): WebSearchSource[] {
+  if (!Array.isArray(value)) {
+    return []
+  }
+  return value.map((item) => ({
+    title: item?.title ?? null,
+    url: item?.url ?? null,
+    publishedAt: item?.publishedAt ?? null,
+    snippet: item?.snippet ?? null,
+  }))
+}
+
 export async function createChatSession(payload: CreateChatSessionRequest): Promise<ChatSession> {
   const response = await http.post('/app/chat/sessions', payload)
   return unwrapResponse(response.data)
@@ -94,6 +108,7 @@ export async function listChatMessages(sessionId: number): Promise<ChatExchange[
     answerText: item.answer,
     answerContentType: normalizeAnswerContentType(item.answerContentType),
     references: item.references ?? [],
+    webSearchSources: normalizeWebSearchSources(item.webSearchSources),
     feedbackType: item.feedbackType ?? null,
     feedbackComment: item.feedbackComment ?? null,
   }))
@@ -126,6 +141,7 @@ export async function chat(sessionId: number, payload: ChatRequest): Promise<Cha
   return {
     ...result,
     answerContentType: normalizeAnswerContentType(result.answerContentType),
+    webSearchSources: normalizeWebSearchSources(result.webSearchSources),
   }
 }
 
@@ -177,6 +193,7 @@ function createStreamHandle(
         return
       }
       event.answerContentType = normalizeAnswerContentType(event.answerContentType)
+      event.webSearchSources = normalizeWebSearchSources(event.webSearchSources)
       if (event.eventType === 'COMPLETE' || event.eventType === 'ERROR') {
         completed = true
       }

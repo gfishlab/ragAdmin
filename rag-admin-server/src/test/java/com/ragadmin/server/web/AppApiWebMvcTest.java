@@ -18,6 +18,7 @@ import com.ragadmin.server.chat.dto.ChatMessageResponse;
 import com.ragadmin.server.chat.dto.ChatResponse;
 import com.ragadmin.server.chat.dto.ChatStreamEventResponse;
 import com.ragadmin.server.chat.dto.ChatUsageResponse;
+import com.ragadmin.server.chat.dto.WebSearchSourceResponse;
 import com.ragadmin.server.common.exception.GlobalExceptionHandler;
 import com.ragadmin.server.common.model.PageResponse;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
@@ -38,6 +39,7 @@ import reactor.core.publisher.Flux;
 
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -338,6 +340,12 @@ class AppApiWebMvcTest {
                         "今天需要完成接口联调。",
                         "text/markdown",
                         List.of(),
+                        List.of(new WebSearchSourceResponse(
+                                "待办资讯",
+                                "https://example.com/todo",
+                                Instant.parse("2026-03-24T09:00:00Z"),
+                                "这里汇总了今天的重点待办。"
+                        )),
                         new ChatAnswerMetadataResponse("LOW", false, true),
                         null,
                         null
@@ -351,6 +359,7 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.data[0].messageId").value(101))
                 .andExpect(jsonPath("$.data[0].answer").value("今天需要完成接口联调。"))
                 .andExpect(jsonPath("$.data[0].answerContentType").value("text/markdown"))
+                .andExpect(jsonPath("$.data[0].webSearchSources[0].url").value("https://example.com/todo"))
                 .andExpect(jsonPath("$.data[0].metadata.confidence").value("LOW"))
                 .andExpect(jsonPath("$.data[0].metadata.needFollowUp").value(true));
     }
@@ -433,6 +442,12 @@ class AppApiWebMvcTest {
                 "根据已选知识库，发布前需要完成回归测试。",
                 "text/markdown",
                 List.of(),
+                List.of(new WebSearchSourceResponse(
+                        "发布检查清单",
+                        "https://example.com/release-checklist",
+                        Instant.parse("2026-03-24T08:30:00Z"),
+                        "上线前需完成回归测试与发布核对。"
+                )),
                 new ChatUsageResponse(180, 42),
                 null
         ));
@@ -450,6 +465,7 @@ class AppApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.messageId").value(102))
                 .andExpect(jsonPath("$.data.answerContentType").value("text/markdown"))
+                .andExpect(jsonPath("$.data.webSearchSources[0].url").value("https://example.com/release-checklist"))
                 .andExpect(jsonPath("$.data.usage.promptTokens").value(180));
     }
 
@@ -463,6 +479,12 @@ class AppApiWebMvcTest {
                         "再确认知识库引用是否命中。",
                         "text/markdown",
                         List.of(),
+                        List.of(new WebSearchSourceResponse(
+                                "发布动态",
+                                "https://example.com/release-news",
+                                Instant.parse("2026-03-24T11:30:00Z"),
+                                "发布前建议同时确认最新外部动态。"
+                        )),
                         new ChatUsageResponse(156, 38),
                         null
                 ))
@@ -487,6 +509,8 @@ class AppApiWebMvcTest {
                 .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
                 .andExpect(content().string(containsString("\"messageId\":103")))
                 .andExpect(content().string(containsString("\"answerContentType\":\"text/markdown\"")))
+                .andExpect(content().string(containsString("\"webSearchSources\"")))
+                .andExpect(content().string(containsString("https://example.com/release-news")))
                 .andExpect(content().string(containsString("\"promptTokens\":156")))
                 .andReturn();
 
@@ -507,6 +531,12 @@ class AppApiWebMvcTest {
                         "新的完整回答。",
                         "text/markdown",
                         List.of(),
+                        List.of(new WebSearchSourceResponse(
+                                "重试来源",
+                                "https://example.com/retry-source",
+                                Instant.parse("2026-03-24T12:00:00Z"),
+                                "重新生成时也应返回联网来源。"
+                        )),
                         new ChatUsageResponse(120, 24),
                         null
                 ))
@@ -530,6 +560,7 @@ class AppApiWebMvcTest {
                 .andExpect(content().string(containsString("\"eventType\":\"COMPLETE\"")))
                 .andExpect(content().string(containsString("\"messageId\":103")))
                 .andExpect(content().string(containsString("\"answerContentType\":\"text/markdown\"")))
+                .andExpect(content().string(containsString("https://example.com/retry-source")))
                 .andExpect(content().string(containsString("\"promptTokens\":120")));
     }
 
