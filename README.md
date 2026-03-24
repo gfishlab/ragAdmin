@@ -163,10 +163,19 @@ mvn -q -pl rag-admin-server spring-boot:run -Dspring-boot.run.profiles=dev
 
 当前 OCR 默认集成在知识库文档解析流水线内部，用于图片文件和扫描版 `PDF` 的兜底文本抽取。
 
+- 这里的“系统内建 OCR 能力”指的是项目已经内建了 OCR 调用链路，不代表 OCR 引擎二进制程序已经随 Java 应用打包进来
+- 当前一期实现仍依赖外部 `Tesseract` 软件本体和语言包；裸机部署时需要预装，容器部署时需要打进镜像
 - `application-local.yml` 中的 `C:/Program Files/Tesseract-OCR/tesseract.exe` 只是 Windows 本地开发示例
 - 生产部署到 Linux 时，不再使用 Windows `exe`，应改为 `tesseract` 或 Linux 绝对路径，例如 `/usr/bin/tesseract`
 - `data-path` 表示 `tessdata` 语言包目录，不是 OCR 程序本体路径；如果 Linux 环境已按系统默认目录安装语言包，可不显式配置
 - 如使用 Docker 部署，应在镜像内安装 `tesseract` 和所需语言包，而不是依赖宿主机临时手工安装
+
+术语定位：
+
+- `Apache Tika`：通用文档文本提取器，负责从文本型 `PDF`、`DOCX`、`XLSX`、`PPTX` 等文件中抽取文本和元数据，不是 OCR 引擎
+- `Tesseract`：OCR 引擎，负责从图片或扫描件中识别文字
+- `Tess4J`：Java 对 `Tesseract` 的封装，不是独立 OCR 引擎；当前项目未采用这条路径，而是直接调用命令行
+- `MinerU`：高阶文档解析方案，不只是 OCR；既能处理文本型 `PDF`，也能处理扫描版 `PDF` / 图片，并补充版面、表格、公式、阅读顺序等能力
 
 当前推荐流程是“上传原始文档，由系统异步完成解析、OCR、切片、Embedding 和索引构建”，而不是要求运营人员先手工借助 `MinerU` 之类工具做前置 OCR，再把产物上传到知识库。
 
