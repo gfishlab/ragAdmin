@@ -159,7 +159,44 @@ mvn -q -pl rag-admin-server spring-boot:run -Dspring-boot.run.profiles=dev
 - `application-local.yml`：本机 Docker 容器环境
 - `application-dev.yml`：内网共享开发环境示例
 
-### 4.1 OCR 配置说明
+### 4.1 本地 Ollama 默认模型说明
+
+当前仓库的本地开发示例默认把模型提供方切到 `Ollama`，并约定以下默认模型：
+
+- 聊天模型：`qwen2.5:1.5b`
+- 向量模型：`quentinz/bge-small-zh-v1.5`
+
+这些默认值主要分布在：
+
+- `docker/compose/docker-compose.yml`
+  - `ollama-init` 会自动预拉取上述两个模型
+- `rag-admin-server/src/main/resources/application-local-secret.yml`
+  - 本地私有配置里会把它们声明为默认聊天模型和默认向量模型
+- `rag-admin-server/src/main/java/com/ragadmin/server/infra/ai/embedding/OllamaProperties.java`
+  - 代码层面保留同一组默认值，避免未覆盖配置时出现旧口径
+
+重要说明：
+
+- 这组模型只是仓库当前的本地开发示例，不是强制标准
+- 如果你准备替换为其他本地模型，请至少同时调整：
+  - `application-local-secret.yml` 中的 `default-chat-model`
+  - `application-local-secret.yml` 中的 `default-embedding-model`
+  - `docker/compose/docker-compose.yml` 中 `ollama-init` 的预拉取模型列表
+- 如果只改了配置文件而没有在本地 Ollama 中实际拉取对应模型，应用通常仍可启动，但以下能力会失败或降级：
+  - 模型探活
+  - 聊天生成
+  - 文档向量化
+  - RAG 检索问答
+- 如果本机根本没有安装或启动 Ollama，本地默认 `Ollama` 链路同样不会可用；此时可以：
+  - 安装并启动 Ollama，再拉取对应模型
+  - 或改用其他已启用的模型提供方
+
+推荐做法：
+
+- 想直接按仓库默认联调，就执行 `docker compose`，让 `ollama-init` 自动预拉取默认模型
+- 想自定义模型，就把“本地私有配置”和“Compose 初始化拉取列表”一起改掉，保持单一事实来源
+
+### 4.2 OCR 配置说明
 
 当前 OCR 默认集成在知识库文档解析流水线内部，用于图片文件和扫描版 `PDF` 的兜底文本抽取。
 
@@ -200,7 +237,7 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 同时包含两个初始化动作：
 
 - 自动创建 MinIO bucket
-- 自动拉取默认 Ollama 聊天模型与 Embedding 模型
+- 自动拉取默认 Ollama 聊天模型 `qwen2.5:1.5b` 与 Embedding 模型 `quentinz/bge-small-zh-v1.5`
 
 更完整的依赖准备、接口验收顺序和常见排查方式，直接看联调文档。
 
@@ -216,4 +253,3 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 - 前台架构设计：[docs/plans/2026-03-19-app-chat-frontend-architecture-design.md](docs/plans/2026-03-19-app-chat-frontend-architecture-design.md)
 - 前台实施计划：[docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md](docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)
-

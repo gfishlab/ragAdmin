@@ -12,6 +12,10 @@ import type {
 } from '@/types/model'
 import { http, unwrapResponse } from './http'
 
+// 本地模型首次冷启动、拉起权重或 CPU 推理都可能显著慢于普通后台接口，
+// 因此探活请求单独放宽超时，避免被全局 15 秒超时提前打断。
+const MODEL_HEALTH_CHECK_TIMEOUT_MS = 240_000
+
 export interface ModelListQuery {
   pageNo: number
   pageSize: number
@@ -33,6 +37,8 @@ export async function createModelProvider(payload: ModelProviderCreateRequest): 
 export async function healthCheckModelProvider(providerId: number): Promise<ModelProviderHealthCheck> {
   const response = await http.post<ApiResponse<ModelProviderHealthCheck>>(
     `/admin/model-providers/${providerId}/health-check`,
+    undefined,
+    { timeout: MODEL_HEALTH_CHECK_TIMEOUT_MS },
   )
   return unwrapResponse(response.data)
 }
@@ -70,6 +76,10 @@ export async function batchDeleteModels(payload: BatchDeleteModelsRequest): Prom
 }
 
 export async function healthCheckModel(modelId: number): Promise<ModelHealthCheck> {
-  const response = await http.post<ApiResponse<ModelHealthCheck>>(`/admin/models/${modelId}/health-check`)
+  const response = await http.post<ApiResponse<ModelHealthCheck>>(
+    `/admin/models/${modelId}/health-check`,
+    undefined,
+    { timeout: MODEL_HEALTH_CHECK_TIMEOUT_MS },
+  )
   return unwrapResponse(response.data)
 }

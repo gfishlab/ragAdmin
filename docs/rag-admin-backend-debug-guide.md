@@ -109,8 +109,8 @@ OCR 配置补充说明：
 2. Redis 可连通，密码正确
 3. MinIO 可连通，Bucket `ragadmin` 已存在
 4. Ollama 已启动，并至少拉取：
-   - `qwen2.5:7b`
-   - `nomic-embed-text`
+   - `qwen2.5:1.5b`
+   - `quentinz/bge-small-zh-v1.5`
 5. Milvus 已启动，`base-url` 当前按 `http://127.0.0.1:19530`
 
 ### 3.4 首次启动会自动初始化
@@ -168,7 +168,7 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 并会自动执行：
 
 - `minio-init`：创建默认 bucket
-- `ollama-init`：拉取默认聊天模型和 Embedding 模型
+- `ollama-init`：拉取默认聊天模型 `qwen2.5:1.5b` 和默认 Embedding 模型 `quentinz/bge-small-zh-v1.5`
 
 说明：
 
@@ -400,7 +400,7 @@ GET /api/admin/system/health
 优先检查：
 
 - 知识库绑定的 Embedding 模型是否具备 `EMBEDDING` 能力
-- Ollama 的 `nomic-embed-text` 是否可用
+- Ollama 的 `quentinz/bge-small-zh-v1.5` 是否可用
 - Milvus 地址与 Token 是否正确
 
 ### 7.5 RAG 问答没有命中

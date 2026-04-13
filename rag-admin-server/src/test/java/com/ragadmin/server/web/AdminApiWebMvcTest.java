@@ -372,7 +372,7 @@ class AdminApiWebMvcTest {
                 "演示知识库",
                 "用于测试",
                 2L,
-                "nomic-embed-text",
+                "quentinz/bge-small-zh-v1.5",
                 5,
                 false,
                 "ENABLED"

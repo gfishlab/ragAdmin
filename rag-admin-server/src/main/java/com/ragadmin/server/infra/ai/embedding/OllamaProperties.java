@@ -8,8 +8,8 @@ public class OllamaProperties {
     private boolean enabled = false;
     private String baseUrl;
     private int timeoutSeconds = 30;
-    private String defaultChatModel = "qwen2.5:7b";
-    private String defaultEmbeddingModel = "nomic-embed-text";
+    private String defaultChatModel = "qwen2.5:1.5b";
+    private String defaultEmbeddingModel = "quentinz/bge-small-zh-v1.5";
 
     public boolean isEnabled() {
         return enabled;

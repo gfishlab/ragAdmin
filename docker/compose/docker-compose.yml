@@ -121,7 +121,8 @@ services:
       - ollama-data:/root/.ollama
     healthcheck:
       # 官方镜像里没有 curl，直接复用 ollama CLI 做本地健康检查。
-      test: ["CMD", "/bin/ollama", "list"]
+      # 这里不写死二进制绝对路径，避免后续镜像内部路径调整导致健康检查失效。
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
       interval: 15s
       timeout: 10s
       retries: 15
@@ -135,7 +136,7 @@ services:
     restart: "no"
     entrypoint: >
       /bin/sh -c "
-      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"gemma4:e4b\"}' &&
+      curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"qwen2.5:1.5b\"}' &&
       curl -fsS http://ollama:11434/api/pull -d '{\"name\":\"quentinz/bge-small-zh-v1.5\"}'
       "
 

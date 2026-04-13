@@ -121,9 +121,9 @@ class ModelBootstrapInitializerTest {
         assertTrue(modelCaptor.getAllValues().stream()
                 .anyMatch(model -> "bge-m3".equals(model.getModelCode())));
         assertFalse(modelCaptor.getAllValues().stream()
-                .anyMatch(model -> "qwen2.5:7b".equals(model.getModelCode())));
+                .anyMatch(model -> "qwen2.5:1.5b".equals(model.getModelCode())));
         assertFalse(modelCaptor.getAllValues().stream()
-                .anyMatch(model -> "nomic-embed-text".equals(model.getModelCode())));
+                .anyMatch(model -> "quentinz/bge-small-zh-v1.5".equals(model.getModelCode())));
         assertEquals(2, modelCaptor.getAllValues().size());
     }
 }
