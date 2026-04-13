@@ -5,6 +5,8 @@ import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.document.support.ChunkVectorizationService;
+import com.ragadmin.server.document.support.DocumentVectorizationProperties;
+import com.ragadmin.server.document.support.DocumentVectorizationStrategyResolver;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.junit.jupiter.api.Test;
@@ -14,6 +16,9 @@ import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.List;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
@@ -47,6 +52,9 @@ class DocumentParseProcessorTest {
     @Mock
     private ChunkVectorizationService chunkVectorizationService;
 
+    @Mock
+    private DocumentVectorizationStrategyResolver strategyResolver;
+
     @Spy
     @InjectMocks
     private DocumentParseProcessor documentParseProcessor;
@@ -61,5 +69,26 @@ class DocumentParseProcessorTest {
 
         verify(documentParseProcessor, never()).markFailed(eq(13L), any());
         verify(documentParseTaskMapper, never()).selectById(13L);
+    }
+
+    @Test
+    void shouldSplitContentByProviderStrategy() {
+        String content = """
+                %s
+
+                %s
+
+                %s
+                """.formatted("a".repeat(220), "b".repeat(220), "c".repeat(220));
+
+        List<String> chunks = documentParseProcessor.splitIntoChunks(
+                content,
+                new DocumentVectorizationProperties.StrategyProperties(1, 400, 80)
+        );
+
+        assertEquals(3, chunks.size());
+        assertEquals(220, chunks.getFirst().length());
+        assertEquals(302, chunks.get(1).length());
+        assertEquals(302, chunks.get(2).length());
     }
 }

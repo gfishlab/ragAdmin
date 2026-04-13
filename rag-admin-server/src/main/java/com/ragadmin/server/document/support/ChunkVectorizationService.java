@@ -9,34 +9,27 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
-import com.ragadmin.server.model.service.ModelService;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 
 @Service
 public class ChunkVectorizationService {
 
-    /**
-     * 当前百炼 Embedding 接口单次请求最多接收 10 条文本，这里统一按 10 条分批，避免大文档切片过多时整批失败。
-     */
-    static final int EMBEDDING_BATCH_SIZE = 10;
-
-    private final ModelService modelService;
+    private final DocumentVectorizationStrategyResolver strategyResolver;
     private final EmbeddingClientRegistry embeddingClientRegistry;
     private final MilvusVectorStoreClient milvusVectorStoreClient;
     private final ChunkVectorRefMapper chunkVectorRefMapper;
 
     public ChunkVectorizationService(
-            ModelService modelService,
+            DocumentVectorizationStrategyResolver strategyResolver,
             EmbeddingClientRegistry embeddingClientRegistry,
             MilvusVectorStoreClient milvusVectorStoreClient,
             ChunkVectorRefMapper chunkVectorRefMapper
     ) {
-        this.modelService = modelService;
+        this.strategyResolver = strategyResolver;
         this.embeddingClientRegistry = embeddingClientRegistry;
         this.milvusVectorStoreClient = milvusVectorStoreClient;
         this.chunkVectorRefMapper = chunkVectorRefMapper;
@@ -47,10 +40,14 @@ public class ChunkVectorizationService {
         if (chunks == null || chunks.isEmpty()) {
             return;
         }
-        EmbeddingModelDescriptor descriptor = modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
+        DocumentVectorizationStrategyResolver.ResolvedStrategy resolvedStrategy =
+                strategyResolver.resolveByEmbeddingModelId(knowledgeBase.getEmbeddingModelId());
+        EmbeddingModelDescriptor descriptor = resolvedStrategy.descriptor();
+        DocumentVectorizationProperties.StrategyProperties strategy = resolvedStrategy.strategy();
         EmbeddingModelClient client = embeddingClientRegistry.getClient(descriptor.providerCode());
-        List<List<Float>> embeddings = java.util.stream.IntStream.iterate(0, index -> index < chunks.size(), index -> index + EMBEDDING_BATCH_SIZE)
-                .mapToObj(start -> embedBatch(client, descriptor.modelCode(), chunks, start))
+        int batchSize = Math.max(1, strategy.getEmbeddingBatchSize());
+        List<List<Float>> embeddings = java.util.stream.IntStream.iterate(0, index -> index < chunks.size(), index -> index + batchSize)
+                .mapToObj(start -> embedBatch(client, descriptor.modelCode(), chunks, start, batchSize))
                 .flatMap(List::stream)
                 .toList();
         if (embeddings.size() != chunks.size()) {
@@ -81,9 +78,10 @@ public class ChunkVectorizationService {
             EmbeddingModelClient client,
             String modelCode,
             List<ChunkEntity> chunks,
-            int start
+            int start,
+            int batchSize
     ) {
-        int end = Math.min(start + EMBEDDING_BATCH_SIZE, chunks.size());
+        int end = Math.min(start + batchSize, chunks.size());
         List<String> inputs = chunks.subList(start, end).stream()
                 .map(ChunkEntity::getChunkText)
                 .toList();

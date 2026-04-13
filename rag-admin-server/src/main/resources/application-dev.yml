@@ -66,6 +66,12 @@ rag:
       data-path: .ocr-data/tessdata
       language: chi_sim+eng
       max-pdf-pages: 5
+    vectorize:
+      provider-strategies:
+        OLLAMA:
+          embedding-batch-size: 1
+          max-chunk-chars: 400
+          chunk-overlap-chars: 80
 
 logging:
   level:

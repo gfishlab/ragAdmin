@@ -62,10 +62,20 @@ rag:
   document:
     ocr:
       enabled: true
-      tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
-      data-path: .ocr-data/tessdata
+      # Windows 本地开发示例：
+      # tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
+      # Mac 本地开发默认示例：通过 Homebrew 安装后通常可直接使用系统 PATH 中的 tesseract
+      tesseract-command: tesseract
+      # 如需使用仓库内自带语言包目录，可显式指定：
+      # data-path: .ocr-data/tessdata
       language: chi_sim+eng
       max-pdf-pages: 5
+    vectorize:
+      provider-strategies:
+        OLLAMA:
+          embedding-batch-size: 1
+          max-chunk-chars: 400
+          chunk-overlap-chars: 80
 
 logging:
   level:

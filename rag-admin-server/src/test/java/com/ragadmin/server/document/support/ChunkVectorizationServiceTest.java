@@ -8,7 +8,6 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
-import com.ragadmin.server.model.service.ModelService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -30,7 +29,7 @@ import static org.mockito.Mockito.when;
 class ChunkVectorizationServiceTest {
 
     @Mock
-    private ModelService modelService;
+    private DocumentVectorizationStrategyResolver strategyResolver;
 
     @Mock
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -48,15 +47,18 @@ class ChunkVectorizationServiceTest {
     private ChunkVectorizationService chunkVectorizationService;
 
     @Test
-    void shouldBatchEmbeddingRequestsByTen() {
+    void shouldBatchEmbeddingRequestsByProviderStrategy() {
         KnowledgeBaseEntity knowledgeBase = new KnowledgeBaseEntity();
         knowledgeBase.setId(8L);
         knowledgeBase.setEmbeddingModelId(3L);
 
-        when(modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(3L))
-                .thenReturn(new EmbeddingModelDescriptor(3L, "text-embedding-v3", "BAILIAN", "阿里百炼", EmbeddingExecutionMode.SYNC_TEXT));
-        when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(embeddingModelClient);
-        when(embeddingModelClient.embed(eq("text-embedding-v3"), anyList()))
+        when(strategyResolver.resolveByEmbeddingModelId(3L))
+                .thenReturn(new DocumentVectorizationStrategyResolver.ResolvedStrategy(
+                        new EmbeddingModelDescriptor(3L, "quentinz/bge-small-zh-v1.5", "OLLAMA", "Ollama", EmbeddingExecutionMode.SYNC_TEXT),
+                        new DocumentVectorizationProperties.StrategyProperties(1, 400, 80)
+                ));
+        when(embeddingClientRegistry.getClient("OLLAMA")).thenReturn(embeddingModelClient);
+        when(embeddingModelClient.embed(eq("quentinz/bge-small-zh-v1.5"), anyList()))
                 .thenAnswer(invocation -> {
                     List<String> inputs = invocation.getArgument(1);
                     List<List<Float>> result = new ArrayList<>();
@@ -82,10 +84,9 @@ class ChunkVectorizationServiceTest {
 
         @SuppressWarnings("unchecked")
         ArgumentCaptor<List<String>> inputsCaptor = ArgumentCaptor.forClass(List.class);
-        verify(embeddingModelClient, times(3)).embed(eq("text-embedding-v3"), inputsCaptor.capture());
-        assertEquals(10, inputsCaptor.getAllValues().get(0).size());
-        assertEquals(10, inputsCaptor.getAllValues().get(1).size());
-        assertEquals(6, inputsCaptor.getAllValues().get(2).size());
+        verify(embeddingModelClient, times(26)).embed(eq("quentinz/bge-small-zh-v1.5"), inputsCaptor.capture());
+        assertEquals(1, inputsCaptor.getAllValues().getFirst().size());
+        assertEquals(1, inputsCaptor.getAllValues().getLast().size());
 
         verify(milvusVectorStoreClient).ensureCollection("kb_8_emb_3_d_3", 3);
         verify(milvusVectorStoreClient).upsert(eq("kb_8_emb_3_d_3"), eq(chunks), anyList());

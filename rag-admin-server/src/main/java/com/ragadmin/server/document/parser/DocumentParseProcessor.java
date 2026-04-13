@@ -13,6 +13,8 @@ import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import com.ragadmin.server.document.support.ChunkVectorizationService;
+import com.ragadmin.server.document.support.DocumentVectorizationProperties;
+import com.ragadmin.server.document.support.DocumentVectorizationStrategyResolver;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -48,6 +50,7 @@ public class DocumentParseProcessor {
     private final TaskStepRecordMapper taskStepRecordMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
+    private final DocumentVectorizationStrategyResolver strategyResolver;
     private final TaskRealtimeEventService taskRealtimeEventService;
     private final DocumentParseProperties documentParseProperties;
     private final ExecutorService documentParseExecutor;
@@ -63,6 +66,7 @@ public class DocumentParseProcessor {
             TaskStepRecordMapper taskStepRecordMapper,
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
+            DocumentVectorizationStrategyResolver strategyResolver,
             TaskRealtimeEventService taskRealtimeEventService,
             DocumentParseProperties documentParseProperties,
             @Qualifier(IO_VIRTUAL_TASK_EXECUTOR) ExecutorService documentParseExecutor,
@@ -76,6 +80,7 @@ public class DocumentParseProcessor {
         this.taskStepRecordMapper = taskStepRecordMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
+        this.strategyResolver = strategyResolver;
         this.taskRealtimeEventService = taskRealtimeEventService;
         this.documentParseProperties = documentParseProperties;
         this.documentParseExecutor = documentParseExecutor;
@@ -145,10 +150,12 @@ public class DocumentParseProcessor {
         try {
             taskRealtimeEventService.publishTaskStarted(context.task(), context.document());
             KnowledgeBaseEntity knowledgeBase = knowledgeBaseService.requireById(context.document().getKbId());
+            DocumentVectorizationProperties.StrategyProperties strategy =
+                    strategyResolver.resolveByEmbeddingModelId(knowledgeBase.getEmbeddingModelId()).strategy();
 
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
             taskRealtimeEventService.publishStepStarted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
-            ParsedContent parsedContent = parseContent(context.document(), context.version());
+            ParsedContent parsedContent = parseContent(context.document(), context.version(), strategy);
             completeStep(extractStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
 
@@ -326,17 +333,23 @@ public class DocumentParseProcessor {
         taskRealtimeEventService.publishTaskFailed(task, document, currentStepCode, currentStepName);
     }
 
-    private ParsedContent parseContent(DocumentEntity document, DocumentVersionEntity version) throws Exception {
+    private ParsedContent parseContent(
+            DocumentEntity document,
+            DocumentVersionEntity version,
+            DocumentVectorizationProperties.StrategyProperties strategy
+    ) throws Exception {
         String content = documentContentExtractor.extract(document, version);
-        return new ParsedContent(splitIntoChunks(content));
+        return new ParsedContent(splitIntoChunks(content, strategy));
     }
 
-    private List<String> splitIntoChunks(String content) {
+    List<String> splitIntoChunks(String content, DocumentVectorizationProperties.StrategyProperties strategy) {
         String normalized = content == null ? "" : content.replace("\r\n", "\n").trim();
         if (normalized.isEmpty()) {
             return List.of();
         }
 
+        int maxChunkChars = Math.max(100, strategy.getMaxChunkChars());
+        int chunkOverlapChars = Math.max(0, Math.min(strategy.getChunkOverlapChars(), maxChunkChars / 2));
         List<String> chunks = new ArrayList<>();
         List<String> paragraphs = List.of(normalized.split("\\n\\s*\\n"));
         StringBuilder current = new StringBuilder();
@@ -346,10 +359,10 @@ public class DocumentParseProcessor {
             if (trimmed.isEmpty()) {
                 continue;
             }
-            if (current.length() > 0 && current.length() + trimmed.length() + 2 > 800) {
+            if (current.length() > 0 && current.length() + trimmed.length() + 2 > maxChunkChars) {
                 chunks.add(current.toString());
                 chunkNo++;
-                current = new StringBuilder(overlapTail(chunks.get(chunkNo - 1), 120));
+                current = new StringBuilder(overlapTail(chunks.get(chunkNo - 1), chunkOverlapChars));
             }
             if (current.length() > 0) {
                 current.append("\n\n");
@@ -361,7 +374,7 @@ public class DocumentParseProcessor {
         }
 
         if (chunks.isEmpty()) {
-            chunks.add(normalized.substring(0, Math.min(normalized.length(), 800)));
+            chunks.add(normalized.substring(0, Math.min(normalized.length(), maxChunkChars)));
         }
         return chunks;
     }
