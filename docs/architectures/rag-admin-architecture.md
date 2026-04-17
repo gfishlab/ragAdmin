@@ -208,6 +208,8 @@ flowchart LR
 
 #### 4.3.1 文档解析技术分工
 
+文档加载与清洗的详细策略见 `rag-admin-document-ingestion-architecture.md`。本节只保留总架构层结论。
+
 在 `ragAdmin` 的 `Knowledge Pipeline` 中，需要区分“文本提取”“OCR 识别”“复杂文档结构化解析”三类能力：
 
 - `Apache Tika`：负责文本型 `PDF`、`DOCX`、`XLSX`、`PPTX`、`TXT`、`Markdown` 等文件的文本与元数据提取
