@@ -328,8 +328,8 @@ git commit -m "feat: 后台前端按权限码收口访问边界"
 
 **Files:**
 - Verify: `docs/plans/2026-03-19-admin-permission-boundary-design.md`
-- Verify: `docs/rag-admin-architecture.md`
-- Verify: `docs/rag-admin-api-design.md`
+- Verify: `docs/architectures/rag-admin-architecture.md`
+- Verify: `docs/architectures/rag-admin-api-design.md`
 - Verify: `AGENTS.md`
 - Test: `rag-admin-server`
 - Test: `rag-admin-web`
@@ -356,7 +356,7 @@ Expected: PASS
 - [ ] **Step 4: 汇总变更并完成最终提交**
 
 ```bash
-git add AGENTS.md docs/rag-admin-architecture.md docs/rag-admin-api-design.md
+git add AGENTS.md docs/architectures/rag-admin-architecture.md docs/architectures/rag-admin-api-design.md
 git commit -m "docs: 同步权限实现与设计文档"
 ```
 

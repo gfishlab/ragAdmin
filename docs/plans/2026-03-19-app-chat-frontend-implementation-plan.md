@@ -14,9 +14,9 @@
 
 ### 后端文档与数据库
 
-- Modify: `docs/rag-admin-architecture.md`
-- Modify: `docs/rag-admin-api-design.md`
-- Modify: `docs/rag-admin-schema-v1.sql`
+- Modify: `docs/architectures/rag-admin-architecture.md`
+- Modify: `docs/architectures/rag-admin-api-design.md`
+- Modify: `docs/architectures/rag-admin-schema-v1.sql`
 - Create: `rag-admin-server/src/main/resources/db/migration/V5__support_app_chat_portal.sql`
 
 ### 后端鉴权与前台接口
@@ -87,9 +87,9 @@
 
 **Files:**
 
-- Modify: `docs/rag-admin-architecture.md`
-- Modify: `docs/rag-admin-api-design.md`
-- Modify: `docs/rag-admin-schema-v1.sql`
+- Modify: `docs/architectures/rag-admin-architecture.md`
+- Modify: `docs/architectures/rag-admin-api-design.md`
+- Modify: `docs/architectures/rag-admin-schema-v1.sql`
 
 - [ ] **Step 1: 更新架构文档中的前端与接口分域描述**
 
@@ -147,7 +147,7 @@ CREATE TABLE chat_session_kb_rel (
 - [ ] **Step 5: 提交**
 
 ```bash
-git add docs/rag-admin-architecture.md docs/rag-admin-api-design.md docs/rag-admin-schema-v1.sql
+git add docs/architectures/rag-admin-architecture.md docs/architectures/rag-admin-api-design.md docs/architectures/rag-admin-schema-v1.sql
 git commit -m "docs(chat): 补充独立问答前台主文档设计"
 ```
 
@@ -676,8 +676,8 @@ git commit -m "feat(app-web): 支持知识库内部聊天场景"
 **Files:**
 
 - Modify: `README.md`
-- Modify: `docs/rag-admin-backend-debug-guide.md`
-- Modify: `docs/rag-admin-api-acceptance.md`
+- Modify: `docs/tasks/rag-admin-backend-debug-guide.md`
+- Modify: `docs/tasks/rag-admin-api-acceptance.md`
 
 - [x] **Step 1: 更新仓库结构说明**
 
@@ -723,7 +723,7 @@ Expected:
 - [ ] **Step 4: 最终提交**
 
 ```bash
-git add README.md docs/rag-admin-backend-debug-guide.md docs/rag-admin-api-acceptance.md
+git add README.md docs/tasks/rag-admin-backend-debug-guide.md docs/tasks/rag-admin-api-acceptance.md
 git commit -m "docs(app): 补充独立问答前台联调说明"
 ```
 

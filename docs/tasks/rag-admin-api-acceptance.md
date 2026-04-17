@@ -39,7 +39,7 @@
 - PostgreSQL、Redis、MinIO、Milvus、Ollama 可访问
 - 默认管理员已初始化
 - 已存在可用的聊天模型和 Embedding 模型
-- 本地准备了一个待上传文件，例如 `F:\codes\ragAdmin\docs\sample.md`
+- 本地准备了一个待上传文件，例如 `F:\codes\ragAdmin\examples\sample.md`
 
 建议先执行：
 
@@ -55,7 +55,7 @@ mvn -q -pl rag-admin-server -am test
 $BaseUrl = "http://127.0.0.1:9212"
 $LoginId = "admin"
 $Password = "Admin@123456"
-$SampleFile = "F:\codes\ragAdmin\docs\sample.md"
+$SampleFile = "F:\codes\ragAdmin\examples\sample.md"
 
 $AccessToken = ""
 $RefreshToken = ""
@@ -494,5 +494,5 @@ curl.exe `
 
 如任一步骤失败，优先结合以下文档排查：
 
-- `docs/rag-admin-backend-debug-guide.md`
-- `docs/rag-admin-error-codes.md`
+- `docs/tasks/rag-admin-backend-debug-guide.md`
+- `docs/architectures/rag-admin-error-codes.md`

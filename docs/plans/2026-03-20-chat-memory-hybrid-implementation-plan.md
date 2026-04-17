@@ -28,14 +28,14 @@
 - 修改：`rag-admin-server/src/main/java/com/ragadmin/server/chat/service/ChatService.java`
 - 修改：`rag-admin-server/src/main/java/com/ragadmin/server/app/service/AppChatService.java`
 - 修改：`rag-admin-server/src/main/java/com/ragadmin/server/chat/service/ChatExchangePersistenceService.java`
-- 修改：`docs/rag-admin-schema-v1.sql`
+- 修改：`docs/architectures/rag-admin-schema-v1.sql`
 
 ## Task 1：扩展配置与数据库结构
 
 **Files:**
 - Create: `rag-admin-server/src/main/resources/db/migration/V8__add_chat_memory_summary.sql`
 - Modify: `rag-admin-server/src/main/java/com/ragadmin/server/infra/ai/chat/ChatMemoryProperties.java`
-- Modify: `docs/rag-admin-schema-v1.sql`
+- Modify: `docs/architectures/rag-admin-schema-v1.sql`
 
 - [ ] 增加短期窗口、空闲 TTL、摘要阈值、摘要最大长度、Redis key 前缀等配置项
 - [ ] 新增 `chat_session_memory_summary` 表迁移脚本

@@ -40,9 +40,9 @@
   - 处理同步、历史和流式返回中的 `webSearchSources`
 - 修改 `rag-chat-web/src/components/chat/AppChatWorkspace.vue`
   - 增加联网来源折叠状态、按钮和展示块
-- 修改 `docs/rag-admin-api-design.md`
+- 修改 `docs/architectures/rag-admin-api-design.md`
   - 补接口字段说明
-- 修改 `docs/rag-admin-schema-v1.sql`
+- 修改 `docs/architectures/rag-admin-schema-v1.sql`
   - 补 `chat_web_search_source`
 
 ## Chunk 1: 后端数据模型与持久化
@@ -51,7 +51,7 @@
 
 **Files:**
 - Create: `rag-admin-server/src/main/resources/db/migration/V12__add_chat_web_search_source.sql`
-- Modify: `docs/rag-admin-schema-v1.sql`
+- Modify: `docs/architectures/rag-admin-schema-v1.sql`
 
 - [ ] **Step 1: 编写 migration**
   - 建表 `chat_web_search_source`
@@ -181,7 +181,7 @@ Expected:
 ### Task 8: 同步接口文档
 
 **Files:**
-- Modify: `docs/rag-admin-api-design.md`
+- Modify: `docs/architectures/rag-admin-api-design.md`
 
 - [ ] **Step 1: 为历史消息接口增加 `webSearchSources` 说明**
 - [ ] **Step 2: 为同步问答响应增加 `webSearchSources` 说明**

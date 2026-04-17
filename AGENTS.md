@@ -20,9 +20,9 @@
 ## 当前事实来源
 
 当前阶段以下文档是主要事实来源：
-- `docs/rag-admin-architecture.md`
-- `docs/rag-admin-api-design.md`
-- `docs/rag-admin-schema-v1.sql`
+- `docs/architectures/rag-admin-architecture.md`
+- `docs/architectures/rag-admin-api-design.md`
+- `docs/architectures/rag-admin-schema-v1.sql`
 
 实现与文档出现差异时，默认先对齐文档，再决定实现。
 
@@ -62,7 +62,7 @@
 - 用户问答侧会话记忆默认持久化到 PostgreSQL，`chatId` 优先使用稳定内部标识，会话操作按用户归属校验
 - 首页通用问答与知识库内问答采用独立会话上下文
 - `rag-admin-server` 顶层优先按业务域拆分，外部依赖适配优先下沉到 `infra`
-- 后端包结构细则见 `docs/rag-admin-backend-package-structure.md`
+- 后端包结构细则见 `docs/architectures/rag-admin-architecture.md`
 
 ## 开发原则
 
@@ -110,9 +110,15 @@
 
 - `*.md` 文档默认使用中文简体
 - 标题、说明、备注、步骤优先使用中文简体
-- 技术名词、接口路径、类名、表名可保留英文
-- 文档数量保持克制，优先维护阶段性聚合文档
-- 跨模块、高风险、长周期主题再拆成专题文档
+- 技术名词、接口路径、类名、表名可保留英文，文件名优先使用稳定英文 slug
+- `docs` 下只保留 `architectures`、`plans`、`tasks` 三类目录，不新增其他文档分类目录
+- `docs/architectures` 存放当前正式生效的架构与技术设计，属于稳定事实源；一个稳定专题一篇文档，失效内容直接改写或删除，不保留并列旧版
+- `docs/plans` 存放当前仍有效的阶段性方案、设计推演与实施计划；一个大功能或一个阶段一篇主 plan，路线变更后直接覆盖、重写或删除旧 plan，不追加兼容性历史
+- `docs/tasks` 存放当前执行型文档；一个 plan 可以对应多个 task 文件，任务完成且无复用价值后直接删除
+- 同一专题在同一阶段只维护一份主文档，避免多个事实源并存；需求、设计、任务边界分别落在对应目录，不交叉堆叠
+- 文档内容保持高信号密度，只写会持续约束实现或指导执行的内容，不为仪式感生成冗长文书
+- 计划结论一旦沉淀为长期有效约束，应及时回写到 `docs/architectures`，避免长期停留在 `plans`
+- 跨模块、高风险、长周期主题允许按专题拆文档，但仍必须归属到 `architectures`、`plans`、`tasks` 三类目录之一
 
 ## Agent 工程运行约定
 

@@ -744,12 +744,12 @@ rag-admin/
 
 实施前先同步修订以下文件：
 
-- `docs/rag-admin-schema-v1.sql`
+- `docs/architectures/rag-admin-schema-v1.sql`
   - 改为 Milvus 引用模型
   - 增加 `mobile` 唯一约束
-- `docs/rag-admin-api-design.md`
+- `docs/architectures/rag-admin-api-design.md`
   - 登录请求改为 `loginId + password`
   - 登录响应改为双 Token
   - 新增 `/api/admin/auth/refresh`
-- `docs/rag-admin-architecture.md`
+- `docs/architectures/rag-admin-architecture.md`
   - 保持与本计划一致，不再保留旧的 `pgvector` 主方案残留

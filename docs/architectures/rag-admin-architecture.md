@@ -563,18 +563,84 @@ rag-admin/
 - `rag-chat-web` 负责终端问答体验
 - `rag-admin-server` 统一承载鉴权、知识库管理、检索编排、模型调用和会话持久化
 
-### 9.2 后端包结构建议
+### 9.2 后端包结构约束
 
-不要按技术层简单平铺，建议按业务域拆分：
+`rag-admin-server` 采用“顶层按业务域拆分，域内保持小分层”的模块化单体结构，不采用全局技术层平铺。
 
-- `auth`
-- `model`
-- `knowledge`
-- `document`
-- `retrieval`
-- `chat`
-- `task`
-- `audit`
+后端主包固定按业务域组织：
+
+```text
+com.ragadmin.server
+├─ audit
+├─ auth
+├─ chat
+├─ common
+├─ document
+├─ infra
+├─ internal
+├─ knowledge
+├─ model
+├─ retrieval
+├─ statistics
+├─ system
+└─ task
+```
+
+各顶层模块职责如下：
+
+- `auth`：认证、授权、用户、角色、Token、登录态
+- `model`：模型提供方、模型定义、能力映射、探活、默认模型解析
+- `knowledge`：知识库主实体、知识库配置、知识库级管理能力
+- `document`：文档上传、版本、切片、解析任务触发、OCR、向量化前后处理
+- `retrieval`：RAG 检索编排、召回、上下文组织、检索参数配置
+- `chat`：问答会话、消息、引用片段、反馈
+- `task`：任务列表、任务详情、任务步骤、重试记录、实时事件推送
+- `audit`：操作审计、请求审计、审计落库与查询
+- `statistics`：聚合统计、报表类查询、概览数据接口
+- `system`：系统健康检查、环境依赖状态、系统级管理能力
+- `internal`：内部回调、内部接口、仅服务间使用的入口
+- `infra`：AI、对象存储、向量库、OCR、外部 HTTP/RPC 等外部依赖适配层
+- `common`：统一响应、全局异常、基础配置、通用模型等跨模块能力
+
+域内默认采用如下小分层：
+
+```text
+<domain>
+├─ controller
+├─ dto
+├─ entity
+├─ mapper
+└─ service
+```
+
+当前阶段不强制拆 `service/impl`。只有在出现完整独立子流程或明显外部依赖适配职责时，才允许新增专项子包，例如：
+
+- `document.parser`
+- `document.support`
+- `auth.config`
+- `auth.model`
+- `retrieval.config`
+- `infra.ai`
+- `infra.storage`
+- `infra.vector`
+- `infra.health`
+
+以下做法明确禁止：
+
+- 新增全局平铺目录，如 `com.ragadmin.server.controller`、`service`、`mapper`
+- 新增 `service/impl` 双层样板结构
+- 将某个业务域的 DTO、Entity、Mapper 抽到全局公共包
+- 将第三方 SDK 直接扩散到业务域 `service`
+- 将跨模块编排逻辑写进 `controller`
+- 把业务相关工具类持续堆入 `common`
+
+新增代码时按如下顺序判断归属：
+
+1. 先判断属于哪个业务域
+2. 再判断属于域内哪一层
+3. 只有当前域出现明显专项职责时，才新增专项子包
+
+一句话原则：顶层按业务域拆分，域内保持小分层，外部依赖统一下沉到 `infra`，不回退到全局技术层平铺结构。
 
 ### 9.3 首期重点风险
 

@@ -13,7 +13,7 @@
 ### Task 1: 补齐设计与配置骨架
 
 **文件：**
-- Create: `docs/plans/2026-03-24-tavily-web-search-design.md`
+- Reference: `docs/architectures/rag-admin-ai-orchestration-architecture.md`
 - Create: `docs/plans/2026-03-24-tavily-web-search-implementation-plan.md`
 - Modify: `rag-admin-server/src/main/resources/application.yml`
 - Modify: `rag-admin-server/src/main/resources/application-local-secret.example.yml`

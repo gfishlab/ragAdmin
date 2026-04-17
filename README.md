@@ -243,13 +243,13 @@ docker compose --env-file docker/compose/.env -f docker/compose/docker-compose.y
 
 ## 5. 关键文档
 
-- 架构设计：[docs/rag-admin-architecture.md](docs/rag-admin-architecture.md)
-- 接口设计：[docs/rag-admin-api-design.md](docs/rag-admin-api-design.md)
-- 数据库草案：[docs/rag-admin-schema-v1.sql](docs/rag-admin-schema-v1.sql)
-- 实施计划：[docs/rag-admin-implementation-plan.md](docs/rag-admin-implementation-plan.md)
-- 后端完成度清单：[docs/rag-admin-backend-completion-checklist.md](docs/rag-admin-backend-completion-checklist.md)
-- 后端联调说明：[docs/rag-admin-backend-debug-guide.md](docs/rag-admin-backend-debug-guide.md)
-- API 验收脚本说明：[docs/rag-admin-api-acceptance.md](docs/rag-admin-api-acceptance.md)
+- 架构设计：[docs/architectures/rag-admin-architecture.md](docs/architectures/rag-admin-architecture.md)
+- AI 编排设计：[docs/architectures/rag-admin-ai-orchestration-architecture.md](docs/architectures/rag-admin-ai-orchestration-architecture.md)
+- 接口设计：[docs/architectures/rag-admin-api-design.md](docs/architectures/rag-admin-api-design.md)
+- 数据库草案：[docs/architectures/rag-admin-schema-v1.sql](docs/architectures/rag-admin-schema-v1.sql)
+- 实施计划：[docs/plans/rag-admin-implementation-plan.md](docs/plans/rag-admin-implementation-plan.md)
+- 后端联调说明：[docs/tasks/rag-admin-backend-debug-guide.md](docs/tasks/rag-admin-backend-debug-guide.md)
+- API 验收脚本说明：[docs/tasks/rag-admin-api-acceptance.md](docs/tasks/rag-admin-api-acceptance.md)
 - 前台架构设计：[docs/plans/2026-03-19-app-chat-frontend-architecture-design.md](docs/plans/2026-03-19-app-chat-frontend-architecture-design.md)
 - 前台实施计划：[docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md](docs/plans/2026-03-19-app-chat-frontend-implementation-plan.md)
 - 项目协作规则：[AGENTS.md](AGENTS.md)
