@@ -190,6 +190,7 @@ public class TaskService {
                         step.getStepName(),
                         step.getStepStatus(),
                         step.getErrorMessage(),
+                        step.getDetailJson(),
                         step.getStartedAt(),
                         step.getFinishedAt()
                 ))

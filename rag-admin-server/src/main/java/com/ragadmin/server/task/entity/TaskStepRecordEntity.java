@@ -18,6 +18,7 @@ public class TaskStepRecordEntity {
     private String stepName;
     private String stepStatus;
     private String errorMessage;
+    private String detailJson;
     private LocalDateTime startedAt;
     private LocalDateTime finishedAt;
     private LocalDateTime createdAt;

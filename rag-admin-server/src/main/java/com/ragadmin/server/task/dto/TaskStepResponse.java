@@ -7,6 +7,7 @@ public record TaskStepResponse(
         String stepName,
         String stepStatus,
         String errorMessage,
+        String detailJson,
         LocalDateTime startedAt,
         LocalDateTime finishedAt
 ) {

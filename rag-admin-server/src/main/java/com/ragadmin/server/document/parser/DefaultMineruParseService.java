@@ -1,11 +1,6 @@
 package com.ragadmin.server.document.parser;
 
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.fasterxml.jackson.annotation.JsonProperty;
 import com.ragadmin.server.common.exception.BusinessException;
-import com.ragadmin.server.infra.storage.support.MinioClientFactory;
-import io.minio.GetPresignedObjectUrlArgs;
-import io.minio.http.Method;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
@@ -34,13 +29,13 @@ public class DefaultMineruParseService implements MineruParseService {
     private static final Logger log = LoggerFactory.getLogger(DefaultMineruParseService.class);
 
     private final MineruProperties mineruProperties;
-    private final MinioClientFactory minioClientFactory;
+    private final MineruSourceResolver mineruSourceResolver;
     private final RestClient restClient;
     private final RestClient downloadClient;
 
-    public DefaultMineruParseService(MineruProperties mineruProperties, MinioClientFactory minioClientFactory) {
+    public DefaultMineruParseService(MineruProperties mineruProperties, MineruSourceResolver mineruSourceResolver) {
         this.mineruProperties = mineruProperties;
-        this.minioClientFactory = minioClientFactory;
+        this.mineruSourceResolver = mineruSourceResolver;
         this.restClient = RestClient.builder()
                 .baseUrl(mineruProperties.getBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + nullSafe(mineruProperties.getApiToken()))
@@ -54,9 +49,9 @@ public class DefaultMineruParseService implements MineruParseService {
         if (!mineruProperties.isConfigured()) {
             throw new BusinessException("MINERU_NOT_CONFIGURED", "MinerU API 未完成配置", HttpStatus.SERVICE_UNAVAILABLE);
         }
-        String sourceUrl = resolveSourceUrl(request);
-        CreateTaskResponse createTaskResponse = submitTask(sourceUrl, request);
-        TaskResultResponse taskResultResponse = pollUntilFinished(createTaskResponse.data().taskId());
+        String sourceUrl = mineruSourceResolver.resolve(request);
+        MineruTaskModels.CreateTaskResponse createTaskResponse = submitTask(sourceUrl, request);
+        MineruTaskModels.TaskResultResponse taskResultResponse = pollUntilFinished(createTaskResponse.data().taskId());
         if (!"done".equalsIgnoreCase(taskResultResponse.data().state())) {
             log.warn("MinerU 解析失败，taskId={}, documentName={}, errMsg={}",
                     createTaskResponse.data().taskId(), request.document().getDocName(), nullSafe(taskResultResponse.data().errMsg()));
@@ -66,7 +61,7 @@ public class DefaultMineruParseService implements MineruParseService {
                     HttpStatus.BAD_GATEWAY
             );
         }
-        MarkdownResult markdownResult = resolveMarkdown(taskResultResponse.data());
+        MineruTaskModels.MarkdownResult markdownResult = resolveMarkdown(taskResultResponse.data());
         Map<String, Object> metadata = new LinkedHashMap<>();
         metadata.put("mineruTaskId", createTaskResponse.data().taskId());
         metadata.put("mineruState", taskResultResponse.data().state());
@@ -86,19 +81,19 @@ public class DefaultMineruParseService implements MineruParseService {
         return new OcrCapability(true, true, "MinerU API 可用", mineruProperties.getLanguage(), mineruProperties.getMaxPdfPages());
     }
 
-    protected CreateTaskResponse submitTask(String sourceUrl, DocumentParseRequest request) {
+    protected MineruTaskModels.CreateTaskResponse submitTask(String sourceUrl, DocumentParseRequest request) {
         Map<String, Object> payload = Map.of(
                 "url", sourceUrl,
                 "model_version", mineruProperties.getModelVersion(),
                 "file_name", request.document().getDocName()
         );
-        CreateTaskResponse response;
+        MineruTaskModels.CreateTaskResponse response;
         try {
             response = restClient.post()
                     .uri("/api/v4/extract/task")
                     .body(payload)
                     .retrieve()
-                    .body(CreateTaskResponse.class);
+                    .body(MineruTaskModels.CreateTaskResponse.class);
         } catch (RestClientResponseException ex) {
             log.warn("MinerU 任务创建失败，documentName={}, statusCode={}, body={}",
                     request.document().getDocName(), ex.getStatusCode(), truncate(ex.getResponseBodyAsString()));
@@ -114,14 +109,14 @@ public class DefaultMineruParseService implements MineruParseService {
         return response;
     }
 
-    protected TaskResultResponse pollUntilFinished(String taskId) throws InterruptedException {
+    protected MineruTaskModels.TaskResultResponse pollUntilFinished(String taskId) throws InterruptedException {
         for (int i = 0; i < mineruProperties.getMaxPollAttempts(); i++) {
-            TaskResultResponse response;
+            MineruTaskModels.TaskResultResponse response;
             try {
                 response = restClient.get()
                         .uri("/api/v4/extract/task/{taskId}", taskId)
                         .retrieve()
-                        .body(TaskResultResponse.class);
+                        .body(MineruTaskModels.TaskResultResponse.class);
             } catch (RestClientResponseException ex) {
                 log.warn("MinerU 任务轮询失败，taskId={}, statusCode={}, body={}",
                         taskId, ex.getStatusCode(), truncate(ex.getResponseBodyAsString()));
@@ -142,15 +137,15 @@ public class DefaultMineruParseService implements MineruParseService {
         throw new BusinessException("MINERU_TASK_TIMEOUT", "MinerU 解析超时", HttpStatus.GATEWAY_TIMEOUT);
     }
 
-    protected MarkdownResult resolveMarkdown(TaskResultData taskResultData) throws Exception {
+    protected MineruTaskModels.MarkdownResult resolveMarkdown(MineruTaskModels.TaskResultData taskResultData) throws Exception {
         if (StringUtils.hasText(taskResultData.fullMdUrl())) {
-            return new MarkdownResult(downloadPlainText(taskResultData.fullMdUrl()), "FULL_MD_URL");
+            return new MineruTaskModels.MarkdownResult(downloadPlainText(taskResultData.fullMdUrl()), "FULL_MD_URL");
         }
         if (StringUtils.hasText(taskResultData.mdUrl())) {
-            return new MarkdownResult(downloadPlainText(taskResultData.mdUrl()), "MD_URL");
+            return new MineruTaskModels.MarkdownResult(downloadPlainText(taskResultData.mdUrl()), "MD_URL");
         }
         if (StringUtils.hasText(taskResultData.fullZipUrl())) {
-            return new MarkdownResult(downloadMarkdownFromZip(taskResultData.fullZipUrl()), "FULL_ZIP_URL");
+            return new MineruTaskModels.MarkdownResult(downloadMarkdownFromZip(taskResultData.fullZipUrl()), "FULL_ZIP_URL");
         }
         throw new BusinessException("MINERU_RESULT_MISSING", "MinerU 未返回可用的 Markdown 结果地址", HttpStatus.BAD_GATEWAY);
     }
@@ -204,22 +199,6 @@ public class DefaultMineruParseService implements MineruParseService {
         throw new BusinessException("MINERU_RESULT_MISSING", "MinerU 结果压缩包中未找到有效 Markdown 文件", HttpStatus.BAD_GATEWAY);
     }
 
-    protected String resolveSourceUrl(DocumentParseRequest request) {
-        try {
-            return minioClientFactory.createClient().getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(request.version().getStorageBucket())
-                            .object(request.version().getStorageObjectKey())
-                            .expiry(30 * 60)
-                            .build()
-            );
-        } catch (Exception ex) {
-            log.warn("生成 MinerU 读取地址失败，documentName={}, reason={}", request.document().getDocName(), ex.getMessage());
-            throw new BusinessException("MINERU_SOURCE_URL_FAILED", "生成 MinerU 读取地址失败", HttpStatus.INTERNAL_SERVER_ERROR);
-        }
-    }
-
     private String nullSafe(String value) {
         return value == null ? "" : value;
     }
@@ -231,29 +210,4 @@ public class DefaultMineruParseService implements MineruParseService {
         return value.length() > 500 ? value.substring(0, 500) : value;
     }
 
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record CreateTaskResponse(int code, String msg, CreateTaskData data) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record CreateTaskData(@JsonProperty("task_id") String taskId) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record TaskResultResponse(int code, String msg, TaskResultData data) {
-    }
-
-    @JsonIgnoreProperties(ignoreUnknown = true)
-    record TaskResultData(
-            @JsonProperty("task_id") String taskId,
-            String state,
-            @JsonProperty("full_zip_url") String fullZipUrl,
-            @JsonProperty("full_md_url") String fullMdUrl,
-            @JsonProperty("md_url") String mdUrl,
-            @JsonProperty("err_msg") String errMsg
-    ) {
-    }
-
-    record MarkdownResult(String markdown, String source) {
-    }
 }

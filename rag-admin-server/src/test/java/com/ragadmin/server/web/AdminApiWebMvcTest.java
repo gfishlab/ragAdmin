@@ -349,7 +349,7 @@ class AdminApiWebMvcTest {
                 LocalDateTime.of(2026, 3, 10, 10, 1),
                 LocalDateTime.of(2026, 3, 10, 9, 59),
                 LocalDateTime.of(2026, 3, 10, 10, 1),
-                List.of(new TaskStepResponse("EXTRACT_TEXT", "文本抽取", "SUCCESS", null, null, null)),
+                List.of(new TaskStepResponse("EXTRACT_TEXT", "文本抽取", "SUCCESS", null, null, null, null)),
                 List.of(new TaskRetryRecordResponse(1, "手动重试", "SUBMITTED", LocalDateTime.of(2026, 3, 10, 9, 58)))
         ));
 

@@ -164,6 +164,7 @@ public class DocumentParseProcessor {
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
             taskRealtimeEventService.publishStepStarted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
             ParsedContent parsedContent = parseContent(context.document(), context.version(), strategy);
+            attachExtractStepDetail(extractStep, parsedContent);
             logParsedContent(context, parsedContent);
             completeStep(extractStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
@@ -235,6 +236,41 @@ public class DocumentParseProcessor {
             step.setStepStatus("SUCCESS");
             step.setFinishedAt(LocalDateTime.now());
             step.setErrorMessage(null);
+            taskStepRecordMapper.updateById(step);
+        });
+    }
+
+    protected void attachExtractStepDetail(TaskStepRecordEntity step, ParsedContent parsedContent) {
+        transactionTemplate.executeWithoutResult(status -> {
+            List<String> readerTypes = parsedContent.sourceDocuments().stream()
+                    .map(document -> String.valueOf(document.getMetadata().get("readerType")))
+                    .distinct()
+                    .toList();
+            List<String> parseModes = parsedContent.sourceDocuments().stream()
+                    .map(document -> String.valueOf(document.getMetadata().get("parseMode")))
+                    .distinct()
+                    .toList();
+            List<String> mineruTaskIds = parsedContent.sourceDocuments().stream()
+                    .map(document -> document.getMetadata().get("mineruTaskId"))
+                    .filter(value -> value != null)
+                    .map(String::valueOf)
+                    .distinct()
+                    .toList();
+            List<String> mineruResultSources = parsedContent.sourceDocuments().stream()
+                    .map(document -> document.getMetadata().get("mineruResultSource"))
+                    .filter(value -> value != null)
+                    .map(String::valueOf)
+                    .distinct()
+                    .toList();
+            Map<String, Object> detail = Map.of(
+                    "readerTypes", readerTypes,
+                    "parseModes", parseModes,
+                    "mineruTaskIds", mineruTaskIds,
+                    "mineruResultSources", mineruResultSources,
+                    "sourceDocumentCount", parsedContent.sourceDocuments().size(),
+                    "chunkDraftCount", parsedContent.chunks().size()
+            );
+            step.setDetailJson(toMetadataJson(detail));
             taskStepRecordMapper.updateById(step);
         });
     }

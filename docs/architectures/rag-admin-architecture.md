@@ -507,7 +507,7 @@ flowchart TB
 | 表名 | 说明 |
 |------|------|
 | `job_task_record` | 异步任务记录 |
-| `job_task_step_record` | 任务步骤记录 |
+| `job_task_step_record` | 任务步骤记录，支持步骤级 `detail_json` 诊断信息 |
 | `job_retry_record` | 重试记录 |
 
 ## 8. 首期迭代范围

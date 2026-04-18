@@ -424,6 +424,7 @@ CREATE TABLE IF NOT EXISTS job_task_step_record (
     step_name           VARCHAR(100) NOT NULL,
     step_status         VARCHAR(16) NOT NULL DEFAULT 'WAITING',
     error_message       TEXT,
+    detail_json         JSONB,
     started_at          TIMESTAMP,
     finished_at         TIMESTAMP,
     created_at          TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
