@@ -349,7 +349,15 @@ class AdminApiWebMvcTest {
                 LocalDateTime.of(2026, 3, 10, 10, 1),
                 LocalDateTime.of(2026, 3, 10, 9, 59),
                 LocalDateTime.of(2026, 3, 10, 10, 1),
-                List.of(new TaskStepResponse("EXTRACT_TEXT", "文本抽取", "SUCCESS", null, null, null, null)),
+                List.of(new TaskStepResponse(
+                        "EXTRACT_TEXT",
+                        "文本抽取",
+                        "SUCCESS",
+                        null,
+                        "{\"readerTypes\":[\"PDF_PAGE_READER\"],\"parseModes\":[\"TEXT\"],\"mineruTaskIds\":[],\"mineruResultSources\":[],\"sourceDocumentCount\":1,\"chunkDraftCount\":3}",
+                        null,
+                        null
+                )),
                 List.of(new TaskRetryRecordResponse(1, "手动重试", "SUBMITTED", LocalDateTime.of(2026, 3, 10, 9, 58)))
         ));
 
@@ -360,6 +368,8 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.data.taskId").value(1))
                 .andExpect(jsonPath("$.data.documentName").value("员工手册.md"))
                 .andExpect(jsonPath("$.data.steps[0].stepCode").value("EXTRACT_TEXT"))
+                .andExpect(jsonPath("$.data.steps[0].detailJson").value(org.hamcrest.Matchers.containsString("readerTypes")))
+                .andExpect(jsonPath("$.data.steps[0].detailJson").value(org.hamcrest.Matchers.containsString("chunkDraftCount")))
                 .andExpect(jsonPath("$.data.retryRecords[0].retryResult").value("SUBMITTED"));
     }
 
@@ -430,6 +440,7 @@ class AdminApiWebMvcTest {
                 true,
                 true,
                 "MinerU API 可用",
+                "MINERU_API",
                 "ch",
                 600,
                 List.of("TXT", "PDF", "PNG"),
@@ -442,6 +453,7 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.ocrEnabled").value(true))
                 .andExpect(jsonPath("$.data.ocrAvailable").value(true))
+                .andExpect(jsonPath("$.data.ocrProvider").value("MINERU_API"))
                 .andExpect(jsonPath("$.data.ocrLanguage").value("ch"))
                 .andExpect(jsonPath("$.data.ocrImageDocTypes[0]").value("PNG"));
     }

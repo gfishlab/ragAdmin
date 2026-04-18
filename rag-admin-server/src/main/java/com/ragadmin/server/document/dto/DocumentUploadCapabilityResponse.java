@@ -6,6 +6,7 @@ public record DocumentUploadCapabilityResponse(
         boolean ocrEnabled,
         boolean ocrAvailable,
         String ocrMessage,
+        String ocrProvider,
         String ocrLanguage,
         int ocrMaxPdfPages,
         List<String> supportedDocTypes,

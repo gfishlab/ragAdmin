@@ -63,6 +63,7 @@ public class FileUploadService {
                 ocrCapability.enabled(),
                 ocrCapability.available(),
                 ocrCapability.message(),
+                "MINERU_API",
                 ocrCapability.language(),
                 ocrCapability.maxPdfPages(),
                 SUPPORTED_DOC_TYPES,
