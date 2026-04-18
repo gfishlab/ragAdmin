@@ -9,6 +9,8 @@ import com.ragadmin.server.document.mapper.ChunkMapper;
 import com.ragadmin.server.document.mapper.DocumentMapper;
 import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import com.ragadmin.server.task.service.TaskRealtimeEventService;
@@ -17,6 +19,7 @@ import com.ragadmin.server.document.support.DocumentVectorizationProperties;
 import com.ragadmin.server.document.support.DocumentVectorizationStrategyResolver;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import org.springframework.ai.document.Document;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +31,7 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
@@ -47,6 +51,7 @@ public class DocumentParseProcessor {
     private final DocumentVersionMapper documentVersionMapper;
     private final ChunkMapper chunkMapper;
     private final DocumentContentExtractor documentContentExtractor;
+    private final DocumentCleaner documentCleaner;
     private final TaskStepRecordMapper taskStepRecordMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
@@ -56,6 +61,7 @@ public class DocumentParseProcessor {
     private final ExecutorService documentParseExecutor;
     private final TransactionTemplate transactionTemplate;
     private final Set<Long> inFlightTaskIds = ConcurrentHashMap.newKeySet();
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DocumentParseProcessor(
             DocumentParseTaskMapper documentParseTaskMapper,
@@ -63,6 +69,7 @@ public class DocumentParseProcessor {
             DocumentVersionMapper documentVersionMapper,
             ChunkMapper chunkMapper,
             DocumentContentExtractor documentContentExtractor,
+            DocumentCleaner documentCleaner,
             TaskStepRecordMapper taskStepRecordMapper,
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
@@ -77,6 +84,7 @@ public class DocumentParseProcessor {
         this.documentVersionMapper = documentVersionMapper;
         this.chunkMapper = chunkMapper;
         this.documentContentExtractor = documentContentExtractor;
+        this.documentCleaner = documentCleaner;
         this.taskStepRecordMapper = taskStepRecordMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
@@ -156,6 +164,7 @@ public class DocumentParseProcessor {
             TaskStepRecordEntity extractStep = startStep(context.task().getId(), "EXTRACT_TEXT", "文本抽取");
             taskRealtimeEventService.publishStepStarted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
             ParsedContent parsedContent = parseContent(context.document(), context.version(), strategy);
+            logParsedContent(context, parsedContent);
             completeStep(extractStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), extractStep.getStepCode(), extractStep.getStepName());
 
@@ -230,7 +239,7 @@ public class DocumentParseProcessor {
         });
     }
 
-    protected List<ChunkEntity> persistChunks(ProcessingContext context, List<String> chunks) {
+    protected List<ChunkEntity> persistChunks(ProcessingContext context, List<ChunkDraft> chunks) {
         return transactionTemplate.execute(status -> {
             List<ChunkEntity> existingChunks = chunkMapper.selectList(new LambdaQueryWrapper<ChunkEntity>()
                     .eq(ChunkEntity::getDocumentVersionId, context.version().getId())
@@ -241,16 +250,16 @@ public class DocumentParseProcessor {
 
             int chunkNo = 1;
             List<ChunkEntity> persistedChunks = new ArrayList<>();
-            for (String chunkText : chunks) {
+            for (ChunkDraft chunk : chunks) {
                 ChunkEntity entity = new ChunkEntity();
                 entity.setKbId(context.document().getKbId());
                 entity.setDocumentId(context.document().getId());
                 entity.setDocumentVersionId(context.version().getId());
                 entity.setChunkNo(chunkNo++);
-                entity.setChunkText(chunkText);
-                entity.setTokenCount(estimateTokenCount(chunkText));
-                entity.setCharCount(chunkText.length());
-                entity.setMetadataJson(null);
+                entity.setChunkText(chunk.text());
+                entity.setTokenCount(estimateTokenCount(chunk.text()));
+                entity.setCharCount(chunk.text().length());
+                entity.setMetadataJson(toMetadataJson(chunk.metadata()));
                 entity.setEnabled(Boolean.TRUE);
                 chunkMapper.insert(entity);
                 persistedChunks.add(entity);
@@ -338,16 +347,66 @@ public class DocumentParseProcessor {
             DocumentVersionEntity version,
             DocumentVectorizationProperties.StrategyProperties strategy
     ) throws Exception {
-        String content = documentContentExtractor.extract(document, version);
-        return new ParsedContent(splitIntoChunks(content, strategy));
+        List<Document> rawDocuments = documentContentExtractor.extract(document, version);
+        List<Document> cleanedDocuments = documentCleaner.clean(
+                rawDocuments,
+                new DocumentCleanContext(document, new DocumentCleanPolicy(true, false, true, false, false, false))
+        );
+        return new ParsedContent(cleanedDocuments, splitIntoChunks(cleanedDocuments, strategy));
     }
 
-    List<String> splitIntoChunks(String content, DocumentVectorizationProperties.StrategyProperties strategy) {
-        String normalized = content == null ? "" : content.replace("\r\n", "\n").trim();
-        if (normalized.isEmpty()) {
-            return List.of();
-        }
+    private void logParsedContent(ProcessingContext context, ParsedContent parsedContent) {
+        List<String> readerTypes = parsedContent.sourceDocuments().stream()
+                .map(document -> String.valueOf(document.getMetadata().get("readerType")))
+                .distinct()
+                .toList();
+        List<String> parseModes = parsedContent.sourceDocuments().stream()
+                .map(document -> String.valueOf(document.getMetadata().get("parseMode")))
+                .distinct()
+                .toList();
+        List<String> mineruTaskIds = parsedContent.sourceDocuments().stream()
+                .map(document -> document.getMetadata().get("mineruTaskId"))
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .distinct()
+                .toList();
+        List<String> mineruResultSources = parsedContent.sourceDocuments().stream()
+                .map(document -> document.getMetadata().get("mineruResultSource"))
+                .filter(value -> value != null)
+                .map(String::valueOf)
+                .distinct()
+                .toList();
+        log.info("文档文本抽取完成，taskId={}, documentId={}, sourceDocumentCount={}, chunkDraftCount={}, readerTypes={}, parseModes={}, mineruTaskIds={}, mineruResultSources={}",
+                context.task().getId(),
+                context.document().getId(),
+                parsedContent.sourceDocuments().size(),
+                parsedContent.chunks().size(),
+                readerTypes,
+                parseModes,
+                mineruTaskIds,
+                mineruResultSources);
+    }
 
+    List<ChunkDraft> splitIntoChunks(List<Document> documents, DocumentVectorizationProperties.StrategyProperties strategy) {
+        List<ChunkDraft> result = new ArrayList<>();
+        for (Document document : documents) {
+            String normalized = document.getText() == null ? "" : document.getText().replace("\r\n", "\n").trim();
+            if (normalized.isEmpty()) {
+                continue;
+            }
+            List<String> chunkTexts = splitText(normalized, strategy);
+            for (int i = 0; i < chunkTexts.size(); i++) {
+                Map<String, Object> metadata = new java.util.LinkedHashMap<>(document.getMetadata());
+                metadata.put("parentDocumentId", document.getId());
+                metadata.put("chunkIndex", i);
+                metadata.put("totalChunks", chunkTexts.size());
+                result.add(new ChunkDraft(chunkTexts.get(i), metadata));
+            }
+        }
+        return result;
+    }
+
+    private List<String> splitText(String normalized, DocumentVectorizationProperties.StrategyProperties strategy) {
         int maxChunkChars = Math.max(100, strategy.getMaxChunkChars());
         int chunkOverlapChars = Math.max(0, Math.min(strategy.getChunkOverlapChars(), maxChunkChars / 2));
         List<String> chunks = new ArrayList<>();
@@ -379,6 +438,17 @@ public class DocumentParseProcessor {
         return chunks;
     }
 
+    private String toMetadataJson(Map<String, Object> metadata) {
+        if (metadata == null || metadata.isEmpty()) {
+            return null;
+        }
+        try {
+            return objectMapper.writeValueAsString(metadata);
+        } catch (JsonProcessingException ex) {
+            throw new IllegalStateException("切片 metadata 序列化失败", ex);
+        }
+    }
+
     private String overlapTail(String source, int tailLength) {
         if (source.length() <= tailLength) {
             return source;
@@ -405,6 +475,9 @@ public class DocumentParseProcessor {
     ) {
     }
 
-    private record ParsedContent(List<String> chunks) {
+    static record ChunkDraft(String text, Map<String, Object> metadata) {
+    }
+
+    private record ParsedContent(List<Document> sourceDocuments, List<ChunkDraft> chunks) {
     }
 }

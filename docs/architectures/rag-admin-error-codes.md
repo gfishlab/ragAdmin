@@ -63,6 +63,15 @@
 |---|---|---|
 | `MINIO_NOT_CONFIGURED` | MinIO 未完成配置 | 获取上传签名时基础配置缺失 |
 | `UPLOAD_URL_GENERATE_FAILED` | 上传地址生成失败 | MinIO 预签名异常 |
+| `MINERU_NOT_CONFIGURED` | MinerU API 未完成配置 | 文档解析链路启用 MinerU 但缺少基础配置 |
+| `MINERU_SOURCE_URL_FAILED` | MinerU 源文件地址生成失败 | 生成 MinIO 临时读取地址失败 |
+| `MINERU_TASK_CREATE_FAILED` | MinerU 任务创建失败 | 调用 MinerU 创建解析任务失败 |
+| `MINERU_TASK_POLL_FAILED` | MinerU 任务轮询失败 | 轮询 MinerU 任务状态失败 |
+| `MINERU_TASK_TIMEOUT` | MinerU 任务执行超时 | 多次轮询后任务仍未完成 |
+| `MINERU_TASK_FAILED` | MinerU 任务执行失败 | MinerU 返回 failed 状态 |
+| `MINERU_RESULT_DOWNLOAD_FAILED` | MinerU 结果下载失败 | 下载 Markdown 或结果压缩包失败 |
+| `MINERU_RESULT_EMPTY` | MinerU 结果为空 | 下载结果为空文本或空压缩包 |
+| `MINERU_RESULT_MISSING` | MinerU 结果缺失 | 未返回可用 Markdown 地址或压缩包中无有效 Markdown |
 | `DOCUMENT_NOT_FOUND` | 文档不存在 | 查询文档、切换状态、触发解析时文档不存在 |
 | `DOCUMENT_VERSION_NOT_FOUND` | 文档版本不存在 | 解析任务、版本切换、内部回调找不到目标版本 |
 | `TASK_NOT_FOUND` | 任务不存在 | 查询任务详情、内部回调时找不到任务 |

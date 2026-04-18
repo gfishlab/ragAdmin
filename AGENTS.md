@@ -121,6 +121,9 @@
 - 文档内容保持高信号密度，只写会持续约束实现或指导执行的内容，不为仪式感生成冗长文书
 - 计划结论一旦沉淀为长期有效约束，应及时回写到 `docs/architectures`，避免长期停留在 `plans`
 - 跨模块、高风险、长周期主题允许按专题拆文档，但仍必须归属到 `architectures`、`plans`、`tasks` 三类目录之一
+- `docs/architectures` 下的架构设计文档或技术方案类 `md` 发生新增、拆分、重写、合并或重要更新时，默认同步一份高信号摘要到 `/Users/gfish/codes/mds/raw/notes`
+- 对应 `notes` 摘要应尽量与 `docs/architectures` 的专题拆分保持一致；如果原有摘要已不适配当前专题边界，应主动重写、拆分或删除旧摘要，避免形成过期并行事实源
+- 如果用户只说“同步到 notes”或等价表达，默认指同步到 `/Users/gfish/codes/mds/raw/notes`，无需用户重复粘贴完整路径
 
 ## Agent 工程运行约定
 

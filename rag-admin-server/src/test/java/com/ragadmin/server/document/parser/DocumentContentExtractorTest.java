@@ -5,14 +5,17 @@ import com.ragadmin.server.document.entity.DocumentVersionEntity;
 import com.ragadmin.server.infra.storage.support.MinioClientFactory;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.ai.document.Document;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.io.InputStream;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -24,51 +27,40 @@ class DocumentContentExtractorTest {
     private MinioClientFactory minioClientFactory;
 
     @Mock
-    private TesseractOcrService tesseractOcrService;
+    private DocumentReaderRouter documentReaderRouter;
 
     @Test
-    void shouldUseOcrForImageDocument() throws Exception {
-        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, tesseractOcrService, "fake-image".getBytes());
-        when(tesseractOcrService.isEnabled()).thenReturn(true);
-        when(tesseractOcrService.extractImageText(any(InputStream.class), org.mockito.ArgumentMatchers.eq("png")))
-                .thenReturn("图片 OCR 文本");
+    void shouldDelegateToReaderRouter() throws Exception {
+        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, documentReaderRouter, "fake-image".getBytes());
+        when(documentReaderRouter.read(any())).thenReturn(List.of(new Document("图片 OCR 文本")));
 
-        String content = extractor.extract(document("PNG"), version());
+        List<Document> documents = extractor.extract(document("PNG"), version());
 
-        assertEquals("图片 OCR 文本", content);
+        assertEquals(1, documents.size());
+        assertEquals("图片 OCR 文本", documents.getFirst().getText());
+        verify(documentReaderRouter).read(argThat(request ->
+                "PNG".equals(request.docType())
+                        && "测试文档.PNG".equals(request.document().getDocName())
+                        && request.content().length > 0
+        ));
     }
 
     @Test
-    void shouldFallbackToPdfOcrWhenTikaReturnsBlank() throws Exception {
-        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, tesseractOcrService, "fake-pdf".getBytes()) {
-            @Override
-            protected String extractByTikaOrOcrFallback(byte[] content, String docType) {
-                return "扫描 PDF OCR 文本";
-            }
-        };
-
-        String content = extractor.extract(document("PDF"), version());
-
-        assertEquals("扫描 PDF OCR 文本", content);
-    }
-
-    @Test
-    void shouldRejectImageDocumentWhenOcrDisabled() throws Exception {
-        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, tesseractOcrService, "fake-image".getBytes());
-        when(tesseractOcrService.isEnabled()).thenReturn(false);
+    void shouldRejectUnsupportedDocTypeBeforeRouting() throws Exception {
+        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, documentReaderRouter, "fake-binary".getBytes());
+        when(documentReaderRouter.read(any())).thenThrow(new IllegalArgumentException("当前文档类型暂未接入解析策略: BIN"));
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
-                () -> extractor.extract(document("PNG"), version())
+                () -> extractor.extract(document("BIN"), version())
         );
 
-        assertEquals("当前图片解析依赖 OCR，需先启用 Tesseract OCR", exception.getMessage());
-        verify(tesseractOcrService, never()).extractImageText(any(InputStream.class), org.mockito.ArgumentMatchers.anyString());
+        assertEquals("当前文档类型暂未接入解析策略: BIN", exception.getMessage());
     }
 
     @Test
     void shouldRejectZeroByteDocumentBeforeInvokingTika() {
-        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, tesseractOcrService, new byte[0]);
+        DocumentContentExtractor extractor = new TestableDocumentContentExtractor(minioClientFactory, documentReaderRouter, new byte[0]);
 
         IllegalArgumentException exception = assertThrows(
                 IllegalArgumentException.class,
@@ -81,6 +73,9 @@ class DocumentContentExtractorTest {
     private DocumentEntity document(String docType) {
         DocumentEntity entity = new DocumentEntity();
         entity.setDocType(docType);
+        entity.setDocName("测试文档." + docType);
+        entity.setStorageBucket("bucket");
+        entity.setStorageObjectKey("folder/object." + docType.toLowerCase());
         return entity;
     }
 
@@ -95,8 +90,8 @@ class DocumentContentExtractorTest {
 
         private final byte[] content;
 
-        private TestableDocumentContentExtractor(MinioClientFactory minioClientFactory, TesseractOcrService tesseractOcrService, byte[] content) {
-            super(minioClientFactory, tesseractOcrService);
+        private TestableDocumentContentExtractor(MinioClientFactory minioClientFactory, DocumentReaderRouter documentReaderRouter, byte[] content) {
+            super(minioClientFactory, documentReaderRouter);
             this.content = content;
         }
 

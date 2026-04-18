@@ -11,11 +11,13 @@ import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.ai.document.Document;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.util.Map;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,6 +44,9 @@ class DocumentParseProcessorTest {
 
     @Mock
     private DocumentContentExtractor documentContentExtractor;
+
+    @Mock
+    private DefaultDocumentCleaner documentCleaner;
 
     @Mock
     private TaskStepRecordMapper taskStepRecordMapper;
@@ -72,7 +77,7 @@ class DocumentParseProcessorTest {
     }
 
     @Test
-    void shouldSplitContentByProviderStrategy() {
+    void shouldSplitDocumentsByProviderStrategyAndKeepMetadata() {
         String content = """
                 %s
 
@@ -81,14 +86,18 @@ class DocumentParseProcessorTest {
                 %s
                 """.formatted("a".repeat(220), "b".repeat(220), "c".repeat(220));
 
-        List<String> chunks = documentParseProcessor.splitIntoChunks(
-                content,
+        List<DocumentParseProcessor.ChunkDraft> chunks = documentParseProcessor.splitIntoChunks(
+                List.of(new Document(content, Map.of("pageNo", 3, "readerType", "TIKA", "parseMode", "TEXT"))),
                 new DocumentVectorizationProperties.StrategyProperties(1, 400, 80)
         );
 
         assertEquals(3, chunks.size());
-        assertEquals(220, chunks.getFirst().length());
-        assertEquals(302, chunks.get(1).length());
-        assertEquals(302, chunks.get(2).length());
+        assertEquals(220, chunks.getFirst().text().length());
+        assertEquals(302, chunks.get(1).text().length());
+        assertEquals(302, chunks.get(2).text().length());
+        assertEquals(3, chunks.getFirst().metadata().get("pageNo"));
+        assertEquals("TIKA", chunks.getFirst().metadata().get("readerType"));
+        assertEquals(0, chunks.getFirst().metadata().get("chunkIndex"));
+        assertEquals(3, chunks.getFirst().metadata().get("totalChunks"));
     }
 }

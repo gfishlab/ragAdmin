@@ -4,8 +4,8 @@ import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.dto.DocumentUploadCapabilityResponse;
 import com.ragadmin.server.document.dto.UploadUrlRequest;
 import com.ragadmin.server.document.dto.UploadUrlResponse;
+import com.ragadmin.server.document.parser.MineruParseService;
 import com.ragadmin.server.document.parser.OcrCapability;
-import com.ragadmin.server.document.parser.TesseractOcrService;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.storage.support.MinioClientFactory;
 import io.minio.GetPresignedObjectUrlArgs;
@@ -35,7 +35,7 @@ public class FileUploadService {
     private MinioClientFactory minioClientFactory;
 
     @Autowired
-    private TesseractOcrService tesseractOcrService;
+    private MineruParseService mineruParseService;
 
     public UploadUrlResponse createUploadUrl(UploadUrlRequest request) {
         if (!minioProperties.isConfigured()) {
@@ -58,7 +58,7 @@ public class FileUploadService {
     }
 
     public DocumentUploadCapabilityResponse getUploadCapability() {
-        OcrCapability ocrCapability = tesseractOcrService.describeCapability();
+        OcrCapability ocrCapability = mineruParseService.describeCapability();
         return new DocumentUploadCapabilityResponse(
                 ocrCapability.enabled(),
                 ocrCapability.available(),

@@ -429,9 +429,9 @@ class AdminApiWebMvcTest {
         when(fileUploadService.getUploadCapability()).thenReturn(new DocumentUploadCapabilityResponse(
                 true,
                 true,
-                "tesseract 5.5.0",
-                "chi_sim+eng",
-                5,
+                "MinerU API 可用",
+                "ch",
+                600,
                 List.of("TXT", "PDF", "PNG"),
                 List.of("PNG", "JPG", "JPEG", "WEBP")
         ));
@@ -442,7 +442,7 @@ class AdminApiWebMvcTest {
                 .andExpect(jsonPath("$.code").value("OK"))
                 .andExpect(jsonPath("$.data.ocrEnabled").value(true))
                 .andExpect(jsonPath("$.data.ocrAvailable").value(true))
-                .andExpect(jsonPath("$.data.ocrLanguage").value("chi_sim+eng"))
+                .andExpect(jsonPath("$.data.ocrLanguage").value("ch"))
                 .andExpect(jsonPath("$.data.ocrImageDocTypes[0]").value("PNG"));
     }
 

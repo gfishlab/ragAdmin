@@ -2,8 +2,8 @@ package com.ragadmin.server.system.service;
 
 import com.ragadmin.server.infra.ai.bailian.BailianApiSupport;
 import com.ragadmin.server.infra.ai.bailian.BailianProperties;
+import com.ragadmin.server.document.parser.MineruParseService;
 import com.ragadmin.server.document.parser.OcrCapability;
-import com.ragadmin.server.document.parser.TesseractOcrService;
 import com.ragadmin.server.document.mapper.ChunkVectorRefMapper;
 import com.ragadmin.server.infra.ai.embedding.OllamaProperties;
 import com.ragadmin.server.infra.search.NoopWebSearchProvider;
@@ -59,7 +59,7 @@ public class SystemHealthService {
     private TavilyProperties tavilyProperties;
 
     @Autowired
-    private TesseractOcrService tesseractOcrService;
+    private MineruParseService mineruParseService;
 
     @Autowired
     private ChunkVectorRefMapper chunkVectorRefMapper;
@@ -243,7 +243,7 @@ public class SystemHealthService {
     }
 
     private DependencyHealthResponse checkOcr() {
-        OcrCapability capability = tesseractOcrService.describeCapability();
+        OcrCapability capability = mineruParseService.describeCapability();
         if (!capability.enabled()) {
             return new DependencyHealthResponse("UNKNOWN", "OCR 已禁用");
         }

@@ -60,12 +60,15 @@ rag:
       token: root:Milvus
       enabled: true
   document:
-    ocr:
+    mineru:
       enabled: true
-      tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
-      data-path: .ocr-data/tessdata
-      language: chi_sim+eng
-      max-pdf-pages: 5
+      base-url: https://mineru.net
+      api-token: change-me
+      model-version: vlm
+      language: ch
+      poll-interval-millis: 2000
+      max-poll-attempts: 30
+      max-pdf-pages: 600
     vectorize:
       provider-strategies:
         OLLAMA:

@@ -208,29 +208,36 @@ flowchart LR
 
 #### 4.3.1 文档解析技术分工
 
-文档加载与清洗的详细策略见 `rag-admin-document-ingestion-architecture.md`。本节只保留总架构层结论。
+文档导入专题见 `rag-admin-document-ingestion-architecture.md`，其中：
+
+- 文档加载详见 `rag-admin-document-loading-architecture.md`
+- 文档清洗详见 `rag-admin-document-cleaning-architecture.md`
+
+本节只保留总架构层结论。
 
 在 `ragAdmin` 的 `Knowledge Pipeline` 中，需要区分“文本提取”“OCR 识别”“复杂文档结构化解析”三类能力：
 
 - `Apache Tika`：负责文本型 `PDF`、`DOCX`、`XLSX`、`PPTX`、`TXT`、`Markdown` 等文件的文本与元数据提取
-- `Tesseract`：负责图片与扫描版 `PDF` 的 OCR 兜底识别
-- `MinerU`：负责更复杂的文档解析增强，例如多栏布局、表格、公式、阅读顺序恢复和更适合 LLM 的结构化输出
+- `MinerU API`：负责图片、扫描版 `PDF` 与复杂版式文档的 OCR 与结构化解析，是当前标准主链路
+- `MinerU` 不只是 OCR 引擎，它同时承担更复杂的版面理解与结构化输出能力
 
 因此：
 
 - 文本型 `PDF` 的解析不必默认走 OCR
-- 扫描版 `PDF` 和图片抽字必须依赖 OCR 或等价视觉识别能力
+- 扫描版 `PDF` 和图片抽字默认走 `MinerU API`
+- 复杂版式 `PDF` 默认走 `MinerU API`，而不是依赖本地 OCR 兜底
 - `MinerU` 不应被简单视为“另一个 OCR 引擎”，它更接近高阶文档解析方案
 
 当前阶段推荐架构：
 
-1. 一期使用 `Tika + Tesseract` 完成主链路
-2. 二期按需要新增 `MinerU` 独立解析服务
+1. 文本型文档优先使用本地 `DocumentReader`
+2. 扫描件、图片与复杂版式文档优先使用 `MinerU API`
+3. 后端通过外部 API 适配层接入 `MinerU`，不再把本地 `Tesseract` 作为标准主链路
 
 这样做的原因：
 
-- 首期先保证知识导入、索引构建、检索问答闭环可稳定交付
-- 复杂文档解析能力通过独立服务演进，避免把重型依赖直接压进主后端
+- 将重型 OCR / 版面解析能力外置，避免在本地开发环境和主后端中维护额外二进制依赖
+- 复杂文档解析能力通过外部服务演进，避免把重型依赖直接压进主后端
 - 系统始终坚持“上传原始文件，由平台统一解析”，而不是要求人工先做 OCR 预处理
 
 ### 4.4 RAG 检索编排模块
