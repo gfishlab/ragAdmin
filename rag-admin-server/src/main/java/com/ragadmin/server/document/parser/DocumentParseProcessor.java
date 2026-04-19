@@ -270,8 +270,7 @@ public class DocumentParseProcessor {
                     "sourceDocumentCount", parsedContent.sourceDocuments().size(),
                     "chunkDraftCount", parsedContent.chunks().size()
             );
-            step.setDetailJson(toMetadataJson(detail));
-            taskStepRecordMapper.updateById(step);
+            taskStepRecordMapper.updateDetailJson(step.getId(), toMetadataJson(detail));
         });
     }
 
@@ -297,7 +296,7 @@ public class DocumentParseProcessor {
                 entity.setCharCount(chunk.text().length());
                 entity.setMetadataJson(toMetadataJson(chunk.metadata()));
                 entity.setEnabled(Boolean.TRUE);
-                chunkMapper.insert(entity);
+                chunkMapper.insertWithJsonb(entity);
                 persistedChunks.add(entity);
             }
             return persistedChunks;

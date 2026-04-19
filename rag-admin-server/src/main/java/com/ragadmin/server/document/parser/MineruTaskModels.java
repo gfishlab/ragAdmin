@@ -8,6 +8,13 @@ final class MineruTaskModels {
     private MineruTaskModels() {
     }
 
+    record CreateTaskRequest(
+            String url,
+            @JsonProperty("model_version") String modelVersion,
+            @JsonProperty("file_name") String fileName
+    ) {
+    }
+
     @JsonIgnoreProperties(ignoreUnknown = true)
     record CreateTaskResponse(int code, String msg, CreateTaskData data) {
     }

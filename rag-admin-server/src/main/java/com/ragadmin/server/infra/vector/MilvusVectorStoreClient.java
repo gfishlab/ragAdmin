@@ -2,13 +2,16 @@ package com.ragadmin.server.infra.vector;
 
 import com.ragadmin.server.common.exception.BusinessException;
 import com.ragadmin.server.document.entity.ChunkEntity;
-import org.springframework.http.HttpHeaders;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
-import org.springframework.web.client.RestClient;
-
-import java.time.Duration;
+import org.springframework.util.StringUtils;
+import java.io.ByteArrayOutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -16,19 +19,13 @@ import java.util.Objects;
 @Component
 public class MilvusVectorStoreClient {
 
+    private static final Logger log = LoggerFactory.getLogger(MilvusVectorStoreClient.class);
+
     private final MilvusProperties milvusProperties;
-    private final RestClient restClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public MilvusVectorStoreClient(MilvusProperties milvusProperties) {
         this.milvusProperties = milvusProperties;
-        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-        requestFactory.setConnectTimeout(Duration.ofSeconds(10));
-        requestFactory.setReadTimeout(Duration.ofSeconds(30));
-        this.restClient = RestClient.builder()
-                .baseUrl(milvusProperties.getBaseUrl())
-                .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + milvusProperties.getToken())
-                .requestFactory(requestFactory)
-                .build();
     }
 
     public void ensureCollection(String collectionName, int dimension) {
@@ -36,9 +33,9 @@ public class MilvusVectorStoreClient {
             return;
         }
         try {
-            Map<String, Object> response = restClient.post()
-                    .uri("/v2/vectordb/collections/create")
-                    .body(Map.of(
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/collections/create",
+                    Map.of(
                             "collectionName", collectionName,
                             "dimension", dimension,
                             "metricType", "COSINE",
@@ -46,11 +43,9 @@ public class MilvusVectorStoreClient {
                             "vectorFieldName", "vector",
                             "idType", "VarChar",
                             "autoID", false,
-                            // VarChar 主键必须显式给出 max_length，否则 Milvus 会返回业务错误码但 HTTP 仍是 200。
                             "params", Map.of("max_length", "128")
-                    ))
-                    .retrieve()
-                    .body(Map.class);
+                    )
+            );
             if (isSuccess(response)) {
                 return;
             }
@@ -62,6 +57,8 @@ public class MilvusVectorStoreClient {
         } catch (BusinessException ex) {
             throw ex;
         } catch (Exception ex) {
+            log.warn("Milvus 集合创建异常，collectionName={}, dimension={}, reason={}",
+                    collectionName, dimension, ex.getMessage(), ex);
             throw new BusinessException("MILVUS_COLLECTION_CREATE_FAILED", "Milvus 集合创建失败", HttpStatus.BAD_GATEWAY);
         }
     }
@@ -87,17 +84,16 @@ public class MilvusVectorStoreClient {
             return List.of();
         }
         try {
-            Map<String, Object> response = restClient.post()
-                    .uri("/v2/vectordb/entities/search")
-                    .body(Map.of(
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/entities/search",
+                    Map.of(
                             "collectionName", collectionName,
                             "data", List.of(vector),
                             "annsField", "vector",
                             "limit", limit,
                             "outputFields", List.of("id")
-                    ))
-                    .retrieve()
-                    .body(Map.class);
+                    )
+            );
             if (!isSuccess(response)) {
                 throw new BusinessException("MILVUS_SEARCH_FAILED", "Milvus 检索失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
             }
@@ -123,11 +119,10 @@ public class MilvusVectorStoreClient {
             return new CollectionDescription(collectionName, "DISABLED", null, null);
         }
         try {
-            Map<String, Object> response = restClient.post()
-                    .uri("/v2/vectordb/collections/describe")
-                    .body(Map.of("collectionName", collectionName))
-                    .retrieve()
-                    .body(Map.class);
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/collections/describe",
+                    Map.of("collectionName", collectionName)
+            );
             if (!isSuccess(response)) {
                 throw new BusinessException("MILVUS_COLLECTION_DESCRIBE_FAILED", "Milvus 集合描述失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
             }
@@ -152,14 +147,13 @@ public class MilvusVectorStoreClient {
             return;
         }
         try {
-            Map<String, Object> response = restClient.post()
-                    .uri("/v2/vectordb/entities/upsert")
-                    .body(Map.of(
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/entities/upsert",
+                    Map.of(
                             "collectionName", collectionName,
                             "data", data
-                    ))
-                    .retrieve()
-                    .body(Map.class);
+                    )
+            );
             if (!isSuccess(response)) {
                 throw new BusinessException("MILVUS_INSERT_FAILED", "Milvus 向量写入失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
             }
@@ -167,6 +161,8 @@ public class MilvusVectorStoreClient {
             if (ex instanceof BusinessException businessException) {
                 throw businessException;
             }
+            log.warn("Milvus 向量写入异常，collectionName={}, rowCount={}, reason={}",
+                    collectionName, data == null ? 0 : data.size(), ex.getMessage(), ex);
             throw new BusinessException("MILVUS_INSERT_FAILED", "Milvus 向量写入失败", HttpStatus.BAD_GATEWAY);
         }
     }
@@ -187,6 +183,38 @@ public class MilvusVectorStoreClient {
             return "空响应";
         }
         return Objects.toString(response.get("message"), "未知错误");
+    }
+
+    private Map<String, Object> postJson(String path, Map<String, Object> payload) throws Exception {
+        String requestBody = objectMapper.writeValueAsString(payload);
+        List<String> command = new ArrayList<>();
+        command.add("curl");
+        command.add("-sS");
+        command.add("-X");
+        command.add("POST");
+        command.add(milvusProperties.getBaseUrl() + path);
+        command.add("-H");
+        command.add("Content-Type: application/json");
+        if (StringUtils.hasText(milvusProperties.getToken())) {
+            command.add("-H");
+            command.add("Authorization: Bearer " + milvusProperties.getToken());
+        }
+        command.add("--data-raw");
+        command.add(requestBody);
+
+        Process process = new ProcessBuilder(command).start();
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        ByteArrayOutputStream error = new ByteArrayOutputStream();
+        process.getInputStream().transferTo(output);
+        process.getErrorStream().transferTo(error);
+        int exitCode = process.waitFor();
+        if (exitCode != 0) {
+            String stderr = error.toString(StandardCharsets.UTF_8);
+            throw new IllegalStateException("curl 调用 Milvus 失败: " + stderr);
+        }
+        String stdout = output.toString(StandardCharsets.UTF_8);
+        return objectMapper.readValue(stdout, new TypeReference<>() {
+        });
     }
 
     private double parseScore(Map<String, Object> item) {

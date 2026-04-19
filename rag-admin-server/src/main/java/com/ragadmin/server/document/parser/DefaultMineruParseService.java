@@ -1,12 +1,14 @@
 package com.ragadmin.server.document.parser;
 
 import com.ragadmin.server.common.exception.BusinessException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.document.Document;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
@@ -16,6 +18,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -32,16 +35,23 @@ public class DefaultMineruParseService implements MineruParseService {
     private final MineruSourceResolver mineruSourceResolver;
     private final RestClient restClient;
     private final RestClient downloadClient;
+    private final ObjectMapper objectMapper = new ObjectMapper();
 
     public DefaultMineruParseService(MineruProperties mineruProperties, MineruSourceResolver mineruSourceResolver) {
         this.mineruProperties = mineruProperties;
         this.mineruSourceResolver = mineruSourceResolver;
+        SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+        requestFactory.setConnectTimeout(Duration.ofSeconds(Math.max(5, mineruProperties.getTimeoutSeconds())));
+        requestFactory.setReadTimeout(Duration.ofSeconds(Math.max(5, mineruProperties.getTimeoutSeconds())));
         this.restClient = RestClient.builder()
                 .baseUrl(mineruProperties.getBaseUrl())
                 .defaultHeader(HttpHeaders.AUTHORIZATION, "Bearer " + nullSafe(mineruProperties.getApiToken()))
                 .defaultHeader(HttpHeaders.CONTENT_TYPE, MediaType.APPLICATION_JSON_VALUE)
+                .requestFactory(requestFactory)
                 .build();
-        this.downloadClient = RestClient.builder().build();
+        this.downloadClient = RestClient.builder()
+                .requestFactory(requestFactory)
+                .build();
     }
 
     @Override
@@ -82,16 +92,17 @@ public class DefaultMineruParseService implements MineruParseService {
     }
 
     protected MineruTaskModels.CreateTaskResponse submitTask(String sourceUrl, DocumentParseRequest request) {
-        Map<String, Object> payload = Map.of(
-                "url", sourceUrl,
-                "model_version", mineruProperties.getModelVersion(),
-                "file_name", request.document().getDocName()
+        MineruTaskModels.CreateTaskRequest payload = new MineruTaskModels.CreateTaskRequest(
+                sourceUrl,
+                mineruProperties.getModelVersion(),
+                request.document().getDocName()
         );
         MineruTaskModels.CreateTaskResponse response;
         try {
+            String requestBody = objectMapper.writeValueAsString(payload);
             response = restClient.post()
                     .uri("/api/v4/extract/task")
-                    .body(payload)
+                    .body(requestBody)
                     .retrieve()
                     .body(MineruTaskModels.CreateTaskResponse.class);
         } catch (RestClientResponseException ex) {

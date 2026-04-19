@@ -11,6 +11,7 @@ public class MineruProperties {
     private String apiToken;
     private String modelVersion = "vlm";
     private String language = "ch";
+    private int timeoutSeconds = 60;
     private int pollIntervalMillis = 2000;
     private int maxPollAttempts = 30;
     private int maxPdfPages = 600;
@@ -53,6 +54,14 @@ public class MineruProperties {
 
     public void setLanguage(String language) {
         this.language = language;
+    }
+
+    public int getTimeoutSeconds() {
+        return timeoutSeconds;
+    }
+
+    public void setTimeoutSeconds(int timeoutSeconds) {
+        this.timeoutSeconds = timeoutSeconds;
     }
 
     public int getPollIntervalMillis() {

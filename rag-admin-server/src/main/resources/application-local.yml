@@ -2,17 +2,6 @@ spring:
   config:
     # 本地敏感配置通过未跟踪文件覆盖，避免提交到仓库。
     import: optional:classpath:application-local-secret.yml
-  datasource:
-    url: jdbc:postgresql://127.0.0.1:5432/rag_admin?sslmode=disable
-    username: postgres
-    password: postgres
-    driver-class-name: org.postgresql.Driver
-  data:
-    redis:
-      host: 127.0.0.1
-      port: 6379
-      password: ragadmin123
-      database: 0
   threads:
     virtual:
       enabled: true
@@ -45,31 +34,17 @@ rag:
       enabled: false
       base-url: https://open.bigmodel.cn/api/paas
       timeout-seconds: 60
-  storage:
-    minio:
-      endpoint: 127.0.0.1
-      port: 9000
-      use-ssl: false
-      access-key: minioadmin
-      secret-key: minioadmin123
-      bucket-name: ragadmin
-      public-url: http://127.0.0.1:9000
-  vector:
-    milvus:
-      base-url: http://127.0.0.1:19530
-      token: root:Milvus
-      enabled: true
   document:
-    ocr:
-      enabled: true
-      # Windows 本地开发示例：
-      # tesseract-command: C:/Program Files/Tesseract-OCR/tesseract.exe
-      # Mac 本地开发默认示例：通过 Homebrew 安装后通常可直接使用系统 PATH 中的 tesseract
-      tesseract-command: tesseract
-      # 如需使用仓库内自带语言包目录，可显式指定：
-      # data-path: .ocr-data/tessdata
-      language: chi_sim+eng
-      max-pdf-pages: 5
+    # 本地 profile 默认不强制启用 MinerU，避免在未提供 Token 或公网 MinIO 地址时误调用。
+    mineru:
+      enabled: false
+      base-url: https://mineru.net
+      model-version: vlm
+      language: ch
+      timeout-seconds: 60
+      poll-interval-millis: 2000
+      max-poll-attempts: 30
+      max-pdf-pages: 600
     vectorize:
       provider-strategies:
         OLLAMA:

@@ -2,7 +2,7 @@ spring:
   application:
     name: rag-admin-server
   profiles:
-    default: local
+    default: dev
   ai:
     chat:
       memory:
@@ -126,6 +126,16 @@ rag:
     parse:
       max-concurrency: 4
       dispatch-batch-size: 4
+    mineru:
+      enabled: false
+      base-url: https://mineru.net
+      api-token:
+      model-version: vlm
+      language: ch
+      timeout-seconds: 60
+      poll-interval-millis: 2000
+      max-poll-attempts: 30
+      max-pdf-pages: 600
     vectorize:
       defaults:
         embedding-batch-size: 10
@@ -140,8 +150,3 @@ rag:
           embedding-batch-size: 1
           max-chunk-chars: 400
           chunk-overlap-chars: 80
-    ocr:
-      enabled: false
-      tesseract-command: tesseract
-      language: chi_sim+eng
-      max-pdf-pages: 5

@@ -181,3 +181,19 @@ Git 规范：
 ## 备注
 
 本文件是当前仓库的项目级工作规则文件，用于统一约束项目目标、工程边界和 Agent 协作方式。
+
+
+<claude-mem-context>
+# Memory Context
+
+# [ragAdmin] recent context, 2026-04-19 7:58pm GMT+8
+
+Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
+Format: ID TIME TYPE TITLE
+Fetch details: get_observations([IDs]) | Search: mem-search skill
+
+Stats: 1 obs (283t read) | 0t work
+
+### Apr 19, 2026
+101 7:46p 🔵 Spring Boot application startup successful with service integrations
+</claude-mem-context>
