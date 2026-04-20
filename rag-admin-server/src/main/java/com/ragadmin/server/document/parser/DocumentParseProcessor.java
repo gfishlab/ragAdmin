@@ -395,7 +395,7 @@ public class DocumentParseProcessor {
         DocumentSignals signals = signalAnalyzer.analyze(cleanedDocuments, cleanContext);
         ChunkStrategyProperties chunkProps = new ChunkStrategyProperties(
                 strategy.getMaxChunkChars(), strategy.getChunkOverlapChars(), strategy.getMinChunkChars());
-        ChunkContext chunkContext = new ChunkContext(document, signals, chunkProps);
+        ChunkContext chunkContext = new ChunkContext(document, signals, chunkProps, extractParseMode(cleanedDocuments));
 
         DocumentChunkStrategy chunkStrategy = chunkStrategyResolver.resolve(chunkContext);
         List<ChunkDraft> chunks = chunkStrategy.chunk(cleanedDocuments, chunkContext);
@@ -449,6 +449,14 @@ public class DocumentParseProcessor {
 
     private int estimateTokenCount(String text) {
         return Math.max(1, text.length() / 4);
+    }
+
+    private String extractParseMode(List<Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return "TEXT";
+        }
+        Object mode = documents.getFirst().getMetadata().get("parseMode");
+        return mode != null ? String.valueOf(mode) : "TEXT";
     }
 
     private String buildErrorMessage(Exception ex) {

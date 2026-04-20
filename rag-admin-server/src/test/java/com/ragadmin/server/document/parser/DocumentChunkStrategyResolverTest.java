@@ -14,7 +14,7 @@ class DocumentChunkStrategyResolverTest {
         DocumentChunkStrategy fallback = new RecursiveFallbackStrategy();
         DocumentChunkStrategyResolver resolver = new DocumentChunkStrategyResolver(List.of(fallback));
 
-        ChunkContext context = new ChunkContext(null, DocumentSignals.empty(), ChunkStrategyProperties.defaults());
+        ChunkContext context = new ChunkContext(null, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
         DocumentChunkStrategy result = resolver.resolve(context);
 
         assertSame(fallback, result);
@@ -37,7 +37,7 @@ class DocumentChunkStrategyResolverTest {
         };
 
         DocumentChunkStrategyResolver resolver = new DocumentChunkStrategyResolver(List.of(neverMatch));
-        ChunkContext context = new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults());
+        ChunkContext context = new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class, () -> resolver.resolve(context));
         assertTrue(ex.getMessage().contains("无匹配的分块策略"));
