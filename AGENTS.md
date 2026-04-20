@@ -186,13 +186,13 @@ Git 规范：
 <claude-mem-context>
 # Memory Context
 
-# [ragAdmin] recent context, 2026-04-19 9:09pm GMT+8
+# [ragAdmin] recent context, 2026-04-20 8:49am GMT+8
 
 Legend: 🎯session 🔴bugfix 🟣feature 🔄refactor ✅change 🔵discovery ⚖️decision
 Format: ID TIME TYPE TITLE
 Fetch details: get_observations([IDs]) | Search: mem-search skill
 
-Stats: 21 obs (7,941t read) | 0t work
+Stats: 22 obs (8,430t read) | 0t work
 
 ### Apr 19, 2026
 101 7:46p 🔵 Spring Boot application startup successful with service integrations
@@ -216,4 +216,5 @@ Stats: 21 obs (7,941t read) | 0t work
 130 9:08p 🔵 Document cleaning architecture requires layered policy-based approach
 131 " 🔵 PDF paragraph reading requires automatic fallback to page-level reading
 132 " ⚖️ Document cleaning must use rule-driven selective cleaner execution
+137 9:11p 🟣 PDF header/footer cleaner implementation committed to version control
 </claude-mem-context>
