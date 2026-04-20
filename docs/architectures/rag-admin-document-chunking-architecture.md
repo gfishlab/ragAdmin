@@ -265,17 +265,20 @@ rag:
 
 ### 9.1 当前实现
 
-- `DocumentParseProcessor.splitText()` 是唯一的分块逻辑，段落聚合 + 字符级重叠
-- 所有文档类型使用相同策略，不区分 Markdown/PDF/OCR
-- 重叠已改为边界感知
+- `RecursiveFallbackStrategy` 作为兜底策略，段落聚合 + 边界感知重叠
+- `DocumentChunkStrategyResolver` 策略选择器已实现
+- `ChunkContext` / `ChunkDraft` / `ChunkStrategyProperties` 核心类型已定义
+- 所有文档类型当前使用相同策略，尚未区分 Markdown/PDF/OCR
+- 清洗阶段的 `DocumentSignals` 已传递给分块阶段的 `ChunkContext`
 
 ### 9.2 演进步骤
 
-1. **抽取接口**：将 `splitText` 重构为 `RecursiveFallbackStrategy`，作为兜底策略
-2. **引入 ChunkContext**：封装 `DocumentEntity` + `DocumentSignals` + `ChunkStrategyProperties`
+1. ~~**抽取接口**：将 `splitText` 重构为 `RecursiveFallbackStrategy`，作为兜底策略~~ ✅ 已完成
+2. ~~**引入 ChunkContext**：封装 `DocumentEntity` + `DocumentSignals` + `ChunkStrategyProperties`~~ ✅ 已完成
 3. **逐个实现策略**：按优先级从高到低，Markdown → HTML → PdfOcr → PdfText
 4. **接入配置**：支持按策略覆盖分块参数
 5. **验证**：每种策略补充单元测试，用真实文档验证切片质量
+6. **父子分块**：实现 `ParentChildChunkStrategy` 分层包装器
 
 ## 10. 框架分块能力对比与选型决策
 
@@ -365,9 +368,125 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 - 适合高价值文档（知识库核心内容），不适合批量导入场景
 - 可以作为可选策略，与固定分块策略并存
 
-### 11.4 多层级索引（更远期）
+### 11.4 父子分块（Parent-Child Chunking）
 
-借鉴 LlamaIndex 的 `HierarchicalNodeParser`：
-- 小 Chunk（200-300 字符）用于精确检索
-- 大 Chunk（800-1200 字符）用于上下文回答
-- 两者通过父子关系关联，检索时先命中小 Chunk，回答时取对应的大 Chunk
+#### 概念
+
+父子分块（也称 Small-to-Big Retrieval）是一种两层分块策略：先将文档切成较大的 parent 块，再将每个 parent 切成较小的 child 块。检索时搜 child 命中精度高，命中后 promote 到 parent 获取完整上下文。
+
+借鉴 LlamaIndex 的 `HierarchicalNodeParser` 和 `AutoMergingRetriever` 的设计思路。
+
+#### 存储模型
+
+| 层级 | 文本存储 | 向量存储 | 用途 |
+|------|---------|---------|------|
+| Parent | PostgreSQL `chunk` 表（`chunk_text`） | 不入 Milvus | 上下文回答 |
+| Child | PostgreSQL `chunk` 表（`chunk_text`） | Milvus（向量 + metadata） | 精确检索 |
+
+#### Schema 变更
+
+`chunk` 表新增 `parent_chunk_id` 列：
+
+```sql
+ALTER TABLE chunk ADD COLUMN parent_chunk_id BIGINT;
+-- parent_chunk_id 为 NULL 表示该切片是 parent
+-- 非 NULL 表示该切片是 child，指向其 parent
+```
+
+不需要新增独立的 parent 表，复用现有 `chunk` 表，通过 `parent_chunk_id IS NULL` 区分层级。
+
+#### 数据流
+
+```
+DocumentChunkStrategy.chunk()
+    → List<ChunkDraft>（含父子层级关系）
+    → persistChunks()
+        → 先插 parent（parent_chunk_id = NULL）
+        → 再插 child（parent_chunk_id = parent.id）
+    → vectorize()
+        → 只对 child 做向量化，parent 不入 Milvus
+```
+
+#### ChunkDraft 扩展
+
+```java
+public record ChunkDraft(
+    String text,
+    Map<String, Object> metadata,
+    List<ChunkDraft> children   // 子切片列表，parent 独有
+) {
+    public boolean isParent() {
+        return children != null && !children.isEmpty();
+    }
+}
+```
+
+#### 检索流程
+
+```
+用户 query
+    → Milvus 搜 child 向量 → 命中 N 个 child
+    → 按 parent_chunk_id 分组
+    → 若同一 parent 下命中 child 数 >= mergeThreshold（默认 2）
+        → promote：返回整个 parent 文本
+    → 若命中 child 数 < mergeThreshold
+        → 直接返回 child 文本
+    → 拼装上下文 → 喂给 LLM
+```
+
+`mergeThreshold` 控制合并灵敏度：值越低越容易 promote 到 parent，值越高越倾向于返回 child 原文。
+
+#### 配置模型
+
+```yaml
+rag:
+  document:
+    chunk:
+      defaults:
+        max-chunk-chars: 800
+        overlap-chars: 120
+        min-chunk-chars: 50
+      parent-child:
+        enabled: false                    # 默认关闭
+        parent-max-chunk-chars: 1200      # parent 块大小
+        child-max-chunk-chars: 300        # child 块大小
+        merge-threshold: 2                # 命中多少 child 后 promote 到 parent
+```
+
+#### 与现有策略的关系
+
+父子分块不是一个独立的 `DocumentChunkStrategy` 实现，而是一个**分层包装器**：
+
+```java
+@Component
+@Order(5)  // 优先于所有策略
+public class ParentChildChunkStrategy implements DocumentChunkStrategy {
+
+    private final DocumentChunkStrategyResolver innerResolver;
+
+    @Override
+    public boolean supports(ChunkContext context) {
+        return parentChildEnabled;  // 配置开关控制
+    }
+
+    @Override
+    public List<ChunkDraft> chunk(List<Document> documents, ChunkContext context) {
+        // 1. 用 parentMaxChunkChars 参数调用内层策略，产出 parent 块
+        // 2. 对每个 parent 块用 childMaxChunkChars 参数再次调用内层策略，产出 child 块
+        // 3. 将 child 块挂到对应 parent 的 children 字段
+    }
+}
+```
+
+内层策略仍然是 `MarkdownChunkStrategy` / `PdfOcrChunkStrategy` 等，父子分块只负责在外层做两级切分。
+
+#### 实施优先级
+
+父子分块是检索层优化，依赖分块策略先稳定。建议在 Markdown / HTML / PDF 专项策略完成后再实施。
+
+#### 代价
+
+- 向量化成本增加：child 数量远多于原有单层切片，embedding 调用量翻 2-3 倍
+- 存储成本增加：parent + child 的文本都要存 PostgreSQL
+- 适合高价值知识库（检索精度要求高），不适合批量导入场景
+- 可按知识库粒度开关，不强制全局启用
