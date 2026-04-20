@@ -141,12 +141,15 @@ rag:
         embedding-batch-size: 10
         max-chunk-chars: 800
         chunk-overlap-chars: 120
+        min-chunk-chars: 50
       provider-strategies:
         BAILIAN:
           embedding-batch-size: 10
           max-chunk-chars: 800
           chunk-overlap-chars: 120
+          min-chunk-chars: 50
         OLLAMA:
           embedding-batch-size: 1
           max-chunk-chars: 400
           chunk-overlap-chars: 80
+          min-chunk-chars: 50

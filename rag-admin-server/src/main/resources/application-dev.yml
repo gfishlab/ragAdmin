@@ -41,6 +41,7 @@ rag:
           embedding-batch-size: 1
           max-chunk-chars: 400
           chunk-overlap-chars: 80
+          min-chunk-chars: 50
 
 logging:
   level:

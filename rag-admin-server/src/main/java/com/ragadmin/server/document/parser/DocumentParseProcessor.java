@@ -56,6 +56,8 @@ public class DocumentParseProcessor {
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
     private final DocumentVectorizationStrategyResolver strategyResolver;
+    private final DocumentChunkStrategyResolver chunkStrategyResolver;
+    private final DocumentSignalAnalyzer signalAnalyzer;
     private final TaskRealtimeEventService taskRealtimeEventService;
     private final DocumentParseProperties documentParseProperties;
     private final ExecutorService documentParseExecutor;
@@ -74,6 +76,8 @@ public class DocumentParseProcessor {
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
             DocumentVectorizationStrategyResolver strategyResolver,
+            DocumentChunkStrategyResolver chunkStrategyResolver,
+            DocumentSignalAnalyzer signalAnalyzer,
             TaskRealtimeEventService taskRealtimeEventService,
             DocumentParseProperties documentParseProperties,
             @Qualifier(IO_VIRTUAL_TASK_EXECUTOR) ExecutorService documentParseExecutor,
@@ -89,6 +93,8 @@ public class DocumentParseProcessor {
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
         this.strategyResolver = strategyResolver;
+        this.chunkStrategyResolver = chunkStrategyResolver;
+        this.signalAnalyzer = signalAnalyzer;
         this.taskRealtimeEventService = taskRealtimeEventService;
         this.documentParseProperties = documentParseProperties;
         this.documentParseExecutor = documentParseExecutor;
@@ -383,11 +389,18 @@ public class DocumentParseProcessor {
             DocumentVectorizationProperties.StrategyProperties strategy
     ) throws Exception {
         List<Document> rawDocuments = documentContentExtractor.extract(document, version);
-        List<Document> cleanedDocuments = documentCleaner.clean(
-                rawDocuments,
-                new DocumentCleanContext(document, DocumentCleanPolicy.defaultPolicy())
-        );
-        return new ParsedContent(cleanedDocuments, splitIntoChunks(cleanedDocuments, strategy));
+        DocumentCleanContext cleanContext = new DocumentCleanContext(document, DocumentCleanPolicy.defaultPolicy());
+        List<Document> cleanedDocuments = documentCleaner.clean(rawDocuments, cleanContext);
+
+        DocumentSignals signals = signalAnalyzer.analyze(cleanedDocuments, cleanContext);
+        ChunkStrategyProperties chunkProps = new ChunkStrategyProperties(
+                strategy.getMaxChunkChars(), strategy.getChunkOverlapChars(), strategy.getMinChunkChars());
+        ChunkContext chunkContext = new ChunkContext(document, signals, chunkProps);
+
+        DocumentChunkStrategy chunkStrategy = chunkStrategyResolver.resolve(chunkContext);
+        List<ChunkDraft> chunks = chunkStrategy.chunk(cleanedDocuments, chunkContext);
+
+        return new ParsedContent(cleanedDocuments, chunks);
     }
 
     private void logParsedContent(ProcessingContext context, ParsedContent parsedContent) {
@@ -422,56 +435,6 @@ public class DocumentParseProcessor {
                 mineruResultSources);
     }
 
-    List<ChunkDraft> splitIntoChunks(List<Document> documents, DocumentVectorizationProperties.StrategyProperties strategy) {
-        List<ChunkDraft> result = new ArrayList<>();
-        for (Document document : documents) {
-            String normalized = document.getText() == null ? "" : document.getText().replace("\r\n", "\n").trim();
-            if (normalized.isEmpty()) {
-                continue;
-            }
-            List<String> chunkTexts = splitText(normalized, strategy);
-            for (int i = 0; i < chunkTexts.size(); i++) {
-                Map<String, Object> metadata = new java.util.LinkedHashMap<>(document.getMetadata());
-                metadata.put("parentDocumentId", document.getId());
-                metadata.put("chunkIndex", i);
-                metadata.put("totalChunks", chunkTexts.size());
-                result.add(new ChunkDraft(chunkTexts.get(i), metadata));
-            }
-        }
-        return result;
-    }
-
-    private List<String> splitText(String normalized, DocumentVectorizationProperties.StrategyProperties strategy) {
-        int maxChunkChars = Math.max(100, strategy.getMaxChunkChars());
-        int chunkOverlapChars = Math.max(0, Math.min(strategy.getChunkOverlapChars(), maxChunkChars / 2));
-        List<String> chunks = new ArrayList<>();
-        List<String> paragraphs = List.of(normalized.split("\\n\\s*\\n"));
-        StringBuilder current = new StringBuilder();
-        int chunkNo = 0;
-        for (String paragraph : paragraphs) {
-            String trimmed = paragraph.trim();
-            if (trimmed.isEmpty()) {
-                continue;
-            }
-            if (current.length() > 0 && current.length() + trimmed.length() + 2 > maxChunkChars) {
-                chunks.add(current.toString());
-                chunkNo++;
-                current = new StringBuilder(overlapTail(chunks.get(chunkNo - 1), chunkOverlapChars));
-            }
-            if (current.length() > 0) {
-                current.append("\n\n");
-            }
-            current.append(trimmed);
-        }
-        if (current.length() > 0) {
-            chunks.add(current.toString());
-        }
-
-        if (chunks.isEmpty()) {
-            chunks.add(normalized.substring(0, Math.min(normalized.length(), maxChunkChars)));
-        }
-        return chunks;
-    }
 
     private String toMetadataJson(Map<String, Object> metadata) {
         if (metadata == null || metadata.isEmpty()) {
@@ -482,32 +445,6 @@ public class DocumentParseProcessor {
         } catch (JsonProcessingException ex) {
             throw new IllegalStateException("切片 metadata 序列化失败", ex);
         }
-    }
-
-    private String overlapTail(String source, int tailLength) {
-        if (source.length() <= tailLength) {
-            return source;
-        }
-        int rawStart = source.length() - tailLength;
-        int tolerance = Math.max(10, (int) (tailLength * 0.3));
-        int searchFrom = Math.max(0, rawStart - tolerance);
-
-        for (int i = rawStart; i > searchFrom; i--) {
-            if (source.charAt(i) == '\n' && source.charAt(i - 1) == '\n') {
-                return source.substring(i + 1);
-            }
-        }
-        for (int i = rawStart; i > searchFrom; i--) {
-            if (source.charAt(i) == '\n') {
-                return source.substring(i + 1);
-            }
-        }
-        for (int i = rawStart; i > searchFrom; i--) {
-            if (Character.isWhitespace(source.charAt(i))) {
-                return source.substring(i + 1);
-            }
-        }
-        return source.substring(rawStart);
     }
 
     private int estimateTokenCount(String text) {
@@ -527,9 +464,6 @@ public class DocumentParseProcessor {
             DocumentEntity document,
             DocumentVersionEntity version
     ) {
-    }
-
-    static record ChunkDraft(String text, Map<String, Object> metadata) {
     }
 
     private record ParsedContent(List<Document> sourceDocuments, List<ChunkDraft> chunks) {
