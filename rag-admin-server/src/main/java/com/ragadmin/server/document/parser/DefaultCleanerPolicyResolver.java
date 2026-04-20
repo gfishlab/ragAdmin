@@ -14,11 +14,19 @@ public class DefaultCleanerPolicyResolver implements CleanerPolicyResolver {
     public DocumentCleanPolicy resolve(DocumentCleaningRequest request) {
         String docType = normalizeDocType(request.document().getDocType());
         String parseMode = detectParseMode(request.documents());
+        DocumentSignals signals = request.signals();
 
         boolean preserveSymbols = List.of("MD", "MARKDOWN", "HTML", "HTM").contains(docType) || "OCR".equals(parseMode);
-        boolean headerFooter = "PDF".equals(docType) && "TEXT".equals(parseMode);
-        boolean lineMerge = "PDF".equals(docType) && "TEXT".equals(parseMode);
-        boolean ocrNoise = "OCR".equals(parseMode);
+
+        boolean headerFooter = ("PDF".equals(docType) && "TEXT".equals(parseMode))
+                && (signals.repeatedHeaderDetected() || signals.repeatedFooterDetected());
+
+        boolean lineMerge = ("PDF".equals(docType) && "TEXT".equals(parseMode))
+                && signals.weakParagraphStructure();
+
+        boolean ocrNoise = "OCR".equals(parseMode)
+                && signals.ocrNoiseDetected();
+
         boolean semantic = headerFooter || lineMerge || ocrNoise;
 
         return new DocumentCleanPolicy(

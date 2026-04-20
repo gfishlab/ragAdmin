@@ -36,6 +36,18 @@ class PdfHeaderFooterCleanerTest {
         assertEquals("葛孝杰\n电话：18852966590", cleaned.getFirst().getText());
     }
 
+    @Test
+    void shouldRemoveMultiLineBrowserPrintHeaderAndFooter() {
+        List<Document> cleaned = cleaner.clean(List.of(
+                new Document("2026/4/12 12:42\n简历 | gfish.online\n葛孝杰\n电话：18852966590\n1/2"),
+                new Document("2026/4/12 12:42\n简历 | gfish.online\n工作经历：后端开发\n2/2")
+        ), new DocumentCleanContext(document(), new DocumentCleanPolicy(true, true, true, true, true, false)));
+
+        assertEquals(2, cleaned.size());
+        assertEquals("葛孝杰\n电话：18852966590", cleaned.getFirst().getText());
+        assertEquals("工作经历：后端开发", cleaned.get(1).getText());
+    }
+
     private com.ragadmin.server.document.entity.DocumentEntity document() {
         com.ragadmin.server.document.entity.DocumentEntity entity = new com.ragadmin.server.document.entity.DocumentEntity();
         entity.setDocType("PDF");

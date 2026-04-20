@@ -21,6 +21,10 @@ public class PdfHeaderFooterCleaner implements DocumentCleanerStep {
     );
     private static final Pattern PAGE_NUMBER_PATTERN = Pattern.compile("^\\d+\\s*/\\s*\\d+$");
     private static final Pattern URL_PATTERN = Pattern.compile("^(https?://|www\\.).*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern BROWSER_PRINT_TITLE_PATTERN = Pattern.compile(
+            ".*[\\|｜].*\\.(online|com|cn|org|net|io|dev|app).*",
+            Pattern.CASE_INSENSITIVE
+    );
 
     @Override
     public boolean supports(DocumentCleanContext context) {
@@ -52,10 +56,10 @@ public class PdfHeaderFooterCleaner implements DocumentCleanerStep {
                 continue;
             }
 
-            if (shouldRemoveHeader(lines, firstLineCount, threshold)) {
+            while (!lines.isEmpty() && shouldRemoveHeader(lines.getFirst(), firstLineCount, threshold)) {
                 lines.removeFirst();
             }
-            if (!lines.isEmpty() && shouldRemoveFooter(lines, lastLineCount, threshold)) {
+            while (!lines.isEmpty() && shouldRemoveFooter(lines.getLast(), lastLineCount, threshold)) {
                 lines.removeLast();
             }
 
@@ -71,20 +75,21 @@ public class PdfHeaderFooterCleaner implements DocumentCleanerStep {
         return cleaned;
     }
 
-    private boolean shouldRemoveHeader(List<String> lines, Map<String, Integer> firstLineCount, int threshold) {
-        String first = lines.getFirst();
-        if (firstLineCount.getOrDefault(first, 0) >= threshold) {
+    private boolean shouldRemoveHeader(String line, Map<String, Integer> firstLineCount, int threshold) {
+        if (firstLineCount.getOrDefault(line, 0) >= threshold) {
             return true;
         }
-        return DATETIME_HEADER_PATTERN.matcher(first).matches() && (first.contains("|") || first.contains(".online"));
+        if (DATETIME_HEADER_PATTERN.matcher(line).matches()) {
+            return true;
+        }
+        return BROWSER_PRINT_TITLE_PATTERN.matcher(line).matches();
     }
 
-    private boolean shouldRemoveFooter(List<String> lines, Map<String, Integer> lastLineCount, int threshold) {
-        String last = lines.getLast();
-        if (lastLineCount.getOrDefault(last, 0) >= threshold) {
+    private boolean shouldRemoveFooter(String line, Map<String, Integer> lastLineCount, int threshold) {
+        if (lastLineCount.getOrDefault(line, 0) >= threshold) {
             return true;
         }
-        return PAGE_NUMBER_PATTERN.matcher(last).matches() || URL_PATTERN.matcher(last).matches();
+        return PAGE_NUMBER_PATTERN.matcher(line).matches() || URL_PATTERN.matcher(line).matches();
     }
 
     private List<String> normalizedLines(String text) {

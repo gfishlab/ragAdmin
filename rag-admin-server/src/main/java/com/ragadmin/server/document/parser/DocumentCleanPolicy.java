@@ -8,4 +8,8 @@ public record DocumentCleanPolicy(
         boolean lineMergeEnabled,
         boolean ocrNoiseCleanEnabled
 ) {
+
+    public static DocumentCleanPolicy defaultPolicy() {
+        return new DocumentCleanPolicy(true, false, true, false, false, false);
+    }
 }

@@ -15,36 +15,83 @@ class DefaultCleanerPolicyResolverTest {
     private final DefaultCleanerPolicyResolver resolver = new DefaultCleanerPolicyResolver();
 
     @Test
-    void shouldEnablePdfSemanticCleaningForTextMode() {
+    void shouldEnableHeaderFooterWhenPdfTextAndSignalsDetected() {
         DocumentEntity document = document("PDF");
+        DocumentSignals signals = new DocumentSignals(true, false, false, false, false, false, false);
 
         DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
                 document,
-                List.of(new Document("正文", Map.of("parseMode", "TEXT", "readerType", "TIKA")))
+                List.of(new Document("正文", Map.of("parseMode", "TEXT", "readerType", "TIKA"))),
+                signals
         ));
 
         assertTrue(policy.safeCleanEnabled());
         assertTrue(policy.semanticCleanEnabled());
         assertTrue(policy.headerFooterCleanEnabled());
-        assertTrue(policy.lineMergeEnabled());
         assertFalse(policy.ocrNoiseCleanEnabled());
     }
 
     @Test
-    void shouldPreserveSymbolsForMarkdownAndEnableOcrNoiseForOcrMode() {
+    void shouldNotEnableHeaderFooterWhenPdfTextButNoSignals() {
+        DocumentEntity document = document("PDF");
+
+        DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
+                document,
+                List.of(new Document("正文", Map.of("parseMode", "TEXT", "readerType", "TIKA"))),
+                DocumentSignals.empty()
+        ));
+
+        assertFalse(policy.headerFooterCleanEnabled());
+        assertFalse(policy.lineMergeEnabled());
+    }
+
+    @Test
+    void shouldEnableLineMergeWhenWeakParagraphStructure() {
+        DocumentEntity document = document("PDF");
+        DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false);
+
+        DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
+                document,
+                List.of(new Document("正文", Map.of("parseMode", "TEXT", "readerType", "TIKA"))),
+                signals
+        ));
+
+        assertTrue(policy.lineMergeEnabled());
+    }
+
+    @Test
+    void shouldPreserveSymbolsForMarkdown() {
         DocumentCleanPolicy markdownPolicy = resolver.resolve(new DocumentCleaningRequest(
                 document("MD"),
-                List.of(new Document("# 标题\n- 项目", Map.of("parseMode", "TEXT", "readerType", "MARKDOWN")))
+                List.of(new Document("# 标题\n- 项目", Map.of("parseMode", "TEXT", "readerType", "MARKDOWN"))),
+                DocumentSignals.empty()
         ));
         assertTrue(markdownPolicy.preserveSymbols());
         assertFalse(markdownPolicy.semanticCleanEnabled());
+    }
 
-        DocumentCleanPolicy ocrPolicy = resolver.resolve(new DocumentCleaningRequest(
+    @Test
+    void shouldEnableOcrNoiseWhenOcrModeAndNoiseDetected() {
+        DocumentSignals signals = new DocumentSignals(false, false, false, false, true, false, false);
+
+        DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
                 document("PDF"),
-                List.of(new Document("扫描内容", Map.of("parseMode", "OCR", "readerType", "TIKA_PDF")))
+                List.of(new Document("扫描内容", Map.of("parseMode", "OCR", "readerType", "TIKA_PDF"))),
+                signals
         ));
-        assertTrue(ocrPolicy.ocrNoiseCleanEnabled());
-        assertFalse(ocrPolicy.lineMergeEnabled());
+
+        assertTrue(policy.ocrNoiseCleanEnabled());
+    }
+
+    @Test
+    void shouldNotEnableOcrNoiseWhenNoNoiseDetected() {
+        DocumentCleanPolicy policy = resolver.resolve(new DocumentCleaningRequest(
+                document("PDF"),
+                List.of(new Document("扫描内容", Map.of("parseMode", "OCR", "readerType", "TIKA_PDF"))),
+                DocumentSignals.empty()
+        ));
+
+        assertFalse(policy.ocrNoiseCleanEnabled());
     }
 
     private DocumentEntity document(String docType) {

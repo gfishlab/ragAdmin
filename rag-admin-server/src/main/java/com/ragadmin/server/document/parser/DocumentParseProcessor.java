@@ -385,7 +385,7 @@ public class DocumentParseProcessor {
         List<Document> rawDocuments = documentContentExtractor.extract(document, version);
         List<Document> cleanedDocuments = documentCleaner.clean(
                 rawDocuments,
-                new DocumentCleanContext(document, new DocumentCleanPolicy(true, false, true, false, false, false))
+                new DocumentCleanContext(document, DocumentCleanPolicy.defaultPolicy())
         );
         return new ParsedContent(cleanedDocuments, splitIntoChunks(cleanedDocuments, strategy));
     }
@@ -488,7 +488,26 @@ public class DocumentParseProcessor {
         if (source.length() <= tailLength) {
             return source;
         }
-        return source.substring(source.length() - tailLength);
+        int rawStart = source.length() - tailLength;
+        int tolerance = Math.max(10, (int) (tailLength * 0.3));
+        int searchFrom = Math.max(0, rawStart - tolerance);
+
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (source.charAt(i) == '\n' && source.charAt(i - 1) == '\n') {
+                return source.substring(i + 1);
+            }
+        }
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (source.charAt(i) == '\n') {
+                return source.substring(i + 1);
+            }
+        }
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (Character.isWhitespace(source.charAt(i))) {
+                return source.substring(i + 1);
+            }
+        }
+        return source.substring(rawStart);
     }
 
     private int estimateTokenCount(String text) {
