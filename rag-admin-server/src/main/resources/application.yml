@@ -96,6 +96,9 @@ rag:
     minio:
       port: 9000
       use-ssl: false
+  search-engine:
+    elasticsearch:
+      enabled: false
   vector:
     milvus:
       enabled: true

@@ -42,6 +42,10 @@ rag:
           max-chunk-chars: 400
           chunk-overlap-chars: 80
           min-chunk-chars: 50
+  search-engine:
+    elasticsearch:
+      uris: http://127.0.0.1:9200
+      enabled: true
 
 logging:
   level:
