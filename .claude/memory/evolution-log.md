@@ -54,3 +54,9 @@
 - 变更：子代理路由规则增加并行执行判断策略
 - 原因：用户要求主 Agent 自主判断任务是否适合并行开发，无需用户额外指示
 - 影响：`subagent-routing.md` 增加并行判断章节，`learned-rules.md` 记录 R-007
+
+## 2026-04-22
+
+- 变更：实现 PG/Milvus/ES 三端数据同步，修复 Milvus 向量孤立问题
+- 原因：文档删除和重解析时 Milvus 向量未被清理；ES 已配置 Docker 但无 Java 集成
+- 影响：新建 ElasticsearchProperties + ElasticsearchClient + ChunkSearchSyncService；MilvusVectorStoreClient 新增 delete；DocumentParseProcessor 新增 SYNC_SEARCH_ENGINE 步骤；DocumentService/KnowledgeBaseService delete 接入三端清理；SystemHealthService 增加 ES 健康检查

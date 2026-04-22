@@ -39,3 +39,11 @@
 - 风险：堆积过期方案，与实际代码状态不一致，误导后续开发
 - 更优做法：完成后及时删除，长期结论回写到 `docs/architectures`
 - 适用范围：所有 plan 文档的生命周期管理
+
+## [A-006] 删除文档时只清理 PG 不清理 Milvus 和 ES
+
+- 日期：2026-04-22
+- 模式描述：文档删除或知识库删除时，只删除 PG 中的 chunk 和 ref 行，不删除 Milvus 中的向量数据和 ES 中的索引文档
+- 风险：Milvus 向量孤立（占用存储且无法被关联），ES 文档残留（全文检索命中已删除的内容）
+- 更优做法：使用 ChunkVectorizationService.deleteRefsByChunkIds() 同时清理 Milvus 向量和 PG ref，使用 ChunkSearchSyncService 清理 ES
+- 适用范围：任何涉及文档或知识库删除的代码路径

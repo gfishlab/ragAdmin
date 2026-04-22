@@ -95,6 +95,12 @@
 | `EMBEDDING_SIZE_MISMATCH` | 向量数量与 chunk 数量不一致 | 批量向量化返回结果异常 |
 | `MILVUS_INSERT_FAILED` | 向量写入失败 | Milvus upsert 失败 |
 | `MILVUS_SEARCH_FAILED` | 向量检索失败 | Milvus search 失败 |
+| `MILVUS_DELETE_FAILED` | Milvus 向量删除失败 | 文档/知识库删除时 Milvus 实体删除失败 |
+| `ES_ENSURE_INDEX_FAILED` | ES 索引创建失败 | 同步检索引擎时索引创建异常 |
+| `ES_BULK_UPSERT_FAILED` | ES 批量写入失败 | chunk 同步到 ES 时批量索引失败 |
+| `ES_DELETE_BY_DOC_FAILED` | ES 按文档删除失败 | 文档删除时清理 ES 索引失败 |
+| `ES_DELETE_INDEX_FAILED` | ES 索引删除失败 | 知识库删除时 ES 索引删除异常 |
+| `ES_SEARCH_FAILED` | ES 检索失败 | 全文检索调用失败 |
 
 ## 7. 内部接口
 

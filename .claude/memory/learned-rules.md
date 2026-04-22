@@ -44,6 +44,20 @@
 - 适用范围：所有非简单任务的执行阶段
 - 备注：详细规则写入 `.claude/rules/subagent-routing.md`
 
+## [R-008] 三端数据同步采用同步写入模式
+
+- 日期：2026-04-22
+- 规则：PG/Milvus/ES 三端数据同步使用同步写入（虚拟线程），不使用 Outbox 或事件驱动。失败由任务重试机制兜底
+- 来源：三端同步实施决策
+- 适用范围：文档上传、重解析、文档删除、知识库删除涉及的多端同步操作
+
+## [R-009] ES 操作受 enabled 开关条件化控制
+
+- 日期：2026-04-22
+- 规则：所有 ES 操作（索引管理、数据同步、删除、检索）通过 `rag.search-engine.elasticsearch.enabled` 开关控制，disabled 时所有方法为空操作
+- 来源：ElasticsearchClient 和 ChunkSearchSyncService 设计
+- 适用范围：任何新增 ES 集成点
+
 ## [R-006] 向量方案锁定 Milvus
 
 - 日期：2026-04-21
