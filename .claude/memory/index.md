@@ -4,7 +4,7 @@
 
 - [已学规则](learned-rules.md) — 9 条稳定规则（R-001~R-009）
 - [纠正记录](corrections.md) — 3 条纠正（后台问答下线、分块策略重构、ChunkContext parseMode）
-- [阶段观察](observations.md) — 4 条观察（TextSplitter局限、中文句子检测、分块参数对齐、父子分块可行性）
+- [阶段观察](observations.md) — 5 条观察（TextSplitter局限、中文句子检测、分块参数对齐、父子分块可行性、ES IK分词器）
 - [反模式清单](anti-patterns.md) — 6 条反模式（A-001~A-006）
 - [演化日志](evolution-log.md) — 9 条演化记录（2026-04-14 至 2026-04-22）
 

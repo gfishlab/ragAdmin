@@ -47,7 +47,7 @@ public class ElasticsearchClient {
                     {
                       "mappings": {
                         "properties": {
-                          "chunk_text": {"type": "text", "analyzer": "standard"},
+                          "chunk_text": {"type": "text", "analyzer": "ik_max_word", "search_analyzer": "ik_smart"},
                           "chunk_id": {"type": "long"},
                           "kb_id": {"type": "long"},
                           "document_id": {"type": "long"},

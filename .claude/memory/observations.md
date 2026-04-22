@@ -31,3 +31,11 @@
 - 判断依据：架构设计分析，`rag-admin-document-chunking-architecture.md` 第 11.4 节
 - 启示：等专项分块策略稳定后可以实施，但会增加向量化成本（child 数量翻 2-3 倍）
 - 状态：远期规划
+
+## [O-005] ES 中文分词必须安装 IK 插件
+
+- 日期：2026-04-22
+- 观察：ES 默认 `standard` 分词器对中文仅做单字切分（"中华人民共和国" → "中"、"华"、"人"...），无法满足中文语义检索。需要安装 `elasticsearch-analysis-ik` 插件，索引分词用 `ik_max_word`，搜索分词用 `ik_smart`
+- 判断依据：实际测试确认，ES 官方 Docker 镜像不含 IK 插件
+- 启示：IK 插件版本必须与 ES 版本严格一致，升级 ES 时必须同步升级 IK。通过自定义 Dockerfile 预装插件是可靠做法
+- 状态：已验证

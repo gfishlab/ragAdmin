@@ -21,7 +21,7 @@
 
 ### 2.3 ES `kb_{kbId}_chunks` 索引
 
-- 全文检索字段：`chunk_text`（使用 standard analyzer）
+- 全文检索字段：`chunk_text`（使用 ik_max_word 分词器，需预装 IK Analysis 插件）
 - 关联字段：`chunk_id`、`kb_id`、`document_id`、`document_version_id`（long 类型）
 - 控制字段：`enabled`（boolean）
 - 元数据字段：`metadata_json`（keyword 类型）
@@ -100,7 +100,7 @@
 {
   "mappings": {
     "properties": {
-      "chunk_text":            { "type": "text", "analyzer": "standard" },
+      "chunk_text":            { "type": "text", "analyzer": "ik_max_word", "search_analyzer": "ik_smart" },
       "chunk_id":              { "type": "long" },
       "kb_id":                 { "type": "long" },
       "document_id":           { "type": "long" },
@@ -111,6 +111,26 @@
   }
 }
 ```
+
+### IK 中文分词器
+
+ES 默认的 `standard` 分词器对中文仅做单字切分，无法满足中文语义检索需求。本系统使用 `elasticsearch-analysis-ik` 插件提供中文分词能力：
+
+- **索引分词**：`ik_max_word`（最细粒度切分，如"中华人民共和国" → "中华人民共和国", "中华人民", "中华", "华人", "人民共和国", "人民", "共和国", "共和", "国"）
+- **搜索分词**：`ik_smart`（智能切分，如"中华人民共和国" → "中华人民共和国"）
+
+**部署要求**：IK 插件版本必须与 ES 版本严格一致。项目通过自定义 Dockerfile（`docker/elasticsearch/Dockerfile`）预装 IK 插件，避免手工进容器安装：
+
+```dockerfile
+FROM docker.elastic.co/elasticsearch/elasticsearch:8.17.3
+RUN /usr/share/elasticsearch/bin/elasticsearch-plugin install --batch \
+    https://get.infini.cloud/elasticsearch/analysis-ik/8.17.3
+```
+
+**坑点提示**：
+- ES 官方 Docker 镜像不自带 IK 插件，需自定义镜像
+- 升级 ES 版本时必须同步更新 IK 插件版本，否则插件加载失败导致 ES 启动报错
+- 安装插件后需重建容器（不是重启），因为插件是构建时安装的
 
 ## 7. 条件化开关
 
