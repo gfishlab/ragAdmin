@@ -146,6 +146,7 @@ public class KnowledgeBaseService {
         entity.setEmbeddingModelId(request.getEmbeddingModelId());
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
+        entity.setRetrievalMode(request.getRetrievalMode());
         entity.setStatus(request.getStatus());
         entity.setCreatedBy(operatorUserId);
         knowledgeBaseMapper.insert(entity);
@@ -173,6 +174,7 @@ public class KnowledgeBaseService {
         entity.setEmbeddingModelId(request.getEmbeddingModelId());
         entity.setRetrieveTopK(request.getRetrieveTopK());
         entity.setRerankEnabled(request.getRerankEnabled());
+        entity.setRetrievalMode(request.getRetrievalMode());
         entity.setStatus(request.getStatus());
         knowledgeBaseMapper.updateById(entity);
         return getDetail(kbId);
@@ -281,6 +283,7 @@ public class KnowledgeBaseService {
                 embeddingModel == null ? null : embeddingModel.getModelName(),
                 entity.getRetrieveTopK(),
                 entity.getRerankEnabled(),
+                entity.getRetrievalMode(),
                 entity.getStatus()
         );
     }

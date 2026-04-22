@@ -9,6 +9,8 @@ public class RetrievalProperties {
     private int maxContextChunks = 5;
     private int maxContextChars = 4000;
     private int referenceSnippetChars = 200;
+    private int rrfK = 60;
+    private int hybridTopKMultiplier = 2;
 
     public int getDefaultTopK() {
         return defaultTopK;
@@ -40,5 +42,21 @@ public class RetrievalProperties {
 
     public void setReferenceSnippetChars(int referenceSnippetChars) {
         this.referenceSnippetChars = referenceSnippetChars;
+    }
+
+    public int getRrfK() {
+        return rrfK;
+    }
+
+    public void setRrfK(int rrfK) {
+        this.rrfK = rrfK;
+    }
+
+    public int getHybridTopKMultiplier() {
+        return hybridTopKMultiplier;
+    }
+
+    public void setHybridTopKMultiplier(int hybridTopKMultiplier) {
+        this.hybridTopKMultiplier = hybridTopKMultiplier;
     }
 }

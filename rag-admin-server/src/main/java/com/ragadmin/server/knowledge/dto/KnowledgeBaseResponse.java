@@ -9,6 +9,7 @@ public record KnowledgeBaseResponse(
         String embeddingModelName,
         Integer retrieveTopK,
         Boolean rerankEnabled,
+        String retrievalMode,
         String status
 ) {
 }

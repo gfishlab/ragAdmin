@@ -223,6 +223,7 @@ class AppApiWebMvcTest {
                         "bge-m3",
                         5,
                         false,
+                        "SEMANTIC_ONLY",
                         "ENABLED"
                 )),
                 1,

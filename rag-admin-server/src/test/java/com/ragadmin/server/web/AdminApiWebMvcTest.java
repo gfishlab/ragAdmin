@@ -385,6 +385,7 @@ class AdminApiWebMvcTest {
                 "quentinz/bge-small-zh-v1.5",
                 5,
                 false,
+                "SEMANTIC_ONLY",
                 "ENABLED"
         ));
 

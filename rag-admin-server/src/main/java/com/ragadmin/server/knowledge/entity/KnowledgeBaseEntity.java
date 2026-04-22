@@ -20,6 +20,7 @@ public class KnowledgeBaseEntity {
     private Long chatModelId;
     private Integer retrieveTopK;
     private Boolean rerankEnabled;
+    private String retrievalMode;
     private String status;
     private Long createdBy;
     private LocalDateTime createdAt;

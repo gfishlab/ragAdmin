@@ -24,6 +24,8 @@ public class CreateKnowledgeBaseRequest {
     @NotNull(message = "rerankEnabled 不能为空")
     private Boolean rerankEnabled;
 
+    private String retrievalMode;
+
     @NotBlank(message = "status 不能为空")
     private String status;
 }

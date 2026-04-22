@@ -11,6 +11,7 @@ import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
 import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.model.service.ModelService;
+import com.ragadmin.server.retrieval.config.RetrievalMode;
 import com.ragadmin.server.retrieval.config.RetrievalProperties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -46,68 +47,38 @@ public class RetrievalService {
     @Autowired
     private RetrievalProperties retrievalProperties;
 
+    @Autowired
+    private KeywordRetrievalStrategy keywordRetrievalStrategy;
+
+    @Autowired
+    private RrfFusionService rrfFusionService;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
-        ChunkVectorRefEntity sampleRef = chunkVectorRefMapper.selectOne(new LambdaQueryWrapper<ChunkVectorRefEntity>()
-                .eq(ChunkVectorRefEntity::getKbId, knowledgeBase.getId())
-                .eq(ChunkVectorRefEntity::getEmbeddingModelId, knowledgeBase.getEmbeddingModelId())
-                .last("LIMIT 1"));
-        if (sampleRef == null) {
-            return new RetrievalResult(List.of(), "");
+        RetrievalMode mode = RetrievalMode.resolve(knowledgeBase.getRetrievalMode());
+        int topK = resolveTopK(knowledgeBase);
+        List<RetrievedChunk> chunks;
+
+        switch (mode) {
+            case KEYWORD_ONLY -> {
+                chunks = keywordRetrievalStrategy.retrieve(knowledgeBase, question, topK);
+            }
+            case HYBRID -> {
+                int expandedTopK = topK * retrievalProperties.getHybridTopKMultiplier();
+                List<RetrievedChunk> semantic = retrieveSemantic(knowledgeBase, question, expandedTopK);
+                List<RetrievedChunk> keyword = keywordRetrievalStrategy.retrieve(knowledgeBase, question, expandedTopK);
+                chunks = rrfFusionService.fuse(semantic, keyword, retrievalProperties.getRrfK(), topK);
+            }
+            default -> {
+                chunks = retrieveSemantic(knowledgeBase, question, topK);
+            }
         }
-
-        var embeddingDescriptor = modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
-        EmbeddingModelClient client = embeddingClientRegistry.getClient(embeddingDescriptor.providerCode());
-        List<Float> vector = client.embed(embeddingDescriptor.modelCode(), List.of(question)).getFirst();
-        List<MilvusVectorStoreClient.SearchResult> searchResults = milvusVectorStoreClient.search(
-                sampleRef.getCollectionName(),
-                vector,
-                resolveTopK(knowledgeBase)
-        );
-        if (searchResults.isEmpty()) {
-            return new RetrievalResult(List.of(), "");
-        }
-
-        List<ChunkVectorRefEntity> refs = chunkVectorRefMapper.selectByVectorIds(searchResults.stream()
-                .map(MilvusVectorStoreClient.SearchResult::vectorId)
-                .toList());
-        Map<String, ChunkVectorRefEntity> refMap = refs.stream()
-                .collect(Collectors.toMap(ChunkVectorRefEntity::getVectorId, Function.identity()));
-        Map<Long, ChunkEntity> chunkMap = chunkMapper.selectBatchIds(refs.stream()
-                        .map(ChunkVectorRefEntity::getChunkId)
-                        .toList())
-                .stream()
-                .collect(Collectors.toMap(ChunkEntity::getId, Function.identity()));
-
-        List<RetrievedChunk> chunks = searchResults.stream()
-                .map(result -> {
-                    ChunkVectorRefEntity ref = refMap.get(result.vectorId());
-                    if (ref == null) {
-                        return null;
-                    }
-                    ChunkEntity chunk = chunkMap.get(ref.getChunkId());
-                    if (chunk == null || !StringUtils.hasText(chunk.getChunkText())) {
-                        return null;
-                    }
-                    return new RetrievedChunk(chunk, result.score());
-                })
-                .filter(java.util.Objects::nonNull)
-                .sorted(Comparator.comparing(RetrievedChunk::score).reversed())
-                .collect(Collectors.collectingAndThen(
-                        Collectors.toMap(
-                                item -> item.chunk().getId(),
-                                Function.identity(),
-                                (left, right) -> left,
-                                LinkedHashMap::new
-                        ),
-                        map -> map.values().stream().toList()
-                ));
 
         String context = buildContext(chunks);
         return new RetrievalResult(chunks, context);
     }
 
     /**
-     * 前台允许一个会话动态选择多个知识库，这里按“逐库检索再合并结果”的最小方案复用现有单库检索能力。
+     * 前台允许一个会话动态选择多个知识库，这里按"逐库检索再合并结果"的最小方案复用现有单库检索能力。
      */
     public RetrievalResult retrieveAcrossKnowledgeBases(List<KnowledgeBaseEntity> knowledgeBases, String question) {
         if (knowledgeBases == null || knowledgeBases.isEmpty()) {
@@ -146,6 +117,63 @@ public class RetrievalService {
                 .toList();
     }
 
+    private List<RetrievedChunk> retrieveSemantic(KnowledgeBaseEntity knowledgeBase, String question, int topK) {
+        ChunkVectorRefEntity sampleRef = chunkVectorRefMapper.selectOne(new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                .eq(ChunkVectorRefEntity::getKbId, knowledgeBase.getId())
+                .eq(ChunkVectorRefEntity::getEmbeddingModelId, knowledgeBase.getEmbeddingModelId())
+                .last("LIMIT 1"));
+        if (sampleRef == null) {
+            return List.of();
+        }
+
+        var embeddingDescriptor = modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(knowledgeBase.getEmbeddingModelId());
+        EmbeddingModelClient client = embeddingClientRegistry.getClient(embeddingDescriptor.providerCode());
+        List<Float> vector = client.embed(embeddingDescriptor.modelCode(), List.of(question)).getFirst();
+        List<MilvusVectorStoreClient.SearchResult> searchResults = milvusVectorStoreClient.search(
+                sampleRef.getCollectionName(),
+                vector,
+                topK
+        );
+        if (searchResults.isEmpty()) {
+            return List.of();
+        }
+
+        List<ChunkVectorRefEntity> refs = chunkVectorRefMapper.selectByVectorIds(searchResults.stream()
+                .map(MilvusVectorStoreClient.SearchResult::vectorId)
+                .toList());
+        Map<String, ChunkVectorRefEntity> refMap = refs.stream()
+                .collect(Collectors.toMap(ChunkVectorRefEntity::getVectorId, Function.identity()));
+        Map<Long, ChunkEntity> chunkMap = chunkMapper.selectBatchIds(refs.stream()
+                        .map(ChunkVectorRefEntity::getChunkId)
+                        .toList())
+                .stream()
+                .collect(Collectors.toMap(ChunkEntity::getId, Function.identity()));
+
+        return searchResults.stream()
+                .map(result -> {
+                    ChunkVectorRefEntity ref = refMap.get(result.vectorId());
+                    if (ref == null) {
+                        return null;
+                    }
+                    ChunkEntity chunk = chunkMap.get(ref.getChunkId());
+                    if (chunk == null || !StringUtils.hasText(chunk.getChunkText())) {
+                        return null;
+                    }
+                    return new RetrievedChunk(chunk, result.score());
+                })
+                .filter(Objects::nonNull)
+                .sorted(Comparator.comparing(RetrievedChunk::score).reversed())
+                .collect(Collectors.collectingAndThen(
+                        Collectors.toMap(
+                                item -> item.chunk().getId(),
+                                Function.identity(),
+                                (left, right) -> left,
+                                LinkedHashMap::new
+                        ),
+                        map -> map.values().stream().toList()
+                ));
+    }
+
     private int resolveTopK(KnowledgeBaseEntity knowledgeBase) {
         Integer configuredTopK = knowledgeBase.getRetrieveTopK();
         if (configuredTopK == null || configuredTopK <= 0) {
@@ -158,7 +186,7 @@ public class RetrievalService {
         int maxChunks = Math.max(1, retrievalProperties.getMaxContextChunks());
         int maxChars = Math.max(500, retrievalProperties.getMaxContextChars());
         StringBuilder contextBuilder = new StringBuilder();
-        int appendedChunks = 0;
+        int appendedChunks =  0;
 
         for (RetrievedChunk item : chunks) {
             if (appendedChunks >= maxChunks) {

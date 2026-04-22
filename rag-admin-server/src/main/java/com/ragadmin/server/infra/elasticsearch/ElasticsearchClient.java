@@ -157,6 +157,43 @@ public class ElasticsearchClient {
         }
     }
 
+    public record ScoredDocument(long chunkId, double score, Map<String, Object> source) {
+    }
+
+    public List<ScoredDocument> searchWithScores(String indexName, String query, int limit) {
+        if (!properties.isEnabled()) {
+            return List.of();
+        }
+
+        try {
+            String searchBody = String.format(
+                    "{\"query\":{\"match\":{\"chunk_text\":{\"query\":\"%s\"}}},\"size\":%d}",
+                    query.replace("\"", "\\\""), limit);
+
+            String response = restClient.post()
+                    .uri("/" + indexName + "/_search")
+                    .body(searchBody)
+                    .retrieve()
+                    .body(String.class);
+
+            Map<String, Object> responseMap = objectMapper.readValue(response, new TypeReference<>() {});
+            Map<String, Object> hits = (Map<String, Object>) responseMap.get("hits");
+            List<Map<String, Object>> hitsList = (List<Map<String, Object>>) hits.get("hits");
+
+            return hitsList.stream()
+                    .map(hit -> {
+                        double score = ((Number) hit.getOrDefault("_score", 0.0)).doubleValue();
+                        Map<String, Object> source = (Map<String, Object>) hit.get("_source");
+                        long chunkId = ((Number) source.getOrDefault("chunk_id", 0)).longValue();
+                        return new ScoredDocument(chunkId, score, source);
+                    })
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Failed to search index {} with query {}: {}", indexName, query, e.getMessage());
+            throw new BusinessException("ES_SEARCH_FAILED", "Failed to search", HttpStatus.INTERNAL_SERVER_ERROR);
+        }
+    }
+
     public List<Map<String, Object>> search(String indexName, String query, int limit) {
         if (!properties.isEnabled()) {
             return List.of();

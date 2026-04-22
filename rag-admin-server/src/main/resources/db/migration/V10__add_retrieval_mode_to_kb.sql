@@ -1,0 +1,4 @@
+ALTER TABLE kb_knowledge_base
+    ADD COLUMN IF NOT EXISTS retrieval_mode VARCHAR(32) NOT NULL DEFAULT 'SEMANTIC_ONLY';
+
+COMMENT ON COLUMN kb_knowledge_base.retrieval_mode IS '检索模式: SEMANTIC_ONLY, KEYWORD_ONLY, HYBRID';

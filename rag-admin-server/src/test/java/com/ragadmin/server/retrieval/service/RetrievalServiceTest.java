@@ -22,9 +22,13 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -45,6 +49,12 @@ class RetrievalServiceTest {
     @Mock
     private ChunkMapper chunkMapper;
 
+    @Mock
+    private KeywordRetrievalStrategy keywordRetrievalStrategy;
+
+    @Mock
+    private RrfFusionService rrfFusionService;
+
     private RetrievalService retrievalService;
 
     @BeforeEach
@@ -55,12 +65,16 @@ class RetrievalServiceTest {
         ReflectionTestUtils.setField(retrievalService, "milvusVectorStoreClient", milvusVectorStoreClient);
         ReflectionTestUtils.setField(retrievalService, "chunkVectorRefMapper", chunkVectorRefMapper);
         ReflectionTestUtils.setField(retrievalService, "chunkMapper", chunkMapper);
+        ReflectionTestUtils.setField(retrievalService, "keywordRetrievalStrategy", keywordRetrievalStrategy);
+        ReflectionTestUtils.setField(retrievalService, "rrfFusionService", rrfFusionService);
 
         RetrievalProperties retrievalProperties = new RetrievalProperties();
         retrievalProperties.setDefaultTopK(5);
         retrievalProperties.setMaxContextChunks(2);
         retrievalProperties.setMaxContextChars(500);
         retrievalProperties.setReferenceSnippetChars(10);
+        retrievalProperties.setRrfK(60);
+        retrievalProperties.setHybridTopKMultiplier(2);
         ReflectionTestUtils.setField(retrievalService, "retrievalProperties", retrievalProperties);
     }
 
@@ -70,6 +84,7 @@ class RetrievalServiceTest {
         knowledgeBase.setId(1L);
         knowledgeBase.setEmbeddingModelId(10L);
         knowledgeBase.setRetrieveTopK(3);
+        // SEMANTIC_ONLY (default)
 
         ChunkVectorRefEntity sampleRef = new ChunkVectorRefEntity();
         sampleRef.setCollectionName("kb_1");
@@ -119,6 +134,95 @@ class RetrievalServiceTest {
         assertFalse(result.context().contains("片段3"));
         assertTrueContains(result.context(), "片段1");
         assertTrueContains(result.context(), "片段2");
+        // SEMANTIC_ONLY 不应调用 keyword 策略
+        verify(keywordRetrievalStrategy, never()).retrieve(any(), anyString(), anyInt());
+    }
+
+    @Test
+    void shouldDispatchToKeywordOnly() {
+        KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
+        kb.setId(1L);
+        kb.setRetrievalMode("KEYWORD_ONLY");
+
+        ChunkEntity chunk1 = chunk(100L, 1, "关键词结果");
+        List<RetrievalService.RetrievedChunk> keywordResults = List.of(
+                new RetrievalService.RetrievedChunk(chunk1, 8.5)
+        );
+        when(keywordRetrievalStrategy.retrieve(eq(kb), eq("查询"), eq(5))).thenReturn(keywordResults);
+
+        RetrievalService.RetrievalResult result = retrievalService.retrieve(kb, "查询");
+
+        assertEquals(1, result.chunks().size());
+        assertEquals(100L, result.chunks().getFirst().chunk().getId());
+        verify(milvusVectorStoreClient, never()).search(any(), any(), anyInt());
+    }
+
+    @Test
+    void shouldDispatchToHybrid() {
+        KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
+        kb.setId(1L);
+        kb.setEmbeddingModelId(10L);
+        kb.setRetrieveTopK(3);
+        kb.setRetrievalMode("HYBRID");
+
+        ChunkEntity semChunk = chunk(100L, 1, "语义结果");
+        ChunkEntity kwChunk = chunk(101L, 2, "关键词结果");
+        List<RetrievalService.RetrievedChunk> semanticResults = List.of(
+                new RetrievalService.RetrievedChunk(semChunk, 0.9)
+        );
+        List<RetrievalService.RetrievedChunk> keywordResults = List.of(
+                new RetrievalService.RetrievedChunk(kwChunk, 8.5)
+        );
+
+        // HYBRID with topK=3, multiplier=2 => expandedTopK=6
+        ChunkVectorRefEntity sampleRef = new ChunkVectorRefEntity();
+        sampleRef.setCollectionName("kb_1");
+        when(chunkVectorRefMapper.selectOne(any())).thenReturn(sampleRef);
+        when(modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(10L))
+                .thenReturn(new EmbeddingModelDescriptor(10L, "text-embedding-v3", "BAILIAN", "百炼", EmbeddingExecutionMode.SYNC_TEXT));
+        when(embeddingClientRegistry.getClient("BAILIAN")).thenReturn(new EmbeddingModelClient() {
+            @Override
+            public boolean supports(String providerCode) { return true; }
+            @Override
+            public List<List<Float>> embed(String modelCode, List<String> inputs) {
+                return List.of(List.of(0.1F, 0.2F));
+            }
+        });
+        when(milvusVectorStoreClient.search("kb_1", List.of(0.1F, 0.2F), 6))
+                .thenReturn(List.of(new MilvusVectorStoreClient.SearchResult("v1", 0.9)));
+        ChunkVectorRefEntity ref = new ChunkVectorRefEntity();
+        ref.setChunkId(100L);
+        ref.setVectorId("v1");
+        when(chunkVectorRefMapper.selectByVectorIds(List.of("v1"))).thenReturn(List.of(ref));
+        when(chunkMapper.selectBatchIds(List.of(100L))).thenReturn(List.of(semChunk));
+
+        when(keywordRetrievalStrategy.retrieve(eq(kb), eq("查询"), eq(6))).thenReturn(keywordResults);
+
+        List<RetrievalService.RetrievedChunk> fusedResults = List.of(
+                new RetrievalService.RetrievedChunk(kwChunk, 0.033),
+                new RetrievalService.RetrievedChunk(semChunk, 0.016)
+        );
+        when(rrfFusionService.fuse(semanticResults, keywordResults, 60, 3)).thenReturn(fusedResults);
+
+        RetrievalService.RetrievalResult result = retrievalService.retrieve(kb, "查询");
+
+        assertEquals(2, result.chunks().size());
+        verify(rrfFusionService).fuse(semanticResults, keywordResults, 60, 3);
+    }
+
+    @Test
+    void shouldDefaultToSemanticOnlyWhenModeIsNull() {
+        KnowledgeBaseEntity kb = new KnowledgeBaseEntity();
+        kb.setId(1L);
+        kb.setEmbeddingModelId(10L);
+        // retrievalMode is null => SEMANTIC_ONLY
+
+        when(chunkVectorRefMapper.selectOne(any())).thenReturn(null);
+
+        RetrievalService.RetrievalResult result = retrievalService.retrieve(kb, "查询");
+
+        assertTrue(result.chunks().isEmpty());
+        verify(keywordRetrievalStrategy, never()).retrieve(any(), anyString(), anyInt());
     }
 
     @Test
