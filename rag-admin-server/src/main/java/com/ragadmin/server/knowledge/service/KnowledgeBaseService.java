@@ -24,6 +24,10 @@ import com.ragadmin.server.knowledge.dto.CreateKnowledgeBaseRequest;
 import com.ragadmin.server.knowledge.dto.KnowledgeBaseResponse;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
+import com.ragadmin.server.infra.vector.MilvusVectorStoreClient;
+import com.ragadmin.server.infra.elasticsearch.ElasticsearchClient;
+import com.ragadmin.server.document.support.ChunkVectorizationService;
+import com.ragadmin.server.document.support.ChunkSearchSyncService;
 import com.ragadmin.server.model.entity.AiModelEntity;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
@@ -80,6 +84,18 @@ public class KnowledgeBaseService {
 
     @Autowired
     private TaskRetryRecordMapper taskRetryRecordMapper;
+
+    @Autowired
+    private MilvusVectorStoreClient milvusVectorStoreClient;
+
+    @Autowired
+    private ElasticsearchClient elasticsearchClient;
+
+    @Autowired
+    private ChunkVectorizationService chunkVectorizationService;
+
+    @Autowired
+    private ChunkSearchSyncService chunkSearchSyncService;
 
     public PageResponse<KnowledgeBaseResponse> list(String keyword, String status, long pageNo, long pageSize) {
         LambdaQueryWrapper<KnowledgeBaseEntity> wrapper = new LambdaQueryWrapper<KnowledgeBaseEntity>()
@@ -232,10 +248,10 @@ public class KnowledgeBaseService {
         if (!chunkIds.isEmpty()) {
             chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
                     .in(ChatAnswerReferenceEntity::getChunkId, chunkIds));
+            // 先清理 Milvus 向量 + PG ref 行
+            chunkVectorizationService.deleteRefsByChunkIds(chunkIds);
         }
 
-        chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
-                .eq(ChunkVectorRefEntity::getKbId, kbId));
         chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
                 .eq(ChunkEntity::getKbId, kbId));
         documentParseTaskMapper.delete(new LambdaQueryWrapper<DocumentParseTaskEntity>()
@@ -247,6 +263,9 @@ public class KnowledgeBaseService {
             documentMapper.delete(new LambdaQueryWrapper<DocumentEntity>()
                     .in(DocumentEntity::getId, documentIds));
         }
+
+        // 清理 ES 索引
+        chunkSearchSyncService.deleteByKnowledgeBase(kbId);
 
         knowledgeBaseMapper.deleteById(kbId);
     }

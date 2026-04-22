@@ -114,6 +114,36 @@ public class MilvusVectorStoreClient {
         }
     }
 
+    public void delete(String collectionName, List<String> vectorIds) {
+        if (!milvusProperties.isEnabled()) {
+            return;
+        }
+        if (vectorIds == null || vectorIds.isEmpty()) {
+            return;
+        }
+        try {
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/entities/delete",
+                    Map.of(
+                            "collectionName", collectionName,
+                            "id", vectorIds
+                    )
+            );
+            if (!isSuccess(response)) {
+                throw new BusinessException("MILVUS_DELETE_FAILED",
+                        "Milvus 向量删除失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
+            }
+            log.info("Milvus 向量删除成功，collectionName={}, count={}", collectionName, vectorIds.size());
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Milvus 向量删除异常，collectionName={}, vectorCount={}, reason={}",
+                    collectionName, vectorIds.size(), ex.getMessage(), ex);
+            throw new BusinessException("MILVUS_DELETE_FAILED",
+                    "Milvus 向量删除失败", HttpStatus.BAD_GATEWAY);
+        }
+    }
+
     public CollectionDescription describeCollection(String collectionName) {
         if (!milvusProperties.isEnabled()) {
             return new CollectionDescription(collectionName, "DISABLED", null, null);
@@ -139,6 +169,30 @@ public class MilvusVectorStoreClient {
                 throw businessException;
             }
             throw new BusinessException("MILVUS_COLLECTION_DESCRIBE_FAILED", "Milvus 集合描述失败", HttpStatus.BAD_GATEWAY);
+        }
+    }
+
+    public void dropCollection(String collectionName) {
+        if (!milvusProperties.isEnabled()) {
+            return;
+        }
+        try {
+            Map<String, Object> response = postJson(
+                    "/v2/vectordb/collections/drop",
+                    Map.of("collectionName", collectionName)
+            );
+            if (!isSuccess(response)) {
+                throw new BusinessException("MILVUS_COLLECTION_DROP_FAILED",
+                        "Milvus 集合删除失败: " + responseMessage(response), HttpStatus.BAD_GATEWAY);
+            }
+            log.info("Milvus 集合删除成功，collectionName={}", collectionName);
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("Milvus 集合删除异常，collectionName={}, reason={}",
+                    collectionName, ex.getMessage(), ex);
+            throw new BusinessException("MILVUS_COLLECTION_DROP_FAILED",
+                    "Milvus 集合删除失败", HttpStatus.BAD_GATEWAY);
         }
     }
 

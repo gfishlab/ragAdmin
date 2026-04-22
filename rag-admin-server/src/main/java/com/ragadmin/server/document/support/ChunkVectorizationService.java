@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class ChunkVectorizationService {
@@ -93,6 +94,20 @@ public class ChunkVectorizationService {
         if (chunkIds == null || chunkIds.isEmpty()) {
             return;
         }
+        // 先查 ref 记录获取 Milvus 向量 ID，按集合分组删除
+        List<ChunkVectorRefEntity> refs = chunkVectorRefMapper.selectList(
+                new LambdaQueryWrapper<ChunkVectorRefEntity>()
+                        .in(ChunkVectorRefEntity::getChunkId, chunkIds));
+        refs.stream()
+                .filter(ref -> ref.getCollectionName() != null && ref.getVectorId() != null)
+                .collect(Collectors.groupingBy(ChunkVectorRefEntity::getCollectionName))
+                .forEach((collectionName, collectionRefs) -> {
+                    List<String> vectorIds = collectionRefs.stream()
+                            .map(ChunkVectorRefEntity::getVectorId)
+                            .toList();
+                    milvusVectorStoreClient.delete(collectionName, vectorIds);
+                });
+        // 删除 PG ref 行
         chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
                 .in(ChunkVectorRefEntity::getChunkId, chunkIds));
     }

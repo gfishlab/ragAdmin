@@ -10,6 +10,8 @@ import com.ragadmin.server.infra.search.NoopWebSearchProvider;
 import com.ragadmin.server.infra.search.TavilyProperties;
 import com.ragadmin.server.infra.search.WebSearchProperties;
 import com.ragadmin.server.infra.search.WebSearchProvider;
+import com.ragadmin.server.infra.elasticsearch.ElasticsearchClient;
+import com.ragadmin.server.infra.elasticsearch.ElasticsearchProperties;
 import com.ragadmin.server.infra.storage.MinioProperties;
 import com.ragadmin.server.infra.vector.MilvusProperties;
 import com.ragadmin.server.system.dto.DependencyHealthResponse;
@@ -53,6 +55,12 @@ public class SystemHealthService {
     private MilvusProperties milvusProperties;
 
     @Autowired
+    private ElasticsearchProperties elasticsearchProperties;
+
+    @Autowired
+    private ElasticsearchClient elasticsearchClient;
+
+    @Autowired
     private WebSearchProperties webSearchProperties;
 
     @Autowired
@@ -74,10 +82,11 @@ public class SystemHealthService {
         DependencyHealthResponse bailian = checkBailian();
         DependencyHealthResponse ollama = checkOllama();
         DependencyHealthResponse milvus = checkMilvus();
+        DependencyHealthResponse elasticsearch = checkElasticsearch();
         DependencyHealthResponse tavily = checkTavily();
         DependencyHealthResponse ocr = checkOcr();
-        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, tavily, ocr) ? "UP" : "DEGRADED";
-        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, tavily, ocr);
+        String status = isHealthy(postgres, redis, minio, bailian, ollama, milvus, tavily, ocr, elasticsearch) ? "UP" : "DEGRADED";
+        return new HealthCheckResponse(status, postgres, redis, minio, bailian, ollama, milvus, tavily, ocr, elasticsearch);
     }
 
     private DependencyHealthResponse checkPostgres() {
@@ -220,6 +229,44 @@ public class SystemHealthService {
             return new DependencyHealthResponse("UP", "Milvus 连通正常，业务集合数=" + safeCount);
         } catch (Exception ex) {
             return new DependencyHealthResponse("DOWN", buildMessage("Milvus 检查失败", ex));
+        }
+    }
+
+    private DependencyHealthResponse checkElasticsearch() {
+        if (!elasticsearchProperties.isEnabled()) {
+            return new DependencyHealthResponse("UNKNOWN", "Elasticsearch 已禁用");
+        }
+        if (!StringUtils.hasText(elasticsearchProperties.getUris())) {
+            return new DependencyHealthResponse("UNKNOWN", "Elasticsearch 未配置地址");
+        }
+        try {
+            // 使用 ElasticsearchClient 的内部 RestClient 调用 _cluster/health API
+            SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+            requestFactory.setConnectTimeout(Duration.ofSeconds(5));
+            requestFactory.setReadTimeout(Duration.ofSeconds(10));
+            RestClient client = RestClient.builder()
+                    .baseUrl(StringUtils.hasText(elasticsearchProperties.getUris()) ? elasticsearchProperties.getUris() : "http://127.0.0.1:9200")
+                    .requestFactory(requestFactory)
+                    .defaultHeader("Content-Type", "application/json")
+                    .build();
+
+            // 调用 ES 集群健康检查 API
+            @SuppressWarnings("unchecked")
+            Map<String, Object> response = client.get()
+                    .uri("/_cluster/health")
+                    .retrieve()
+                    .body(Map.class);
+
+            if (response != null && response.containsKey("status")) {
+                String esStatus = String.valueOf(response.get("status"));
+                // ES 状态: green(健康), yellow(分片副本可用但未全部分配), red(部分数据不可用)
+                String clusterName = response.containsKey("cluster_name") ? String.valueOf(response.get("cluster_name")) : "unknown";
+                int activeShards = response.containsKey("active_shards") ? ((Number) response.get("active_shards")).intValue() : 0;
+                return new DependencyHealthResponse("UP", String.format("Elasticsearch 连通正常，集群=%s，状态=%s，活跃分片=%d", clusterName, esStatus, activeShards));
+            }
+            return new DependencyHealthResponse("UP", "Elasticsearch 连通正常");
+        } catch (Exception ex) {
+            return new DependencyHealthResponse("DOWN", buildMessage("Elasticsearch 检查失败", ex));
         }
     }
 

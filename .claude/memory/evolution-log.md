@@ -48,3 +48,9 @@
 - 变更：完成 memory 沉淀，清理已完成 plans
 - 原因：6 个 plans 已完成，长期结论需回写到 architectures
 - 影响：memory 五个文件补齐核心内容，6 个 plans 删除，架构文档更新
+
+## 2026-04-21
+
+- 变更：子代理路由规则增加并行执行判断策略
+- 原因：用户要求主 Agent 自主判断任务是否适合并行开发，无需用户额外指示
+- 影响：`subagent-routing.md` 增加并行判断章节，`learned-rules.md` 记录 R-007

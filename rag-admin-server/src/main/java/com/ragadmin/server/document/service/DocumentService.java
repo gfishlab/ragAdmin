@@ -26,6 +26,8 @@ import com.ragadmin.server.document.mapper.DocumentParseTaskMapper;
 import com.ragadmin.server.document.mapper.DocumentVersionMapper;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
+import com.ragadmin.server.document.support.ChunkSearchSyncService;
+import com.ragadmin.server.document.support.ChunkVectorizationService;
 import com.ragadmin.server.task.entity.TaskRetryRecordEntity;
 import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskRetryRecordMapper;
@@ -72,6 +74,12 @@ public class DocumentService {
 
     @Autowired
     private TaskRealtimeEventService taskRealtimeEventService;
+
+    @Autowired
+    private ChunkVectorizationService chunkVectorizationService;
+
+    @Autowired
+    private ChunkSearchSyncService chunkSearchSyncService;
 
     @Transactional
     public DocumentResponse createDocument(Long kbId, CreateDocumentRequest request, Long operatorUserId) {
@@ -141,10 +149,13 @@ public class DocumentService {
         }
 
         if (!chunkIds.isEmpty()) {
+            // 清理 Milvus 向量数据
+            chunkVectorizationService.deleteRefsByChunkIds(chunkIds);
+            // 清理 ES 搜索索引
+            chunkSearchSyncService.deleteByDocument(document.getKbId(), documentId);
+            // 清理关联数据
             chatAnswerReferenceMapper.delete(new LambdaQueryWrapper<ChatAnswerReferenceEntity>()
                     .in(ChatAnswerReferenceEntity::getChunkId, chunkIds));
-            chunkVectorRefMapper.delete(new LambdaQueryWrapper<ChunkVectorRefEntity>()
-                    .in(ChunkVectorRefEntity::getChunkId, chunkIds));
         }
 
         chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()

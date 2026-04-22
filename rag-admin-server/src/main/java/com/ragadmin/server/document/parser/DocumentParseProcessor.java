@@ -15,8 +15,10 @@ import com.ragadmin.server.task.entity.TaskStepRecordEntity;
 import com.ragadmin.server.task.mapper.TaskStepRecordMapper;
 import com.ragadmin.server.task.service.TaskRealtimeEventService;
 import com.ragadmin.server.document.support.ChunkVectorizationService;
+import com.ragadmin.server.document.support.ChunkSearchSyncService;
 import com.ragadmin.server.document.support.DocumentVectorizationProperties;
 import com.ragadmin.server.document.support.DocumentVectorizationStrategyResolver;
+import com.ragadmin.server.infra.elasticsearch.ElasticsearchClient;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import org.springframework.ai.document.Document;
@@ -55,6 +57,8 @@ public class DocumentParseProcessor {
     private final TaskStepRecordMapper taskStepRecordMapper;
     private final KnowledgeBaseService knowledgeBaseService;
     private final ChunkVectorizationService chunkVectorizationService;
+    private final ChunkSearchSyncService chunkSearchSyncService;
+    private final ElasticsearchClient elasticsearchClient;
     private final DocumentVectorizationStrategyResolver strategyResolver;
     private final DocumentChunkStrategyResolver chunkStrategyResolver;
     private final DocumentSignalAnalyzer signalAnalyzer;
@@ -75,6 +79,8 @@ public class DocumentParseProcessor {
             TaskStepRecordMapper taskStepRecordMapper,
             KnowledgeBaseService knowledgeBaseService,
             ChunkVectorizationService chunkVectorizationService,
+            ChunkSearchSyncService chunkSearchSyncService,
+            ElasticsearchClient elasticsearchClient,
             DocumentVectorizationStrategyResolver strategyResolver,
             DocumentChunkStrategyResolver chunkStrategyResolver,
             DocumentSignalAnalyzer signalAnalyzer,
@@ -92,6 +98,8 @@ public class DocumentParseProcessor {
         this.taskStepRecordMapper = taskStepRecordMapper;
         this.knowledgeBaseService = knowledgeBaseService;
         this.chunkVectorizationService = chunkVectorizationService;
+        this.chunkSearchSyncService = chunkSearchSyncService;
+        this.elasticsearchClient = elasticsearchClient;
         this.strategyResolver = strategyResolver;
         this.chunkStrategyResolver = chunkStrategyResolver;
         this.signalAnalyzer = signalAnalyzer;
@@ -186,6 +194,12 @@ public class DocumentParseProcessor {
             chunkVectorizationService.vectorize(knowledgeBase, chunks);
             completeStep(embeddingStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), embeddingStep.getStepCode(), embeddingStep.getStepName());
+
+            TaskStepRecordEntity searchSyncStep = startStep(context.task().getId(), "SYNC_SEARCH_ENGINE", "同步检索引擎");
+            taskRealtimeEventService.publishStepStarted(context.task(), context.document(), searchSyncStep.getStepCode(), searchSyncStep.getStepName());
+            chunkSearchSyncService.syncChunks(context.document().getKbId(), chunks);
+            completeStep(searchSyncStep);
+            taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), searchSyncStep.getStepCode(), searchSyncStep.getStepName());
 
             markSuccess(context);
             log.info("文档解析任务执行成功，taskId={}, documentId={}, chunkCount={}",
