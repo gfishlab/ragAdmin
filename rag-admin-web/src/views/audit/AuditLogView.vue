@@ -300,8 +300,8 @@ onMounted(async () => {
   gap: 24px;
   padding: 10px 20px;
   background:
-    radial-gradient(circle at right top, rgba(198, 107, 34, 0.12), transparent 32%),
-    linear-gradient(180deg, rgba(255, 251, 246, 0.96), rgba(255, 248, 241, 0.9));
+    radial-gradient(circle at right top, var(--ember-primary-light), transparent 32%),
+    linear-gradient(180deg, var(--ember-background), var(--ember-surface));
 }
 
 .head-stats {
@@ -314,21 +314,21 @@ onMounted(async () => {
   display: flex;
   align-items: baseline;
   gap: 4px;
-  color: #8f7159;
+  color: var(--ember-text-secondary);
   font-size: 13px;
 }
 
 .head-stats .stat em {
   font-style: normal;
   font-weight: 700;
-  color: #2f241d;
+  color: var(--ember-text-primary);
   font-size: 16px;
   margin-right: 2px;
 }
 
-.head-stats .is-success em { color: #529b2e; }
-.head-stats .is-danger em { color: #c45656; }
-.head-stats .is-warm em { color: #b88230; }
+.head-stats .is-success em { color: var(--ember-success); }
+.head-stats .is-danger em { color: var(--ember-error); }
+.head-stats .is-warm em { color: var(--ember-warning); }
 
 .filter-panel,
 .table-panel {
@@ -368,18 +368,18 @@ onMounted(async () => {
 
 .operator-cell strong,
 .method-badge {
-  color: #2f241d;
+  color: var(--ember-text-primary);
 }
 
 .operator-cell span,
 .path-cell span,
 .response-cell span {
-  color: #8f7159;
+  color: var(--ember-text-secondary);
   font-size: 12px;
 }
 
 .path-cell code {
-  color: #684d39;
+  color: var(--ember-neutral);
   white-space: pre-wrap;
   word-break: break-all;
 }
@@ -391,8 +391,8 @@ onMounted(async () => {
   width: fit-content;
   min-width: 64px;
   padding: 6px 10px;
-  border-radius: 999px;
-  background: rgba(255, 248, 238, 0.88);
+  border-radius: var(--ember-radius-pill);
+  background: var(--ember-surface);
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.08em;
@@ -406,7 +406,7 @@ onMounted(async () => {
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 @media (max-width: 1080px) {

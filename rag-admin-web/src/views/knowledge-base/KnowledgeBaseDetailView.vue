@@ -1263,9 +1263,9 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.78);
-  box-shadow: inset 0 0 0 1px rgba(201, 168, 129, 0.12);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+  box-shadow: inset 0 0 0 1px var(--ember-border-light);
 }
 
 .capability-alert {
@@ -1288,8 +1288,8 @@ onUnmounted(() => {
 .filter-panel {
   margin-bottom: 18px;
   padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .filter-grid {
@@ -1329,7 +1329,7 @@ onUnmounted(() => {
 }
 
 .selection-summary {
-  color: #7a6451;
+  color: var(--ember-text-secondary);
   font-size: 13px;
 }
 
@@ -1340,7 +1340,7 @@ onUnmounted(() => {
 }
 
 .parse-progress-text {
-  color: #7a6451;
+  color: var(--ember-text-secondary);
   line-height: 1.4;
 }
 
@@ -1364,7 +1364,7 @@ onUnmounted(() => {
 
 .overview-card span,
 .detail-item span {
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1374,10 +1374,10 @@ onUnmounted(() => {
 .detail-item-value {
   display: block;
   margin-top: 6px;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 18px;
   line-height: 1.25;
-  color: #2f241d;
+  color: var(--ember-text-primary);
   word-break: break-word;
 }
 
@@ -1391,13 +1391,13 @@ onUnmounted(() => {
 
 .section-head h2 {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 18px;
 }
 
 .section-head p {
   margin: 6px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   font-size: 13px;
   line-height: 1.6;
 }
@@ -1410,8 +1410,8 @@ onUnmounted(() => {
 
 .detail-item {
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
   min-height: 0;
 }
 
@@ -1434,7 +1434,7 @@ onUnmounted(() => {
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .error-actions {
@@ -1451,7 +1451,7 @@ onUnmounted(() => {
 
 .upload-hint {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .upload-box {
@@ -1473,13 +1473,13 @@ onUnmounted(() => {
 
 .upload-meta-item {
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .upload-meta-item span {
   display: block;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1488,14 +1488,14 @@ onUnmounted(() => {
 .upload-meta-item strong {
   display: block;
   margin-top: 10px;
-  color: #2f241d;
+  color: var(--ember-text-primary);
   word-break: break-word;
 }
 
 .upload-meta-item small {
   display: block;
   margin-top: 8px;
-  color: #7a6451;
+  color: var(--ember-text-secondary);
   line-height: 1.5;
 }
 
@@ -1508,13 +1508,13 @@ onUnmounted(() => {
 
 .upload-progress-item {
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .upload-progress-item span {
   display: block;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -1523,7 +1523,7 @@ onUnmounted(() => {
 .upload-progress-item strong {
   display: block;
   margin-top: 10px;
-  color: #2f241d;
+  color: var(--ember-text-primary);
   word-break: break-word;
 }
 
@@ -1533,9 +1533,9 @@ onUnmounted(() => {
   justify-content: space-between;
   gap: 16px;
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
-  color: #6d5948;
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+  color: var(--ember-text-secondary);
 }
 
 .upload-result-list {
@@ -1549,8 +1549,8 @@ onUnmounted(() => {
 
 .upload-result-item {
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .upload-result-head {
@@ -1561,13 +1561,13 @@ onUnmounted(() => {
 }
 
 .upload-result-head strong {
-  color: #2f241d;
+  color: var(--ember-text-primary);
   word-break: break-word;
 }
 
 .upload-result-message {
   margin: 10px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.6;
 }
 

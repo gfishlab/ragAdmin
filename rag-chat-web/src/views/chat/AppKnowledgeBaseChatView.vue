@@ -127,7 +127,7 @@ onMounted(async () => {
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   height: 100%;
   width: 100%;
   min-width: 0;
@@ -138,14 +138,14 @@ onMounted(async () => {
 .kb-page-placeholder {
   display: grid;
   place-items: center;
-  min-height: calc(100vh - 40px);
-  border-radius: 32px;
+  min-height: calc(100vh - 32px);
+  border-radius: var(--radius-xl);
   padding: 32px;
   color: var(--text-secondary);
 }
 
 .kb-page-placeholder.is-error {
-  color: #b04d35;
+  color: var(--genesis-error);
 }
 
 .reference-focus-card {
@@ -154,8 +154,8 @@ onMounted(async () => {
   align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
-  padding: 20px 24px;
-  border-radius: 28px;
+  padding: 16px 20px;
+  border-radius: var(--radius-xl);
 }
 
 .reference-focus-copy {
@@ -165,14 +165,17 @@ onMounted(async () => {
 .reference-focus-kicker {
   margin: 0 0 8px;
   color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
 .reference-focus-copy h2 {
   margin: 0;
   font-size: 24px;
+  font-family: "General Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.02em;
   line-height: 1.3;
 }
 
@@ -185,9 +188,9 @@ onMounted(async () => {
 .reference-focus-copy blockquote {
   margin: 14px 0 0;
   padding: 12px 16px;
-  border-radius: 18px;
-  border-left: 3px solid rgba(157, 91, 47, 0.42);
-  background: rgba(255, 251, 245, 0.88);
+  border-radius: var(--radius-md);
+  border-left: 3px solid var(--genesis-primary-medium);
+  background: rgba(99, 102, 241, 0.04);
   color: var(--text-secondary);
 }
 </style>

@@ -1,29 +1,53 @@
-@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Noto+Serif+SC:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500&family=Playfair+Display:wght@600;700&family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
 :root {
-  font-family: "Manrope", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  /* Colors */
+  --ember-primary: #C2410C;
+  --ember-primary-hover: #9A3412;
+  --ember-primary-light: rgba(194, 65, 12, 0.08);
+  --ember-primary-medium: rgba(194, 65, 12, 0.12);
+  --ember-primary-ring: rgba(194, 65, 12, 0.12);
+  --ember-accent: #F59E0B;
+  --ember-neutral: #78716C;
+  --ember-background: #FAFAF9;
+  --ember-surface: #F5F5F4;
+  --ember-surface-raised: #E7E5E4;
+  --ember-text-primary: #1C1917;
+  --ember-text-secondary: #57534E;
+  --ember-text-muted: #A8A29E;
+  --ember-border: #D6D3D1;
+  --ember-border-light: rgba(214, 211, 209, 0.6);
+  --ember-success: #16A34A;
+  --ember-warning: #D97706;
+  --ember-error: #DC2626;
+
+  /* Shadows */
+  --ember-shadow-sm: 0 1px 2px rgba(28, 25, 23, 0.04);
+  --ember-shadow-md: 0 4px 16px rgba(28, 25, 23, 0.06);
+  --ember-shadow-lg: 0 24px 48px rgba(28, 25, 23, 0.12);
+  --ember-shadow-glow: 0 4px 12px rgba(194, 65, 12, 0.25);
+
+  /* Typography */
+  --ember-font-body: "Source Sans 3", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  --ember-font-heading: "Playfair Display", "PingFang SC", "Hiragino Sans GB", serif;
+  --ember-font-code: "Fira Code", "JetBrains Mono", monospace;
+
+  /* Border Radius */
+  --ember-radius-sm: 4px;
+  --ember-radius-md: 8px;
+  --ember-radius-lg: 12px;
+  --ember-radius-xl: 16px;
+  --ember-radius-pill: 9999px;
+
+  font-family: var(--ember-font-body);
   line-height: 1.5;
-  font-weight: 500;
-  color: #2f241d;
-  background:
-    radial-gradient(circle at top left, rgba(218, 122, 34, 0.14), transparent 32%),
-    radial-gradient(circle at bottom right, rgba(106, 74, 42, 0.1), transparent 24%),
-    linear-gradient(180deg, #f7f1e7 0%, #f4ecdf 100%);
+  font-weight: 400;
+  color: var(--ember-text-primary);
+  background: var(--ember-background);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  --rag-bg: #f4ecdf;
-  --rag-surface: rgba(255, 251, 245, 0.8);
-  --rag-surface-strong: #fffaf2;
-  --rag-border: rgba(113, 82, 45, 0.18);
-  --rag-text-primary: #2f241d;
-  --rag-text-secondary: #6b5746;
-  --rag-accent: #c66b22;
-  --rag-accent-deep: #8d4510;
-  --rag-success: #2f8f5b;
-  --rag-danger: #b54d3d;
-  --rag-shadow: 0 24px 60px rgba(91, 65, 37, 0.12);
 }
 
 * {
@@ -39,23 +63,8 @@ body,
 }
 
 body {
-  color: var(--rag-text-primary);
-  background:
-    linear-gradient(rgba(82, 62, 45, 0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(82, 62, 45, 0.04) 1px, transparent 1px),
-    linear-gradient(180deg, #f8f2e8 0%, #f3eadb 100%);
-  background-size: 32px 32px, 32px 32px, 100% 100%;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 20% 15%, rgba(198, 107, 34, 0.1), transparent 22%),
-    radial-gradient(circle at 80% 85%, rgba(141, 69, 16, 0.08), transparent 18%);
-  mix-blend-mode: multiply;
+  color: var(--ember-text-primary);
+  background: var(--ember-background);
 }
 
 a {
@@ -72,22 +81,56 @@ select {
 
 .page-title {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
-  font-size: 32px;
-  font-weight: 600;
-  letter-spacing: 0.04em;
+  font-family: var(--ember-font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .page-subtitle {
   margin: 8px 0 0;
-  color: var(--rag-text-secondary);
+  color: var(--ember-text-secondary);
   font-size: 14px;
 }
 
 .soft-panel {
-  border: 1px solid var(--rag-border);
-  border-radius: 24px;
-  background: var(--rag-surface);
-  box-shadow: var(--rag-shadow);
-  backdrop-filter: blur(12px);
+  border: 1px solid var(--ember-border);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+}
+
+/* Element Plus overrides */
+:root {
+  --el-color-primary: #C2410C;
+  --el-color-primary-light-3: #D97706;
+  --el-color-primary-light-5: #E89A3C;
+  --el-color-primary-light-7: #F0B96A;
+  --el-color-primary-light-8: #F5CC8E;
+  --el-color-primary-light-9: #FAE0B8;
+  --el-color-primary-dark-2: #9A3412;
+  --el-color-success: #16A34A;
+  --el-color-warning: #D97706;
+  --el-color-danger: #DC2626;
+  --el-border-radius-base: 8px;
+  --el-border-color: #D6D3D1;
+  --el-fill-color-blank: #F5F5F4;
+  --el-bg-color: #F5F5F4;
+  --el-bg-color-page: #FAFAF9;
+  --el-text-color-primary: #1C1917;
+  --el-text-color-regular: #1C1917;
+  --el-text-color-secondary: #57534E;
+  --el-text-color-placeholder: #A8A29E;
+}
+
+.el-button--primary {
+  --el-button-bg-color: #C2410C;
+  --el-button-border-color: #C2410C;
+  --el-button-hover-bg-color: #9A3412;
+  --el-button-hover-border-color: #9A3412;
+  --el-button-active-bg-color: #9A3412;
+  --el-button-active-border-color: #9A3412;
+}
+
+.el-button--primary:hover {
+  box-shadow: 0 4px 12px rgba(194, 65, 12, 0.25);
 }

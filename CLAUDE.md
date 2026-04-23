@@ -49,6 +49,16 @@
 6. 执行任务
 7. 在关键 hook 阶段完成验证、复盘与沉淀
 
+## 设计系统
+
+本项目前端使用 DESIGN.md 管理设计规范。DESIGN.md 是一个 Markdown 文件，Claude Code 读取后按照其中的颜色、字体、间距、组件规范来生成和修改 UI。
+
+- `rag-chat-web/DESIGN.md`：Genesis 设计系统（靛蓝主色 #6366F1、DM Sans / General Sans 字体、12px 圆角卡片）
+- `rag-admin-web/DESIGN.md`：Ember Studio 设计系统（赤陶主色 #C2410C、Playfair Display / Source Sans 3 字体、暖色系管理面板风格）
+- 涉及前端样式改动时，先读取对应前端目录下的 DESIGN.md 确认规范再动手
+- 新增组件或页面时，颜色用 CSS 变量，不硬编码色值
+- 可通过 designmd.ai MCP 工具搜索、下载、上传设计系统，也可用 `designmd` CLI 离线操作
+
 ## 文档规则
 
 - `docs` 下只保留 `architectures`、`plans`、`tasks` 三类目录，不新增其他文档分类目录

@@ -395,7 +395,7 @@ onUnmounted(() => {
 }
 
 .task-progress-text {
-  color: #7a6451;
+  color: var(--ember-text-secondary);
   line-height: 1.5;
 }
 
@@ -405,7 +405,7 @@ onUnmounted(() => {
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .table-footer {

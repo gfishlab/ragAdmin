@@ -148,16 +148,15 @@ const emit = defineEmits<{
 
 .metric-card {
   padding: 14px 16px;
-  border: 1px solid rgba(141, 69, 16, 0.1);
-  border-radius: 18px;
+  border: 1px solid var(--ember-border-light);
+  border-radius: var(--ember-radius-lg);
   background:
-    linear-gradient(135deg, rgba(255, 252, 246, 0.96), rgba(252, 241, 228, 0.9));
+    linear-gradient(135deg, var(--ember-background), var(--ember-surface));
 }
 
 .metric-card.is-warning {
-  border-color: rgba(181, 77, 61, 0.24);
-  background:
-    linear-gradient(135deg, rgba(255, 248, 245, 0.98), rgba(255, 237, 228, 0.92));
+  border-color: var(--ember-error);
+  background: var(--ember-background);
 }
 
 .metric-card small,
@@ -166,7 +165,7 @@ const emit = defineEmits<{
 }
 
 .metric-card small {
-  color: #8d6f57;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -177,11 +176,11 @@ const emit = defineEmits<{
   margin: 10px 0 6px;
   font-size: 28px;
   line-height: 1;
-  color: #7d3e0f;
+  color: var(--ember-primary);
 }
 
 .metric-card span {
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   font-size: 13px;
 }
 
@@ -207,19 +206,19 @@ const emit = defineEmits<{
   grid-template-columns: 108px minmax(0, 1fr);
   gap: 18px;
   padding: 18px 20px;
-  border-radius: 20px;
+  border-radius: var(--ember-radius-xl);
   background:
-    linear-gradient(135deg, rgba(143, 70, 16, 0.95), rgba(198, 107, 34, 0.92));
-  color: #fff8f0;
-  box-shadow: 0 18px 32px rgba(141, 69, 16, 0.22);
+    linear-gradient(135deg, var(--ember-primary), var(--ember-primary-hover));
+  color: var(--ember-background);
+  box-shadow: var(--ember-shadow-glow);
 }
 
 .banner-code {
   display: grid;
   place-items: center;
   min-height: 82px;
-  border-radius: 16px;
-  background: rgba(255, 248, 239, 0.14);
+  border-radius: var(--ember-radius-lg);
+  background: rgba(255, 255, 255, 0.14);
   font-size: 14px;
   font-weight: 800;
   letter-spacing: 0.22em;
@@ -233,12 +232,12 @@ const emit = defineEmits<{
 
 .banner-content p {
   margin: 8px 0 0;
-  color: rgba(255, 248, 240, 0.9);
+  color: rgba(255, 255, 255, 0.9);
   line-height: 1.7;
 }
 
 .default-alert {
-  border-radius: 18px;
+  border-radius: var(--ember-radius-lg);
 }
 
 .filter-shell {
@@ -266,15 +265,15 @@ const emit = defineEmits<{
   align-items: center;
   min-height: 40px;
   padding: 0 14px;
-  border-radius: 999px;
-  background: rgba(141, 69, 16, 0.08);
-  color: #8f735b;
+  border-radius: var(--ember-radius-pill);
+  background: var(--ember-primary-light);
+  color: var(--ember-text-secondary);
   font-size: 13px;
 }
 
 .selection-tip.is-active {
-  background: rgba(198, 107, 34, 0.16);
-  color: #8d4510;
+  background: var(--ember-primary-medium);
+  color: var(--ember-primary);
   font-weight: 700;
 }
 

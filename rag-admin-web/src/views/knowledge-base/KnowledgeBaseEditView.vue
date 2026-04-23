@@ -144,7 +144,7 @@ onMounted(async () => {
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .error-actions {

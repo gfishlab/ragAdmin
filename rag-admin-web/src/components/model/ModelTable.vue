@@ -227,9 +227,9 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .health-banner {
   padding: 18px 20px;
-  border: 1px solid rgba(47, 143, 91, 0.16);
-  border-radius: 20px;
-  background: rgba(242, 252, 247, 0.88);
+  border: 1px solid var(--ember-success);
+  border-radius: var(--ember-radius-lg);
+  background: rgba(22, 163, 74, 0.08);
 }
 
 .health-banner-head {
@@ -246,7 +246,7 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .health-banner-head p {
   margin: 8px 0 0;
-  color: #5f6d62;
+  color: var(--ember-text-secondary);
 }
 
 .health-detail-list {
@@ -258,13 +258,13 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .health-detail-item {
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--ember-radius-md);
   background: rgba(255, 255, 255, 0.72);
 }
 
 .health-detail-item p {
   margin: 10px 0 0;
-  color: #64584f;
+  color: var(--ember-text-secondary);
   line-height: 1.6;
 }
 
@@ -272,9 +272,9 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
   display: grid;
   place-items: center;
   min-height: 220px;
-  border: 1px dashed rgba(141, 69, 16, 0.18);
-  border-radius: 20px;
-  background: rgba(255, 251, 245, 0.62);
+  border: 1px dashed var(--ember-primary-medium);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
   text-align: center;
 }
 
@@ -284,14 +284,14 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .empty-state p {
   margin: 8px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .inline-error {
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(181, 77, 61, 0.1);
-  color: #9e4135;
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-error);
+  color: var(--ember-error);
 }
 
 .model-cell,
@@ -312,12 +312,12 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .model-cell small,
 .provider-cell small {
-  color: #88705d;
+  color: var(--ember-text-muted);
   font-size: 12px;
 }
 
 .default-tag {
-  border-radius: 999px;
+  border-radius: var(--ember-radius-pill);
 }
 
 .scene-tags,
@@ -329,17 +329,17 @@ function isUnsupportedEmbedding(model: ModelDefinition): boolean {
 
 .scene-desc {
   margin: 0;
-  color: #6f5b4b;
+  color: var(--ember-text-secondary);
   line-height: 1.6;
 }
 
 .scene-desc.is-warning {
-  color: #b54d3d;
+  color: var(--ember-error);
   font-weight: 600;
 }
 
 .runtime-cell span {
-  color: #5f5348;
+  color: var(--ember-text-secondary);
 }
 
 .table-footer {

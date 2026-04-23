@@ -84,7 +84,7 @@ async function handleLogin(): Promise<void> {
 .login-page {
   display: grid;
   grid-template-columns: minmax(0, 1.1fr) minmax(340px, 420px);
-  gap: 28px;
+  gap: 24px;
   min-height: 100vh;
   padding: 24px;
   align-items: stretch;
@@ -92,7 +92,7 @@ async function handleLogin(): Promise<void> {
 
 .login-copy,
 .login-card {
-  border-radius: 32px;
+  border-radius: var(--radius-xl);
 }
 
 .login-copy {
@@ -100,18 +100,16 @@ async function handleLogin(): Promise<void> {
   flex-direction: column;
   justify-content: center;
   padding: clamp(28px, 7vw, 68px);
-  background:
-    linear-gradient(145deg, rgba(255, 251, 245, 0.72), rgba(245, 233, 214, 0.58)),
-    rgba(255, 255, 255, 0.24);
-  border: 1px solid rgba(110, 84, 54, 0.1);
+  background: var(--genesis-surface);
+  border: 1px solid var(--genesis-border);
 }
 
 .copy-kicker,
 .card-kicker {
   margin: 0 0 10px;
   color: var(--text-muted);
-  font-size: 12px;
-  letter-spacing: 0.22em;
+  font-size: 11px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -125,8 +123,8 @@ async function handleLogin(): Promise<void> {
   margin: 18px 0 0;
   max-width: 720px;
   color: var(--text-secondary);
-  line-height: 1.9;
-  font-size: 16px;
+  line-height: 1.8;
+  font-size: 15px;
 }
 
 .copy-points {
@@ -139,9 +137,9 @@ async function handleLogin(): Promise<void> {
 
 .copy-points li {
   padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.46);
-  border: 1px solid rgba(110, 84, 54, 0.08);
+  border-radius: var(--radius-lg);
+  background: var(--genesis-background);
+  border: 1px solid var(--genesis-border);
 }
 
 .login-card {
@@ -153,7 +151,7 @@ async function handleLogin(): Promise<void> {
 
 .login-card-head h2 {
   margin: 0;
-  font-size: 34px;
+  font-size: 32px;
 }
 
 .login-card-head span {
@@ -165,6 +163,8 @@ async function handleLogin(): Promise<void> {
 .submit-button {
   width: 100%;
   margin-top: 8px;
+  height: 44px;
+  border-radius: var(--radius-md);
 }
 
 @media (max-width: 980px) {

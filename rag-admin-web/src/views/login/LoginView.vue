@@ -112,7 +112,7 @@ async function submit(): Promise<void> {
 
 .eyebrow {
   margin: 0 0 18px;
-  color: #9b7755;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.28em;
 }
@@ -120,49 +120,61 @@ async function submit(): Promise<void> {
 .hero-copy h1 {
   max-width: 720px;
   margin: 0;
-  font-family: "Noto Serif SC", serif;
-  font-size: clamp(42px, 5vw, 72px);
-  line-height: 1.08;
+  font-family: var(--ember-font-heading);
+  font-size: clamp(42px, 5vw, 64px);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
 }
 
 .description {
   margin: 18px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   font-size: 17px;
+  line-height: 1.7;
 }
 
 .login-card {
   align-self: center;
-  padding: 28px;
+  padding: 32px;
 }
 
 .card-head p {
   margin: 0;
-  color: #9b7755;
-  font-size: 12px;
+  color: var(--ember-neutral);
+  font-size: 11px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 .card-head h2 {
   margin: 8px 0 0;
-  font-family: "Noto Serif SC", serif;
-  font-size: 32px;
+  font-family: var(--ember-font-heading);
+  font-size: 28px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .submit-button {
   width: 100%;
   margin-top: 10px;
-  height: 46px;
+  height: 44px;
   border: none;
-  background: linear-gradient(135deg, #d37829 0%, #8d4510 100%);
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-primary);
+  font-weight: 600;
+}
+
+.submit-button:hover {
+  background: var(--ember-primary-hover);
+  box-shadow: var(--ember-shadow-glow);
 }
 
 .hint-block {
   margin-top: 18px;
   padding-top: 18px;
-  border-top: 1px dashed rgba(113, 82, 45, 0.18);
-  color: #6d5948;
+  border-top: 1px dashed var(--ember-border);
+  color: var(--ember-text-secondary);
 }
 
 .hint-block span {

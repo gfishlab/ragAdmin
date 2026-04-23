@@ -958,7 +958,7 @@ onMounted(async () => {
 
 .table-result-summary {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.7;
 }
 
@@ -993,7 +993,7 @@ onMounted(async () => {
 .role-dialog-head span,
 .kickout-dialog-head span,
 .session-summary-text span {
-  color: #8f7159;
+  color: var(--ember-text-secondary);
 }
 
 .tag-list,
@@ -1018,8 +1018,8 @@ onMounted(async () => {
   gap: 8px;
   margin-bottom: 12px;
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 249, 241, 0.82);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-background);
 }
 
 .role-dialog-head {
@@ -1038,14 +1038,14 @@ onMounted(async () => {
 .role-checkbox-item {
   display: block;
   padding: 14px 16px;
-  border-radius: 16px;
-  background: rgba(255, 251, 245, 0.82);
-  border: 1px solid rgba(110, 84, 54, 0.08);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+  border: 1px solid var(--ember-border-light);
 }
 
 .role-checkbox-item p {
   margin: 10px 0 0 24px;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.7;
 }
 
@@ -1071,20 +1071,20 @@ onMounted(async () => {
 .session-user-name {
   display: block;
   margin-top: 4px;
-  color: #2f241d;
-  font-family: "Noto Serif SC", serif;
+  color: var(--ember-text-primary);
+  font-family: var(--ember-font-heading);
   font-size: 24px;
 }
 
 .session-summary-text {
   margin: 14px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.7;
 }
 
 .session-guard-text {
   margin: 14px 0 0;
-  color: #b04d18;
+  color: var(--ember-error);
   line-height: 1.7;
 }
 
@@ -1097,15 +1097,15 @@ onMounted(async () => {
 .session-domain-label {
   display: block;
   margin-bottom: 6px;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 
 .session-domain-head strong {
-  color: #2f241d;
-  font-family: "Noto Serif SC", serif;
+  color: var(--ember-text-primary);
+  font-family: var(--ember-font-heading);
   font-size: 20px;
 }
 
@@ -1117,7 +1117,7 @@ onMounted(async () => {
 
 .session-metadata dt {
   margin-bottom: 6px;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1125,7 +1125,7 @@ onMounted(async () => {
 
 .session-metadata dd {
   margin: 0;
-  color: #3d2f25;
+  color: var(--ember-text-primary);
   line-height: 1.7;
 }
 

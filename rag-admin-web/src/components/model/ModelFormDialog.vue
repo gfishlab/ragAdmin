@@ -207,16 +207,16 @@ watch(
   gap: 16px;
   align-items: center;
   padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(255, 248, 240, 0.88);
-  border: 1px solid rgba(198, 107, 34, 0.14);
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-surface);
+  border: 1px solid var(--ember-primary-medium);
 }
 
 .mode-preview small,
 .provider-card small,
 .runtime-preview small {
   display: block;
-  color: #8c735f;
+  color: var(--ember-text-muted);
   font-size: 12px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -249,9 +249,9 @@ watch(
   gap: 8px;
   min-height: 100%;
   padding: 16px 18px;
-  border-radius: 18px;
-  background: rgba(250, 247, 242, 0.94);
-  border: 1px solid rgba(141, 69, 16, 0.1);
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-surface);
+  border: 1px solid var(--ember-border);
 }
 
 .provider-card strong {
@@ -260,7 +260,7 @@ watch(
 
 .provider-card span,
 .runtime-preview span {
-  color: #67564a;
+  color: var(--ember-text-secondary);
   line-height: 1.6;
 }
 

@@ -111,8 +111,8 @@ watch(() => route.fullPath, () => {
         class="nav-menu"
         router
         background-color="transparent"
-        text-color="#6b5746"
-        active-text-color="#8d4510"
+        text-color="#57534E"
+        active-text-color="#C2410C"
         @select="closeMobileSidebar"
       >
         <el-menu-item
@@ -163,7 +163,7 @@ watch(() => route.fullPath, () => {
 .admin-shell {
   position: relative;
   display: grid;
-  grid-template-columns: 280px minmax(0, 1fr);
+  grid-template-columns: 256px minmax(0, 1fr);
   gap: 20px;
   height: 100vh;
   padding: 20px;
@@ -190,28 +190,30 @@ watch(() => route.fullPath, () => {
 .brand-sign {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: linear-gradient(160deg, #d37829 0%, #8d4510 100%);
-  color: #fff6ec;
-  font-family: "Noto Serif SC", serif;
-  font-size: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--ember-radius-lg);
+  background: linear-gradient(160deg, var(--ember-primary) 0%, var(--ember-primary-hover) 100%);
+  color: #fff;
+  font-family: var(--ember-font-heading);
+  font-size: 22px;
   font-weight: 700;
-  box-shadow: 0 18px 30px rgba(141, 69, 16, 0.2);
+  box-shadow: var(--ember-shadow-glow);
 }
 
 .brand-caption {
   margin: 0 0 6px;
-  color: #97765a;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.28em;
 }
 
 .brand-block h1 {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
-  font-size: 24px;
+  font-family: var(--ember-font-heading);
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
 .nav-menu {
@@ -219,13 +221,13 @@ watch(() => route.fullPath, () => {
 }
 
 :deep(.nav-menu .el-menu-item) {
-  height: 48px;
-  margin-bottom: 8px;
-  border-radius: 14px;
+  height: 44px;
+  margin-bottom: 4px;
+  border-radius: var(--ember-radius-md);
 }
 
 :deep(.nav-menu .el-menu-item.is-active) {
-  background: rgba(198, 107, 34, 0.12);
+  background: var(--ember-primary-light);
 }
 
 .content-shell {
@@ -245,18 +247,16 @@ watch(() => route.fullPath, () => {
   justify-content: space-between;
   gap: 16px;
   align-items: center;
-  padding: 18px 24px;
+  padding: 16px 24px;
   transition:
     box-shadow 180ms ease,
-    background-color 180ms ease,
-    transform 180ms ease;
+    background-color 180ms ease;
 }
 
 .topbar.is-elevated {
-  background: rgba(255, 250, 242, 0.92);
-  box-shadow:
-    0 18px 34px rgba(91, 65, 37, 0.12),
-    0 8px 18px rgba(141, 69, 16, 0.08);
+  background: rgba(245, 245, 244, 0.92);
+  backdrop-filter: blur(8px);
+  box-shadow: var(--ember-shadow-md);
 }
 
 .topbar-leading {
@@ -267,15 +267,15 @@ watch(() => route.fullPath, () => {
 
 .menu-toggle {
   flex-shrink: 0;
-  border: 1px solid rgba(141, 69, 16, 0.14);
-  background: rgba(255, 250, 242, 0.92);
+  border: 1px solid var(--ember-border);
+  background: var(--ember-surface);
 }
 
 .topbar-label {
-  margin: 0 0 6px;
-  color: #8a715e;
-  font-size: 12px;
-  letter-spacing: 0.16em;
+  margin: 0 0 4px;
+  color: var(--ember-neutral);
+  font-size: 11px;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
@@ -288,14 +288,14 @@ watch(() => route.fullPath, () => {
 .user-badge {
   min-width: 140px;
   padding: 10px 14px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.86);
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-surface);
 }
 
 .user-badge-label {
   display: block;
   margin-bottom: 4px;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
 }
 
@@ -313,14 +313,14 @@ watch(() => route.fullPath, () => {
 
 .main-panel::-webkit-scrollbar,
 .side-panel::-webkit-scrollbar {
-  width: 10px;
+  width: 8px;
 }
 
 .main-panel::-webkit-scrollbar-thumb,
 .side-panel::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
-  background: rgba(141, 69, 16, 0.18);
+  border-radius: var(--ember-radius-pill);
+  background: var(--ember-surface-raised);
   background-clip: padding-box;
 }
 
@@ -333,7 +333,7 @@ watch(() => route.fullPath, () => {
   position: fixed;
   inset: 0;
   z-index: 3;
-  background: rgba(47, 36, 29, 0.18);
+  background: rgba(28, 25, 23, 0.18);
   backdrop-filter: blur(4px);
 }
 

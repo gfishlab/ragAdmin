@@ -119,9 +119,9 @@ function providerChecking(providerId: number, checkingIds: number[]): boolean {
 
 .drawer-tip {
   padding: 18px 20px;
-  border-radius: 18px;
-  background: rgba(255, 247, 237, 0.92);
-  border: 1px solid rgba(198, 107, 34, 0.16);
+  border-radius: var(--ember-radius-md);
+  background: var(--ember-surface);
+  border: 1px solid var(--ember-primary-medium);
 }
 
 .drawer-tip strong {
@@ -131,7 +131,7 @@ function providerChecking(providerId: number, checkingIds: number[]): boolean {
 
 .drawer-tip p {
   margin: 8px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.7;
 }
 
@@ -145,14 +145,14 @@ function providerChecking(providerId: number, checkingIds: number[]): boolean {
 
 .health-result {
   padding: 18px 20px;
-  border-radius: 20px;
-  background: rgba(247, 250, 255, 0.86);
-  border: 1px solid rgba(88, 126, 171, 0.14);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+  border: 1px solid var(--ember-border);
 }
 
 .health-header p {
   margin: 8px 0 0;
-  color: #61708a;
+  color: var(--ember-text-secondary);
 }
 
 .health-detail-list {
@@ -163,7 +163,7 @@ function providerChecking(providerId: number, checkingIds: number[]): boolean {
 
 .health-detail-item {
   padding: 14px 16px;
-  border-radius: 16px;
+  border-radius: var(--ember-radius-md);
   background: rgba(255, 255, 255, 0.74);
 }
 
@@ -177,7 +177,7 @@ function providerChecking(providerId: number, checkingIds: number[]): boolean {
 
 .health-detail-item span,
 .health-detail-item p {
-  color: #635b54;
+  color: var(--ember-text-secondary);
 }
 
 .health-detail-item p {

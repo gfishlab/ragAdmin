@@ -464,7 +464,7 @@ onUnmounted(() => {
 
 .detail-eyebrow {
   margin: 0 0 8px;
-  color: #9b7755;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -487,7 +487,7 @@ onUnmounted(() => {
 
 .overview-card span,
 .detail-item span {
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -497,13 +497,13 @@ onUnmounted(() => {
 .detail-item strong {
   display: block;
   margin-top: 12px;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 24px;
 }
 
 .overview-card p {
   margin: 12px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .section-head {
@@ -516,13 +516,13 @@ onUnmounted(() => {
 
 .section-head h2 {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 24px;
 }
 
 .section-head p {
   margin: 8px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .detail-matrix {
@@ -533,8 +533,8 @@ onUnmounted(() => {
 
 .detail-item {
   padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .progress-matrix {
@@ -543,25 +543,25 @@ onUnmounted(() => {
 
 .progress-message {
   margin: 12px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .error-block {
   margin: 0;
   padding: 18px;
-  border-radius: 18px;
-  background: rgba(255, 250, 242, 0.72);
-  color: #5d4736;
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
+  color: var(--ember-text-primary);
   white-space: pre-wrap;
   word-break: break-word;
-  font-family: "Consolas", "Courier New", monospace;
+  font-family: var(--ember-font-code);
   font-size: 13px;
   line-height: 1.6;
 }
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .error-actions {
@@ -585,9 +585,9 @@ onUnmounted(() => {
 .timeline-item {
   position: relative;
   padding: 18px;
-  border-radius: 18px;
-  border: 1px solid rgba(113, 82, 45, 0.12);
-  background: rgba(255, 250, 242, 0.58);
+  border-radius: var(--ember-radius-lg);
+  border: 1px solid var(--ember-border-light);
+  background: var(--ember-surface);
 }
 
 .timeline-item::after {
@@ -597,7 +597,7 @@ onUnmounted(() => {
   right: -18px;
   width: 20px;
   height: 2px;
-  background: rgba(113, 82, 45, 0.14);
+  background: var(--ember-border-light);
 }
 
 .timeline-item:last-child::after {
@@ -605,23 +605,23 @@ onUnmounted(() => {
 }
 
 .timeline-item.is-reached {
-  border-color: rgba(198, 107, 34, 0.28);
-  background: rgba(255, 247, 235, 0.9);
+  border-color: var(--ember-primary-medium);
+  background: var(--ember-primary-light);
 }
 
 .timeline-item.is-current {
-  box-shadow: 0 18px 30px rgba(141, 69, 16, 0.12);
+  box-shadow: var(--ember-shadow-glow);
 }
 
 .timeline-marker {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: rgba(113, 82, 45, 0.18);
+  background: var(--ember-border-light);
 }
 
 .timeline-item.is-reached .timeline-marker {
-  background: #c66b22;
+  background: var(--ember-primary);
 }
 
 .timeline-content strong {
@@ -632,7 +632,7 @@ onUnmounted(() => {
 
 .timeline-content p {
   margin: 8px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   font-size: 13px;
 }
 

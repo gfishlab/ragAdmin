@@ -123,9 +123,9 @@ async function goTo(path: string): Promise<void> {
 
 .dashboard-eyebrow,
 .entry-eyebrow {
-  color: #9d7a58;
-  font-size: 12px;
-  letter-spacing: 0.18em;
+  color: var(--ember-neutral);
+  font-size: 11px;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
@@ -147,35 +147,37 @@ async function goTo(path: string): Promise<void> {
   gap: 20px;
   min-height: 0;
   padding: 16px 20px;
-  border: 1px solid rgba(179, 139, 96, 0.12);
+  border: 1px solid var(--ember-border);
+  background: var(--ember-surface);
+  border-radius: var(--ember-radius-lg);
   text-align: left;
   cursor: pointer;
   transition:
-    transform 180ms ease,
-    box-shadow 180ms ease,
-    border-color 180ms ease;
+    transform 150ms ease,
+    box-shadow 150ms ease,
+    border-color 150ms ease;
 }
 
 .entry-card.is-primary {
   background:
-    radial-gradient(circle at top right, rgba(211, 120, 41, 0.24), transparent 34%),
-    linear-gradient(160deg, rgba(255, 248, 238, 0.96), rgba(255, 252, 247, 0.9));
+    radial-gradient(circle at top right, rgba(194, 65, 12, 0.08), transparent 34%),
+    var(--ember-surface);
 }
 
 .entry-card.is-warm {
   background:
-    linear-gradient(145deg, rgba(252, 241, 226, 0.94), rgba(255, 250, 244, 0.9));
+    radial-gradient(circle at bottom left, rgba(194, 65, 12, 0.04), transparent 50%),
+    var(--ember-surface);
 }
 
 .entry-card.is-light {
-  background:
-    linear-gradient(180deg, rgba(255, 252, 248, 0.95), rgba(255, 249, 242, 0.88));
+  background: var(--ember-surface);
 }
 
 .entry-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(198, 107, 34, 0.22);
-  box-shadow: 0 22px 38px rgba(141, 69, 16, 0.1);
+  transform: translateY(-2px);
+  border-color: var(--ember-primary);
+  box-shadow: var(--ember-shadow-md);
 }
 
 .entry-card:nth-child(1),
@@ -193,16 +195,16 @@ async function goTo(path: string): Promise<void> {
 .entry-icon {
   display: grid;
   place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: rgba(198, 107, 34, 0.14);
-  color: #8d4510;
-  font-size: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-primary-light);
+  color: var(--ember-primary);
+  font-size: 22px;
 }
 
 .entry-link {
-  color: #8d4510;
+  color: var(--ember-primary);
   font-size: 13px;
   font-weight: 600;
 }
@@ -210,18 +212,20 @@ async function goTo(path: string): Promise<void> {
 .entry-copy {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 8px;
 }
 
 .entry-copy strong {
-  font-family: "Noto Serif SC", serif;
-  font-size: 32px;
-  line-height: 1.15;
+  font-family: var(--ember-font-heading);
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
 }
 
 .entry-copy p {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
   line-height: 1.7;
 }
 

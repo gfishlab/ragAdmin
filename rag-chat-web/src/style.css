@@ -1,25 +1,45 @@
-@import url('https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@500;700&family=Noto+Sans+SC:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap');
+@import url('https://api.fontshare.com/v2/css?f[]=general-sans@700&display=swap');
 
 :root {
   color-scheme: light;
-  font-family: "Noto Sans SC", sans-serif;
-  --app-bg:
-    radial-gradient(circle at top left, rgba(206, 152, 89, 0.16), transparent 24%),
-    radial-gradient(circle at bottom right, rgba(108, 94, 76, 0.12), transparent 28%),
-    linear-gradient(180deg, #f7f1e7 0%, #efe5d6 100%);
-  --panel-bg: rgba(255, 251, 246, 0.82);
-  --panel-border: rgba(110, 84, 54, 0.14);
-  --panel-shadow: 0 22px 60px rgba(70, 48, 20, 0.12);
-  --text-primary: #2f241d;
-  --text-secondary: #675543;
-  --text-muted: #8e765e;
-  --accent: #9d5b2f;
-  --accent-strong: #7f431b;
-  --accent-soft: rgba(157, 91, 47, 0.12);
-  --danger-soft: rgba(179, 59, 43, 0.1);
-  --radius-xl: 28px;
-  --radius-lg: 22px;
-  --radius-md: 16px;
+  font-family: "DM Sans", sans-serif;
+
+  /* Genesis Color Tokens */
+  --genesis-primary: #6366F1;
+  --genesis-primary-hover: #4F46E5;
+  --genesis-primary-soft: rgba(99, 102, 241, 0.10);
+  --genesis-primary-medium: rgba(99, 102, 241, 0.24);
+  --genesis-neutral: #9C9C9C;
+  --genesis-background: #FAFAFA;
+  --genesis-surface: #FFFFFF;
+  --genesis-text-primary: #0A0A0A;
+  --genesis-text-secondary: #6B6B6B;
+  --genesis-border: #E8E8EC;
+  --genesis-border-soft: rgba(0, 0, 0, 0.06);
+  --genesis-success: #10B981;
+  --genesis-warning: #F59E0B;
+  --genesis-error: #EF4444;
+
+  /* Semantic aliases for backward compatibility */
+  --app-bg: var(--genesis-background);
+  --panel-bg: var(--genesis-surface);
+  --panel-border: var(--genesis-border);
+  --panel-shadow: none;
+  --text-primary: var(--genesis-text-primary);
+  --text-secondary: var(--genesis-text-secondary);
+  --text-muted: var(--genesis-neutral);
+  --accent: var(--genesis-primary);
+  --accent-strong: var(--genesis-primary-hover);
+  --accent-soft: var(--genesis-primary-soft);
+  --danger-soft: rgba(239, 68, 68, 0.08);
+
+  /* Spacing */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-pill: 9999px;
   --layout-gap: 20px;
 }
 
@@ -36,18 +56,7 @@ body,
 body {
   margin: 0;
   color: var(--text-primary);
-  background: var(--app-bg);
-}
-
-body::before {
-  position: fixed;
-  inset: 0;
-  z-index: -1;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.2), transparent 42%),
-    linear-gradient(transparent 0%, rgba(126, 94, 55, 0.04) 100%);
-  pointer-events: none;
-  content: '';
+  background: var(--genesis-background);
 }
 
 a {
@@ -67,26 +76,26 @@ select {
 }
 
 .app-shell-panel {
-  background: var(--panel-bg);
-  border: 1px solid var(--panel-border);
-  box-shadow: var(--panel-shadow);
-  backdrop-filter: blur(18px);
+  background: var(--genesis-surface);
+  border: 1px solid var(--genesis-border);
 }
 
 .serif-title {
-  font-family: "Noto Serif SC", serif;
+  font-family: "General Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
 }
 
 .page-scrollbar::-webkit-scrollbar,
 .thin-scrollbar::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 .page-scrollbar::-webkit-scrollbar-thumb,
 .thin-scrollbar::-webkit-scrollbar-thumb {
-  border-radius: 999px;
-  background: rgba(123, 84, 46, 0.24);
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.12);
 }
 
 .page-scrollbar::-webkit-scrollbar-track,
@@ -94,23 +103,24 @@ select {
   background: transparent;
 }
 
+/* Element Plus Overrides */
 .el-button--primary {
-  --el-button-bg-color: var(--accent);
-  --el-button-border-color: var(--accent);
-  --el-button-hover-bg-color: #a86a41;
-  --el-button-hover-border-color: #a86a41;
-  --el-button-active-bg-color: var(--accent-strong);
-  --el-button-active-border-color: var(--accent-strong);
+  --el-button-bg-color: var(--genesis-primary);
+  --el-button-border-color: var(--genesis-primary);
+  --el-button-hover-bg-color: var(--genesis-primary-hover);
+  --el-button-hover-border-color: var(--genesis-primary-hover);
+  --el-button-active-bg-color: #4338CA;
+  --el-button-active-border-color: #4338CA;
 }
 
 .el-switch.is-checked .el-switch__core {
-  --el-switch-on-color: var(--accent);
+  --el-switch-on-color: var(--genesis-primary);
 }
 
 .el-select__wrapper,
 .el-textarea__inner,
 .el-input__wrapper {
-  border-radius: 16px;
+  border-radius: var(--radius-md);
 }
 
 .el-empty__description p,

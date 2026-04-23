@@ -801,7 +801,7 @@ onUnmounted(() => {
 
 .detail-eyebrow {
   margin: 0 0 8px;
-  color: #9b7755;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -825,12 +825,12 @@ onUnmounted(() => {
 
 .info-item {
   padding: 14px 18px;
-  border-radius: 14px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .info-item span {
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 11px;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -839,7 +839,7 @@ onUnmounted(() => {
 .info-item strong {
   display: block;
   margin-top: 6px;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 18px;
   word-break: break-word;
 }
@@ -851,8 +851,8 @@ onUnmounted(() => {
 .info-meta {
   margin-top: 14px;
   padding: 14px 18px;
-  border-radius: 14px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .meta-row {
@@ -863,19 +863,19 @@ onUnmounted(() => {
 }
 
 .meta-row + .meta-row {
-  border-top: 1px dashed rgba(157, 122, 88, 0.2);
+  border-top: 1px dashed var(--ember-border-light);
   margin-top: 6px;
   padding-top: 6px;
 }
 
 .meta-label {
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 11px;
   letter-spacing: 0.1em;
 }
 
 .meta-value {
-  color: #2f241d;
+  color: var(--ember-text-primary);
   font-size: 13px;
   word-break: break-all;
 }
@@ -890,13 +890,13 @@ onUnmounted(() => {
 
 .section-head h2 {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 24px;
 }
 
 .section-head p {
   margin: 8px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .version-error {
@@ -913,12 +913,12 @@ onUnmounted(() => {
 
 .chunk-focus-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .chunk-content p {
   margin: 0;
-  color: #5d4736;
+  color: var(--ember-text-primary);
   line-height: 1.7;
   white-space: pre-wrap;
   word-break: break-word;
@@ -926,11 +926,11 @@ onUnmounted(() => {
 
 :deep(.el-table .chunk-row.is-route-highlight > td.el-table__cell) {
   background:
-    linear-gradient(90deg, rgba(226, 160, 87, 0.22), rgba(255, 246, 232, 0.92));
+    linear-gradient(90deg, rgba(194, 65, 12, 0.22), var(--ember-background));
 }
 
 :deep(.el-table .chunk-row.is-route-highlight .cell) {
-  color: #4e361f;
+  color: var(--ember-text-primary);
   font-weight: 600;
 }
 
@@ -942,7 +942,7 @@ onUnmounted(() => {
 
 .upload-hint {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .upload-box {
@@ -958,13 +958,13 @@ onUnmounted(() => {
 
 .upload-meta-item {
   padding: 14px;
-  border-radius: 16px;
-  background: rgba(255, 250, 242, 0.72);
+  border-radius: var(--ember-radius-lg);
+  background: var(--ember-surface);
 }
 
 .upload-meta-item span {
   display: block;
-  color: #9d7a58;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -973,7 +973,7 @@ onUnmounted(() => {
 .upload-meta-item strong {
   display: block;
   margin-top: 10px;
-  color: #2f241d;
+  color: var(--ember-text-primary);
   word-break: break-word;
 }
 
@@ -991,7 +991,7 @@ onUnmounted(() => {
 
 .error-text {
   margin: 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .error-actions {

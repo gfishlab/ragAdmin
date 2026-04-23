@@ -10,7 +10,6 @@ interface Props {
 
 const props = defineProps<Props>()
 
-// 这里注入的 HTML 只来自受控 Markdown 子集渲染器，不直接信任模型原始字符串。
 const renderedHtml = computed(() => renderChatContent(props.content, props.contentType ?? 'text/markdown'))
 </script>
 
@@ -21,7 +20,7 @@ const renderedHtml = computed(() => renderChatContent(props.content, props.conte
 <style scoped>
 .chat-markdown {
   color: inherit;
-  line-height: 1.85;
+  line-height: 1.75;
   word-break: break-word;
 }
 
@@ -45,8 +44,10 @@ const renderedHtml = computed(() => renderChatContent(props.content, props.conte
 .chat-markdown :deep(h2),
 .chat-markdown :deep(h3) {
   margin: 0 0 10px;
-  color: #2f241d;
-  font-family: "Noto Serif SC", serif;
+  color: var(--genesis-text-primary);
+  font-family: "General Sans", sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.03em;
   line-height: 1.3;
 }
 
@@ -73,26 +74,27 @@ const renderedHtml = computed(() => renderChatContent(props.content, props.conte
 
 .chat-markdown :deep(blockquote) {
   padding: 10px 14px;
-  border-left: 3px solid rgba(157, 91, 47, 0.24);
-  border-radius: 0 14px 14px 0;
-  background: rgba(248, 242, 234, 0.72);
-  color: #5d4939;
+  border-left: 3px solid var(--genesis-primary-medium);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  background: rgba(99, 102, 241, 0.04);
+  color: var(--genesis-text-secondary);
 }
 
 .chat-markdown :deep(code) {
   padding: 2px 6px;
-  border-radius: 8px;
-  background: rgba(244, 237, 228, 0.9);
-  color: #7a4424;
-  font-size: 0.92em;
+  border-radius: var(--radius-sm);
+  background: rgba(99, 102, 241, 0.06);
+  color: var(--genesis-primary-hover);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 0.9em;
 }
 
 .chat-markdown :deep(pre) {
   overflow-x: auto;
   padding: 12px 14px;
-  border-radius: 16px;
-  background: #2f241d;
-  color: #fff7ef;
+  border-radius: var(--radius-lg);
+  background: var(--genesis-text-primary);
+  color: #f0f0f0;
 }
 
 .chat-markdown :deep(pre code) {
@@ -102,7 +104,7 @@ const renderedHtml = computed(() => renderChatContent(props.content, props.conte
 }
 
 .chat-markdown :deep(a) {
-  color: #9d5b2f;
+  color: var(--genesis-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
 }

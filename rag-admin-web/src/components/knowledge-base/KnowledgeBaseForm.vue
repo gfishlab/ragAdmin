@@ -193,7 +193,7 @@ async function handleSubmit(): Promise<void> {
 
 .form-eyebrow {
   margin: 0 0 8px;
-  color: #9b7755;
+  color: var(--ember-neutral);
   font-size: 12px;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -201,14 +201,14 @@ async function handleSubmit(): Promise<void> {
 
 .form-head h2 {
   margin: 0;
-  font-family: "Noto Serif SC", serif;
+  font-family: var(--ember-font-heading);
   font-size: 32px;
 }
 
 .form-description {
   max-width: 720px;
   margin: 10px 0 0;
-  color: #6d5948;
+  color: var(--ember-text-secondary);
 }
 
 .kb-form {
@@ -232,7 +232,7 @@ async function handleSubmit(): Promise<void> {
 
 .field-tip {
   margin: 8px 0 0;
-  color: #8a715e;
+  color: var(--ember-text-muted);
   font-size: 12px;
   line-height: 1.5;
 }
@@ -244,7 +244,7 @@ async function handleSubmit(): Promise<void> {
 }
 
 .option-row small {
-  color: #9d7a58;
+  color: var(--ember-text-muted);
 }
 
 .form-actions {
