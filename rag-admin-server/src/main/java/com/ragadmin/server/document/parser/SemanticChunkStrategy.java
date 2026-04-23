@@ -2,6 +2,8 @@ package com.ragadmin.server.document.parser;
 
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingModelClient;
+import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
+import com.ragadmin.server.knowledge.service.KnowledgeBaseService;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.document.support.EmbeddingModelDescriptor;
 import org.slf4j.Logger;
@@ -28,6 +30,9 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
     @Autowired
     private ModelService modelService;
+
+    @Autowired
+    private KnowledgeBaseService knowledgeBaseService;
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
@@ -59,8 +64,6 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
         EmbeddingModelDescriptor embeddingDesc;
         try {
-            Long embeddingModelId = context.document() != null ? null : null;
-            // Use knowledge base embedding model
             embeddingDesc = resolveEmbeddingDescriptor(context);
             if (embeddingDesc == null) {
                 log.debug("无法解析 embedding 模型，回退到普通分块");
@@ -210,9 +213,17 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
     private EmbeddingModelDescriptor resolveEmbeddingDescriptor(ChunkContext context) {
         try {
-            // This is a simplified approach; in production, resolve from KB config
-            return null; // Will be properly resolved when integrated with KB embedding config
+            Long kbId = context.document().getKbId();
+            if (kbId == null) {
+                return null;
+            }
+            KnowledgeBaseEntity kb = knowledgeBaseService.requireById(kbId);
+            if (kb.getEmbeddingModelId() == null) {
+                return null;
+            }
+            return modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(kb.getEmbeddingModelId());
         } catch (Exception e) {
+            log.debug("解析 embedding 模型描述符失败: {}", e.getMessage());
             return null;
         }
     }
