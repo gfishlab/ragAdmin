@@ -13,12 +13,6 @@ import java.util.List;
 @Order(100)
 public class TikaDocumentReaderStrategy implements DocumentReaderStrategy {
 
-    private static final List<String> SUPPORTED_TYPES = List.of(
-            "DOCX",
-            "PPTX",
-            "XLSX"
-    );
-
     private final DocumentMetadataFactory documentMetadataFactory;
     private final Tika tika = new Tika();
 
@@ -28,7 +22,7 @@ public class TikaDocumentReaderStrategy implements DocumentReaderStrategy {
 
     @Override
     public boolean supports(DocumentParseRequest request) {
-        return SUPPORTED_TYPES.contains(request.docType());
+        return true;
     }
 
     @Override

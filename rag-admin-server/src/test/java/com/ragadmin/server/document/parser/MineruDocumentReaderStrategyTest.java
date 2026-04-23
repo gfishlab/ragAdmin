@@ -8,6 +8,7 @@ import org.springframework.ai.document.Document;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
@@ -24,6 +25,22 @@ class MineruDocumentReaderStrategyTest {
 
         assertEquals(1, documents.size());
         assertEquals("MinerU 图片文本", documents.getFirst().getText());
+        assertEquals("MINERU_API", documents.getFirst().getMetadata().get("readerType"));
+        assertEquals("OCR", documents.getFirst().getMetadata().get("parseMode"));
+    }
+
+    @Test
+    void shouldUseMineruForPdf() throws Exception {
+        MineruParseService mineruParseService = mock(MineruParseService.class);
+        when(mineruParseService.parse(any())).thenReturn(List.of(new Document("MinerU PDF 文本")));
+        MineruDocumentReaderStrategy strategy = new MineruDocumentReaderStrategy(mineruParseService, new DocumentMetadataFactory());
+
+        assertTrue(strategy.supports(request("PDF")));
+
+        List<Document> documents = strategy.read(request("PDF"));
+
+        assertEquals(1, documents.size());
+        assertEquals("MinerU PDF 文本", documents.getFirst().getText());
         assertEquals("MINERU_API", documents.getFirst().getMetadata().get("readerType"));
         assertEquals("OCR", documents.getFirst().getMetadata().get("parseMode"));
     }

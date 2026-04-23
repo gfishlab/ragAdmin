@@ -12,37 +12,33 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class TikaDocumentReaderStrategyTest {
 
     @Test
-    void shouldUseTikaForOfficeDocuments() throws Exception {
+    void shouldSupportAnyDocType() {
+        TikaDocumentReaderStrategy strategy = new TikaDocumentReaderStrategy(new DocumentMetadataFactory());
+        assertEquals(true, strategy.supports(request("RTF")));
+        assertEquals(true, strategy.supports(request("EPUB")));
+        assertEquals(true, strategy.supports(request("DOCX")));
+        assertEquals(true, strategy.supports(request("UNKNOWN")));
+    }
+
+    @Test
+    void shouldParseWithTika() throws Exception {
         TikaDocumentReaderStrategy strategy = new TikaDocumentReaderStrategy(new DocumentMetadataFactory()) {
             @Override
             protected String parseWithTika(byte[] content) {
-                return "Office 文本";
+                return "Tika 提取文本";
             }
         };
 
-        List<Document> documents = strategy.read(request("DOCX", "fake-docx".getBytes()));
+        List<Document> documents = strategy.read(request("RTF"));
 
         assertEquals(1, documents.size());
-        assertEquals("Office 文本", documents.getFirst().getText());
+        assertEquals("Tika 提取文本", documents.getFirst().getText());
         assertEquals("TEXT", documents.getFirst().getMetadata().get("parseMode"));
         assertEquals("TIKA", documents.getFirst().getMetadata().get("readerType"));
     }
 
-    @Test
-    void shouldUseTikaForXlsx() throws Exception {
-        TikaDocumentReaderStrategy strategy = new TikaDocumentReaderStrategy(new DocumentMetadataFactory()) {
-            @Override
-            protected String parseWithTika(byte[] content) {
-                return "Sheet 内容";
-            }
-        };
-
-        List<Document> documents = strategy.read(request("XLSX", "fake-xlsx".getBytes()));
-
-        assertEquals(1, documents.size());
-        assertEquals("Sheet 内容", documents.getFirst().getText());
-        assertEquals("TEXT", documents.getFirst().getMetadata().get("parseMode"));
-        assertEquals("TIKA", documents.getFirst().getMetadata().get("readerType"));
+    private DocumentParseRequest request(String docType) {
+        return request(docType, "fake".getBytes());
     }
 
     private DocumentParseRequest request(String docType, byte[] content) {

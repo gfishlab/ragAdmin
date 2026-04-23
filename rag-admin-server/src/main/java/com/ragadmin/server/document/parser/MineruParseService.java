@@ -8,5 +8,7 @@ public interface MineruParseService {
 
     List<Document> parse(DocumentParseRequest request) throws Exception;
 
+    List<Document> parseByUrl(String presignedUrl, String fileName) throws Exception;
+
     OcrCapability describeCapability();
 }

@@ -60,11 +60,19 @@ public class DefaultMineruParseService implements MineruParseService {
             throw new BusinessException("MINERU_NOT_CONFIGURED", "MinerU API 未完成配置", HttpStatus.SERVICE_UNAVAILABLE);
         }
         String sourceUrl = mineruSourceResolver.resolve(request);
-        MineruTaskModels.CreateTaskResponse createTaskResponse = submitTask(sourceUrl, request);
+        return parseByUrl(sourceUrl, request.document().getDocName());
+    }
+
+    @Override
+    public List<Document> parseByUrl(String presignedUrl, String fileName) throws Exception {
+        if (!mineruProperties.isConfigured()) {
+            throw new BusinessException("MINERU_NOT_CONFIGURED", "MinerU API 未完成配置", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        MineruTaskModels.CreateTaskResponse createTaskResponse = submitTask(presignedUrl, fileName);
         MineruTaskModels.TaskResultResponse taskResultResponse = pollUntilFinished(createTaskResponse.data().taskId());
         if (!"done".equalsIgnoreCase(taskResultResponse.data().state())) {
-            log.warn("MinerU 解析失败，taskId={}, documentName={}, errMsg={}",
-                    createTaskResponse.data().taskId(), request.document().getDocName(), nullSafe(taskResultResponse.data().errMsg()));
+            log.warn("MinerU 解析失败，taskId={}, fileName={}, errMsg={}",
+                    createTaskResponse.data().taskId(), fileName, nullSafe(taskResultResponse.data().errMsg()));
             throw new BusinessException(
                     "MINERU_TASK_FAILED",
                     "MinerU 解析失败: " + nullSafe(taskResultResponse.data().errMsg()),
@@ -76,8 +84,7 @@ public class DefaultMineruParseService implements MineruParseService {
         metadata.put("mineruTaskId", createTaskResponse.data().taskId());
         metadata.put("mineruState", taskResultResponse.data().state());
         metadata.put("mineruResultSource", markdownResult.source());
-        String markdown = markdownResult.markdown();
-        return List.of(new Document(markdown, metadata));
+        return List.of(new Document(markdownResult.markdown(), metadata));
     }
 
     @Override
@@ -91,11 +98,11 @@ public class DefaultMineruParseService implements MineruParseService {
         return new OcrCapability(true, true, "MinerU API 可用", mineruProperties.getLanguage(), mineruProperties.getMaxPdfPages());
     }
 
-    protected MineruTaskModels.CreateTaskResponse submitTask(String sourceUrl, DocumentParseRequest request) {
+    protected MineruTaskModels.CreateTaskResponse submitTask(String sourceUrl, String fileName) {
         MineruTaskModels.CreateTaskRequest payload = new MineruTaskModels.CreateTaskRequest(
                 sourceUrl,
                 mineruProperties.getModelVersion(),
-                request.document().getDocName()
+                fileName
         );
         MineruTaskModels.CreateTaskResponse response;
         try {
@@ -106,17 +113,17 @@ public class DefaultMineruParseService implements MineruParseService {
                     .retrieve()
                     .body(MineruTaskModels.CreateTaskResponse.class);
         } catch (RestClientResponseException ex) {
-            log.warn("MinerU 任务创建失败，documentName={}, statusCode={}, body={}",
-                    request.document().getDocName(), ex.getStatusCode(), truncate(ex.getResponseBodyAsString()));
+            log.warn("MinerU 任务创建失败，fileName={}, statusCode={}, body={}",
+                    fileName, ex.getStatusCode(), truncate(ex.getResponseBodyAsString()));
             throw new BusinessException("MINERU_TASK_CREATE_FAILED", "MinerU 任务创建失败", HttpStatus.BAD_GATEWAY);
         } catch (Exception ex) {
-            log.warn("MinerU 任务创建异常，documentName={}, reason={}", request.document().getDocName(), ex.getMessage());
+            log.warn("MinerU 任务创建异常，fileName={}, reason={}", fileName, ex.getMessage());
             throw new BusinessException("MINERU_TASK_CREATE_FAILED", "MinerU 任务创建失败", HttpStatus.BAD_GATEWAY);
         }
         if (response == null || response.data() == null || !StringUtils.hasText(response.data().taskId())) {
             throw new BusinessException("MINERU_TASK_CREATE_FAILED", "MinerU 任务创建失败", HttpStatus.BAD_GATEWAY);
         }
-        log.info("MinerU 任务创建成功，taskId={}, documentName={}", response.data().taskId(), request.document().getDocName());
+        log.info("MinerU 任务创建成功，taskId={}, fileName={}", response.data().taskId(), fileName);
         return response;
     }
 
