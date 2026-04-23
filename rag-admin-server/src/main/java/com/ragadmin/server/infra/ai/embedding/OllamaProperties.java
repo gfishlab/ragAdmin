@@ -10,6 +10,7 @@ public class OllamaProperties {
     private int timeoutSeconds = 30;
     private String defaultChatModel = "qwen2.5:1.5b";
     private String defaultEmbeddingModel = "quentinz/bge-small-zh-v1.5";
+    private String defaultRerankerModel;
 
     public boolean isEnabled() {
         return enabled;
@@ -49,5 +50,13 @@ public class OllamaProperties {
 
     public void setDefaultEmbeddingModel(String defaultEmbeddingModel) {
         this.defaultEmbeddingModel = defaultEmbeddingModel;
+    }
+
+    public String getDefaultRerankerModel() {
+        return defaultRerankerModel;
+    }
+
+    public void setDefaultRerankerModel(String defaultRerankerModel) {
+        this.defaultRerankerModel = defaultRerankerModel;
     }
 }

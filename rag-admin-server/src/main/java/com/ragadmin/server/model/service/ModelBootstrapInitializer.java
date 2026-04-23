@@ -14,6 +14,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
 import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -72,6 +73,17 @@ public class ModelBootstrapInitializer implements ApplicationRunner {
                     null,
                     null
             );
+            if (StringUtils.hasText(ollamaProperties.getDefaultRerankerModel())) {
+                ensureModel(
+                        ollama,
+                        ollamaProperties.getDefaultRerankerModel(),
+                        "Ollama Reranker Model",
+                        "RERANKER",
+                        List.of("RERANK"),
+                        null,
+                        null
+                );
+            }
         }
 
         log.info("已完成默认模型提供方与模型定义初始化");

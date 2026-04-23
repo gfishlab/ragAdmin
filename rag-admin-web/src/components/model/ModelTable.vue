@@ -46,6 +46,7 @@ function resolveScene(model: ModelDefinition) {
 }
 
 function resolvePrimaryCapabilityLabel(model: ModelDefinition): string {
+  if (model.modelType === 'RERANKER' || model.capabilityTypes?.includes('RERANK')) return '重排'
   return isChatModel(model) ? '聊天' : '向量化'
 }
 

@@ -7,6 +7,8 @@ import com.ragadmin.server.infra.ai.chat.ChatCompletionResult;
 import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.chat.PromptTemplateService;
+import com.ragadmin.server.infra.ai.rerank.RerankClientRegistry;
+import com.ragadmin.server.infra.ai.rerank.RerankResult;
 import com.ragadmin.server.model.service.ModelService;
 import com.ragadmin.server.retrieval.config.RerankingProperties;
 import org.slf4j.Logger;
@@ -20,6 +22,7 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.IntStream;
 
 @Service
@@ -44,6 +47,9 @@ public class RerankingService {
     @Autowired
     private ObjectMapper objectMapper;
 
+    @Autowired(required = false)
+    private RerankClientRegistry rerankClientRegistry;
+
     @Value("classpath:prompts/ai/retrieval/reranking-system.st")
     private Resource systemPromptResource;
 
@@ -57,7 +63,13 @@ public class RerankingService {
         if (candidates.size() <= 1 || !rerankingProperties.isEnabled()) {
             return candidates;
         }
+        if ("CROSS_ENCODER".equalsIgnoreCase(rerankingProperties.getMethod())) {
+            return rerankViaCrossEncoder(query, candidates);
+        }
+        return rerankViaLlm(query, candidates);
+    }
 
+    private List<RetrievalService.RetrievedChunk> rerankViaLlm(String query, List<RetrievalService.RetrievedChunk> candidates) {
         var chatModel = modelService.findDefaultChatModelDescriptor();
         if (chatModel == null) {
             log.debug("无可用聊天模型，跳过 reranking");
@@ -89,10 +101,61 @@ public class RerankingService {
             reranked.sort(Comparator.comparing(RetrievalService.RetrievedChunk::score).reversed());
 
             int topN = Math.min(rerankingProperties.getTopN(), reranked.size());
-            log.debug("Reranking 完成: candidates={}, scored={}, topN={}", candidates.size(), scores.size(), topN);
+            log.debug("LLM Reranking 完成: candidates={}, scored={}, topN={}", candidates.size(), scores.size(), topN);
             return reranked.subList(0, topN);
         } catch (Exception e) {
-            log.warn("Reranking 失败，返回原始排序: {}", e.getMessage());
+            log.warn("LLM Reranking 失败，返回原始排序: {}", e.getMessage());
+            return candidates;
+        }
+    }
+
+    private List<RetrievalService.RetrievedChunk> rerankViaCrossEncoder(String query, List<RetrievalService.RetrievedChunk> candidates) {
+        var rerankerModel = modelService.findDefaultRerankerModelDescriptor();
+        if (rerankerModel == null) {
+            log.debug("无可用 Reranker 模型，返回原始排序");
+            return candidates;
+        }
+
+        int maxCandidates = Math.min(candidates.size(), rerankingProperties.getMaxCandidates());
+        List<RetrievalService.RetrievedChunk> limited = candidates.subList(0, maxCandidates);
+
+        try {
+            List<String> documents = limited.stream()
+                    .map(chunk -> {
+                        String text = chunk.chunk().getChunkText();
+                        if (text != null && text.length() > SNIPPET_MAX_CHARS) {
+                            return text.substring(0, SNIPPET_MAX_CHARS) + "...";
+                        }
+                        return text != null ? text : "";
+                    })
+                    .toList();
+
+            RerankResult result = rerankClientRegistry.getClient(rerankerModel.providerCode())
+                    .rerank(rerankerModel.modelCode(), query, documents);
+
+            List<RetrievalService.RetrievedChunk> reranked = new ArrayList<>();
+            for (RerankResult.RerankItem item : result.results()) {
+                if (item.index() >= 0 && item.index() < limited.size()) {
+                    RetrievalService.RetrievedChunk original = limited.get(item.index());
+                    reranked.add(new RetrievalService.RetrievedChunk(original.chunk(), item.relevanceScore()));
+                }
+            }
+
+            // Add remaining candidates not in rerank results
+            for (int i = 0; i < limited.size(); i++) {
+                final int idx = i;
+                if (reranked.stream().noneMatch(r -> r.chunk().getId().equals(limited.get(idx).chunk().getId()))) {
+                    reranked.add(limited.get(i));
+                }
+            }
+
+            reranked.sort(Comparator.comparing(RetrievalService.RetrievedChunk::score).reversed());
+
+            int topN = Math.min(rerankingProperties.getTopN(), reranked.size());
+            log.debug("Cross-Encoder Reranking 完成: candidates={}, reranked={}, topN={}", candidates.size(), reranked.size(), topN);
+            return reranked.subList(0, topN);
+        } catch (Exception e) {
+            log.warn("Cross-Encoder Reranking 失败，返回原始排序: {}", e.getMessage());
             return candidates;
         }
     }

@@ -11,6 +11,7 @@ import {
   sceneLabel,
   sceneTagType,
   isEmbeddingModel,
+  isRerankerModel,
 } from '@/utils/model-management'
 
 const props = defineProps<{
@@ -30,7 +31,9 @@ const modelForm = reactive<ModelCreateRequest>(createEmptyModelForm())
 
 const dialogTitle = computed(() => (props.mode === 'create' ? '新增模型定义' : '编辑模型定义'))
 const dialogConfirmText = computed(() => (props.mode === 'create' ? '确认创建' : '确认保存'))
-const showGenerationOptionFields = computed(() => !isEmbeddingModel(modelForm.modelType))
+const showGenerationOptionFields = computed(() =>
+  !isEmbeddingModel(modelForm.modelType) && !isRerankerModel(modelForm.modelType)
+)
 const currentScene = computed(() => detectModelScene(modelForm.modelType, modelForm.modelCode))
 const currentPurposeHint = computed(() => modelPurposeHint(modelForm.modelType, modelForm.modelCode))
 
@@ -76,7 +79,7 @@ watch(
 watch(
   () => modelForm.modelType,
   (modelType) => {
-    if (isEmbeddingModel(modelType)) {
+    if (isEmbeddingModel(modelType) || isRerankerModel(modelType)) {
       modelForm.maxTokens = null
       modelForm.temperatureDefault = null
       return
@@ -101,7 +104,7 @@ watch(
     </section>
 
     <el-alert
-      v-if="modelForm.modelType === 'EMBEDDING'"
+      v-if="modelForm.modelType === 'EMBEDDING' || modelForm.modelType === 'RERANKER'"
       :title="currentPurposeHint"
       :type="currentScene === 'SYNC_TEXT' ? 'success' : currentScene === 'ASYNC_TEXT' ? 'warning' : 'error'"
       :closable="false"

@@ -16,11 +16,13 @@ export const capabilityOptions = [
   { label: '全部用途', value: '' },
   { label: '聊天', value: 'TEXT_GENERATION' },
   { label: '向量化', value: 'EMBEDDING' },
+  { label: '重排', value: 'RERANK' },
 ]
 
 export const modelTypeOptions = [
   { label: '聊天', value: 'CHAT' },
   { label: '向量化', value: 'EMBEDDING' },
+  { label: '重排', value: 'RERANKER' },
 ]
 
 export function createEmptyModelForm(): ModelCreateRequest {
@@ -50,12 +52,18 @@ export function isEmbeddingModel(modelType: string): boolean {
   return modelType === 'EMBEDDING'
 }
 
+export function isRerankerModel(modelType: string): boolean {
+  return modelType === 'RERANKER'
+}
+
 export function isChatModel(model: Pick<ModelDefinition, 'modelType' | 'capabilityTypes'>): boolean {
   return model.modelType === 'CHAT' || model.capabilityTypes.includes('TEXT_GENERATION')
 }
 
 export function allowedCapabilityTypes(modelType: string): string[] {
-  return isEmbeddingModel(modelType) ? ['EMBEDDING'] : ['TEXT_GENERATION']
+  if (isEmbeddingModel(modelType)) return ['EMBEDDING']
+  if (isRerankerModel(modelType)) return ['RERANK']
+  return ['TEXT_GENERATION']
 }
 
 // 前端只暴露“模型用途”，实际提交给后端的 capabilityTypes 仍按用途自动派生。
@@ -70,7 +78,7 @@ export function normalizeRuntimeOptions(
   maxTokens: number | null | undefined,
   temperatureDefault: number | null | undefined,
 ): { maxTokens: number | null; temperatureDefault: number | null } {
-  if (isEmbeddingModel(modelType)) {
+  if (isEmbeddingModel(modelType) || isRerankerModel(modelType)) {
     return {
       maxTokens: null,
       temperatureDefault: null,
@@ -120,6 +128,9 @@ export function capabilityLabel(capability: string): string {
   if (capability === 'EMBEDDING') {
     return '向量化'
   }
+  if (capability === 'RERANK') {
+    return '重排'
+  }
   return capability
 }
 
@@ -137,13 +148,16 @@ export function statusTagType(status: string): UiTagType {
 }
 
 export function runtimeOptionDisplay(modelType: string, value: number | string | null | undefined): number | string {
-  if (isEmbeddingModel(modelType)) {
+  if (isEmbeddingModel(modelType) || isRerankerModel(modelType)) {
     return '不适用'
   }
   return value ?? '未配置'
 }
 
 export function detectModelScene(modelType: string, modelCode: string): ModelScene {
+  if (isRerankerModel(modelType)) {
+    return 'CHAT'
+  }
   if (!isEmbeddingModel(modelType)) {
     return 'CHAT'
   }

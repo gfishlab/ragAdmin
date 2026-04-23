@@ -15,6 +15,7 @@ import com.ragadmin.server.infra.ai.chat.ChatPromptMessage;
 import com.ragadmin.server.infra.ai.chat.ConversationChatClient;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingClientRegistry;
 import com.ragadmin.server.infra.ai.embedding.EmbeddingExecutionMode;
+import com.ragadmin.server.infra.ai.rerank.RerankClientRegistry;
 import com.ragadmin.server.knowledge.entity.KnowledgeBaseEntity;
 import com.ragadmin.server.knowledge.mapper.KnowledgeBaseMapper;
 import com.ragadmin.server.model.dto.BatchDeleteModelsRequest;
@@ -80,6 +81,9 @@ public class ModelService {
 
     @Autowired
     private EmbeddingClientRegistry embeddingClientRegistry;
+
+    @Autowired(required = false)
+    private RerankClientRegistry rerankClientRegistry;
 
     @Autowired
     private TransactionTemplate transactionTemplate;
@@ -352,6 +356,46 @@ public class ModelService {
         }
     }
 
+    public RerankerModelDescriptor findDefaultRerankerModelDescriptor() {
+        List<Long> modelIds = aiModelCapabilityMapper.selectModelIdsByCapabilityType("RERANK");
+        if (modelIds.isEmpty()) {
+            return null;
+        }
+        LambdaQueryWrapper<AiModelEntity> wrapper = new LambdaQueryWrapper<AiModelEntity>()
+                .in(AiModelEntity::getId, modelIds)
+                .eq(AiModelEntity::getStatus, "ENABLED")
+                .orderByAsc(AiModelEntity::getId)
+                .last("LIMIT 1");
+        AiModelEntity model = aiModelMapper.selectOne(wrapper);
+        if (model == null) {
+            return null;
+        }
+        AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
+        if (provider == null) {
+            return null;
+        }
+        return new RerankerModelDescriptor(
+                model.getId(),
+                model.getModelCode(),
+                provider.getProviderCode(),
+                provider.getProviderName()
+        );
+    }
+
+    public RerankerModelDescriptor requireRerankerModelDescriptor(Long modelId) {
+        AiModelEntity model = requireModelWithCapability(modelId, "RERANK");
+        AiProviderEntity provider = aiProviderMapper.selectById(model.getProviderId());
+        if (provider == null) {
+            throw new BusinessException("PROVIDER_NOT_FOUND", "模型提供方不存在", HttpStatus.NOT_FOUND);
+        }
+        return new RerankerModelDescriptor(
+                model.getId(),
+                model.getModelCode(),
+                provider.getProviderCode(),
+                provider.getProviderName()
+        );
+    }
+
     public ModelHealthCheckResponse healthCheck(Long modelId) {
         AiModelEntity model = requireModel(modelId);
         AiProviderEntity provider = requireProvider(model.getProviderId());
@@ -433,6 +477,13 @@ public class ModelService {
                         .embed(descriptor.modelCode(), List.of("health check"));
                 return new ModelCapabilityHealthResponse(capabilityType, "UP", "向量能力可用");
             }
+            if ("RERANK".equals(capabilityType)) {
+                if (rerankClientRegistry != null) {
+                    rerankClientRegistry.getClient(provider.getProviderCode()).healthCheck(model.getModelCode());
+                    return new ModelCapabilityHealthResponse(capabilityType, "UP", "重排能力可用");
+                }
+                return new ModelCapabilityHealthResponse(capabilityType, "DOWN", "未配置重排客户端");
+            }
             return new ModelCapabilityHealthResponse(capabilityType, "DOWN", "当前未实现该能力探活");
         } catch (Exception ex) {
             String message = ex.getMessage() == null || ex.getMessage().isBlank() ? "探活失败" : ex.getMessage();
@@ -482,21 +533,27 @@ public class ModelService {
             }
             return distinctCapabilityTypes;
         }
-        throw new BusinessException("MODEL_TYPE_INVALID", "当前仅支持 CHAT 或 EMBEDDING 模型类型", HttpStatus.BAD_REQUEST);
+        if ("RERANKER".equalsIgnoreCase(modelType)) {
+            if (!distinctCapabilityTypes.equals(List.of("RERANK"))) {
+                throw new BusinessException("MODEL_CAPABILITY_INVALID", "重排模型只能配置重排能力", HttpStatus.BAD_REQUEST);
+            }
+            return distinctCapabilityTypes;
+        }
+        throw new BusinessException("MODEL_TYPE_INVALID", "当前仅支持 CHAT、EMBEDDING 或 RERANKER 模型类型", HttpStatus.BAD_REQUEST);
     }
 
     /**
      * 向量模型不参与文本生成，这里的生成参数需要在保存时统一收口为 null。
      */
     private Integer normalizeMaxTokens(String modelType, Integer maxTokens) {
-        return "EMBEDDING".equalsIgnoreCase(modelType) ? null : maxTokens;
+        return "EMBEDDING".equalsIgnoreCase(modelType) || "RERANKER".equalsIgnoreCase(modelType) ? null : maxTokens;
     }
 
     /**
      * 温度仅对聊天生成模型有意义，向量模型配置后也不会生效。
      */
     private BigDecimal normalizeTemperatureDefault(String modelType, BigDecimal temperatureDefault) {
-        return "EMBEDDING".equalsIgnoreCase(modelType) ? null : temperatureDefault;
+        return "EMBEDDING".equalsIgnoreCase(modelType) || "RERANKER".equalsIgnoreCase(modelType) ? null : temperatureDefault;
     }
 
     /**
@@ -696,4 +753,6 @@ public class ModelService {
             String providerName
     ) {
     }
+
+    public record RerankerModelDescriptor(Long modelId, String modelCode, String providerCode, String providerName) {}
 }

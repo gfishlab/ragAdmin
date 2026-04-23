@@ -8,6 +8,7 @@ public class RerankingProperties {
     private boolean enabled = false;
     private int topN = 3;
     private int maxCandidates = 20;
+    private String method = "LLM";
 
     public boolean isEnabled() {
         return enabled;
@@ -31,5 +32,13 @@ public class RerankingProperties {
 
     public void setMaxCandidates(int maxCandidates) {
         this.maxCandidates = maxCandidates;
+    }
+
+    public String getMethod() {
+        return method;
+    }
+
+    public void setMethod(String method) {
+        this.method = method;
     }
 }
