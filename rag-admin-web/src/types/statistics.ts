@@ -18,3 +18,23 @@ export interface VectorIndexOverview {
   milvusStatus: string
   milvusMessage: string
 }
+
+export interface ModelCallStatistics {
+  modelId: number
+  modelCode: string
+  modelName: string
+  callCount: number
+  totalPromptTokens: number
+  totalCompletionTokens: number
+  averageLatencyMs: number
+}
+
+export interface KnowledgeBaseChatStatistics {
+  kbId: number
+  sessionCount: number
+  messageCount: number
+  distinctUserCount: number
+  totalPromptTokens: number
+  totalCompletionTokens: number
+  averageLatencyMs: number
+}
