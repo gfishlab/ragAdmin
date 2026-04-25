@@ -3,7 +3,7 @@
     "SessionStart": [
       {
         "type": "command",
-        "command": "cat .claude/memory/project-progress.md"
+        "command": "cat \"$(git rev-parse --show-toplevel)/.claude/memory/project-progress.md\""
       }
     ]
   }

@@ -2,11 +2,10 @@
   "hooks": {
     "SessionStart": [
       {
-        "matcher": null,
         "hooks": [
           {
             "type": "command",
-            "command": "cat .codex/memory/project-progress.md"
+            "command": "cat \"$(git rev-parse --show-toplevel)/.codex/memory/project-progress.md\""
           }
         ]
       }
