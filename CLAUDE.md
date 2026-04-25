@@ -17,7 +17,7 @@
 - `.claude/rules`：任务分类、记忆写入、子代理路由、验证清单等执行细则
 - `.claude/memory`：纠正记录、阶段观察、已学规则、反模式、演化日志、**项目进度快照**等工程记忆
 - `.claude/agents`：`planner`、`executor`、`verifier` 等子代理职责说明
-- `.claude/settings.local.json`：Hook 配置（SessionStart 自动加载项目进度等）
+- `.claude/settings.json`：项目级 Hook 配置（SessionStart 自动加载项目进度等，随仓库提交共享）
 
 ## 记忆协作关系
 

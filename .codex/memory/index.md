@@ -2,15 +2,14 @@
 
 ## 文件说明
 
-- `corrections.md`：记录已发生问题及纠正结论
-- `observations.md`：记录阶段性观察
-- `learned-rules.md`：记录稳定复用规则
-- `anti-patterns.md`：记录高风险模式及更优替代方式
-- `evolution-log.md`：记录运行机制演进
+- [项目进度快照](project-progress.md) — **新会话必读**，项目整体完成状态与优先级
+- [纠正记录](corrections.md) — 记录已发生问题及纠正结论
+- [阶段观察](observations.md) — 记录阶段性观察
+- [已学规则](learned-rules.md) — 记录稳定复用规则
+- [反模式清单](anti-patterns.md) — 记录高风险模式及更优替代方式
+- [演化日志](evolution-log.md) — 记录运行机制演进
 
 ## 当前高频主题
 
-- 文档优先
-- 包结构边界
-- API 契约清晰性
-- 任务开始前的约束加载
+- Phase 1 核心管线已完成，Phase 2 大部分完成
+- 下一优先：聊天记忆 Redis 层、查询改写接入、语义分块、Cross-Encoder 重排序
