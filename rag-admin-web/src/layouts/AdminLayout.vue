@@ -3,6 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import {
+  ChatDotRound,
   Collection,
   Connection,
   DataAnalysis,
@@ -35,6 +36,7 @@ const menuItems = computed(() => {
     { index: '/users', label: '用户管理', icon: User, permission: 'USER_MANAGE' },
     { index: '/vector-indexes', label: '向量索引', icon: DataAnalysis, permission: 'STATISTICS_VIEW' },
     { index: '/tasks', label: '任务监控', icon: List, permission: 'TASK_VIEW' },
+    { index: '/feedback', label: '反馈管理', icon: ChatDotRound, permission: 'CHAT_FEEDBACK_VIEW' },
     { index: '/audit-logs', label: '审计日志', icon: Tickets, permission: 'AUDIT_VIEW' },
   ]
   return items.filter((item) => hasPermission(authStore.currentUser, item.permission))

@@ -45,6 +45,7 @@ public class AdminPermissionService {
             permissions.add(AdminPermissionCode.TASK_VIEW.name());
             permissions.add(AdminPermissionCode.AUDIT_VIEW.name());
             permissions.add(AdminPermissionCode.STATISTICS_VIEW.name());
+            permissions.add(AdminPermissionCode.CHAT_FEEDBACK_VIEW.name());
         }
         return List.copyOf(permissions);
     }

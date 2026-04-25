@@ -12,6 +12,7 @@ public enum AdminPermissionCode {
     TASK_OPERATE,
     AUDIT_VIEW,
     STATISTICS_VIEW,
+    CHAT_FEEDBACK_VIEW,
     USER_MANAGE;
 
     public static List<String> allCodes() {

@@ -130,6 +130,15 @@ const router = createRouter({
           },
         },
         {
+          path: 'feedback',
+          name: 'feedback',
+          component: () => import('@/views/feedback/FeedbackView.vue'),
+          meta: {
+            title: '反馈管理',
+            requiredPermissions: ['CHAT_FEEDBACK_VIEW'],
+          },
+        },
+        {
           path: 'tasks/:id',
           name: 'task-detail',
           component: () => import('@/views/task/TaskDetailView.vue'),
