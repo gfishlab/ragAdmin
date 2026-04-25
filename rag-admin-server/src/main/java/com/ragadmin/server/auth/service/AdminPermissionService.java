@@ -39,6 +39,7 @@ public class AdminPermissionService {
             permissions.add(AdminPermissionCode.TASK_VIEW.name());
             permissions.add(AdminPermissionCode.TASK_OPERATE.name());
             permissions.add(AdminPermissionCode.STATISTICS_VIEW.name());
+            permissions.add(AdminPermissionCode.PROMPT_TEMPLATE_MANAGE.name());
         }
         if (roleCodes.contains("AUDITOR")) {
             permissions.add(AdminPermissionCode.DASHBOARD_VIEW.name());
@@ -46,6 +47,7 @@ public class AdminPermissionService {
             permissions.add(AdminPermissionCode.AUDIT_VIEW.name());
             permissions.add(AdminPermissionCode.STATISTICS_VIEW.name());
             permissions.add(AdminPermissionCode.CHAT_FEEDBACK_VIEW.name());
+            permissions.add(AdminPermissionCode.PROMPT_TEMPLATE_MANAGE.name());
         }
         return List.copyOf(permissions);
     }

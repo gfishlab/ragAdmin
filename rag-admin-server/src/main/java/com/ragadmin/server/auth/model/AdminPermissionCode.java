@@ -13,6 +13,7 @@ public enum AdminPermissionCode {
     AUDIT_VIEW,
     STATISTICS_VIEW,
     CHAT_FEEDBACK_VIEW,
+    PROMPT_TEMPLATE_MANAGE,
     USER_MANAGE;
 
     public static List<String> allCodes() {

@@ -139,6 +139,24 @@ const router = createRouter({
           },
         },
         {
+          path: 'prompt-templates',
+          name: 'prompt-templates',
+          component: () => import('@/views/prompt-template/PromptTemplateListView.vue'),
+          meta: {
+            title: 'Prompt 模板',
+            requiredPermissions: ['PROMPT_TEMPLATE_MANAGE'],
+          },
+        },
+        {
+          path: 'prompt-templates/:id',
+          name: 'prompt-template-detail',
+          component: () => import('@/views/prompt-template/PromptTemplateDetailView.vue'),
+          meta: {
+            title: '模板详情',
+            requiredPermissions: ['PROMPT_TEMPLATE_MANAGE'],
+          },
+        },
+        {
           path: 'tasks/:id',
           name: 'task-detail',
           component: () => import('@/views/task/TaskDetailView.vue'),
