@@ -131,7 +131,7 @@
 
 - `.codex/rules`：任务分类、记忆写入、子代理路由、验证清单等执行细则
 - `.codex/rules/document-lifecycle.md`：文档流转、收口、删除与回写规则
-- `.codex/hooks`：任务开始前、任务结束后、失败复盘、提交前检查等关键阶段的流程约定
+- `.codex/hooks.json`：项目级 Hook 配置（SessionStart 自动加载项目进度等）
 - `.codex/memory`：纠正记录、阶段观察、已学规则、反模式、演化日志、**项目进度快照**等工程记忆
 - `.codex/agents`：`planner`、`executor`、`verifier` 三个固定角色 agent
 
