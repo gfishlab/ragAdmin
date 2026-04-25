@@ -8,7 +8,8 @@ public record ChunkContext(
         DocumentEntity document,
         DocumentSignals signals,
         ChunkStrategyProperties properties,
-        String parseMode
+        String parseMode,
+        String contentType
 ) {
 
     private static final Set<String> MD_TYPES = Set.of("MD", "MARKDOWN");
@@ -40,5 +41,19 @@ public record ChunkContext(
 
     public boolean isTextMode() {
         return parseMode == null || "TEXT".equals(parseMode);
+    }
+
+    public boolean contentContainsTable() {
+        return signals != null && signals.containsTable();
+    }
+
+    public boolean contentContainsImage() {
+        return signals != null && signals.containsImage();
+    }
+
+    public static ChunkContext of(DocumentEntity document, DocumentSignals signals,
+                                   ChunkStrategyProperties properties, String parseMode) {
+        String contentType = signals != null ? signals.inferContentType() : "TEXT";
+        return new ChunkContext(document, signals, properties, parseMode, contentType);
     }
 }

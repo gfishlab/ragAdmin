@@ -17,19 +17,19 @@ class PdfOcrChunkStrategyTest {
     private ChunkContext ocrContext(int maxChunkChars, int overlapChars) {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
-        return new ChunkContext(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "OCR");
+        return ChunkContext.of(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "OCR");
     }
 
     private ChunkContext textModeContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
-        return new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
+        return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
     }
 
     private ChunkContext nonPdfContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("MD");
-        return new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "OCR");
+        return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "OCR");
     }
 
     @Nested
@@ -77,10 +77,10 @@ class PdfOcrChunkStrategyTest {
 
         @Test
         void shouldChunkOcrTextWithWeakParagraphs() {
-            DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false);
+            DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false, false, false, 0.0, 0.0);
             DocumentEntity doc = new DocumentEntity();
             doc.setDocType("PDF");
-            ChunkContext ctx = new ChunkContext(doc, signals, new ChunkStrategyProperties(200, 40, 50), "OCR");
+            ChunkContext ctx = ChunkContext.of(doc, signals, new ChunkStrategyProperties(200, 40, 50), "OCR");
 
             String content = "姓名 张三\n年龄 28\n\n工作经历\n公司A 高级工程师\n2024-至今\n\n教育背景\n北京大学 计算机科学";
             List<ChunkDraft> chunks = strategy.chunk(

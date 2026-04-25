@@ -54,7 +54,11 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
                 detectWeakParagraphStructure(documents),
                 detectOcrNoise(documents),
                 detectSymbolDensityHigh(documents),
-                detectTocOutlineMissing(documents)
+                detectTocOutlineMissing(documents),
+                detectMarkdownTable(documents),
+                detectMarkdownImage(documents),
+                computeTableRatio(documents),
+                computeImageRatio(documents)
         );
     }
 
@@ -278,5 +282,62 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
             count.put(line, count.getOrDefault(line, 0) + 1);
         }
         return count;
+    }
+
+    private static final Pattern PIPE_TABLE_ROW = Pattern.compile("^\\|.+\\|$");
+    private static final Pattern PIPE_TABLE_SEP = Pattern.compile("^\\|[-:]+[-| :]*\\|$");
+    private static final Pattern IMAGE_REF = Pattern.compile("!\\[[^\\]]*\\]\\([^)]+\\)");
+
+    boolean detectMarkdownTable(List<Document> documents) {
+        for (Document doc : documents) {
+            if (doc == null || !doc.isText()) continue;
+            String text = doc.getText();
+            if (text != null) {
+                boolean hasRow = PIPE_TABLE_ROW.matcher(text).find();
+                boolean hasSep = PIPE_TABLE_SEP.matcher(text).find();
+                if (hasRow && hasSep) return true;
+            }
+        }
+        return false;
+    }
+
+    boolean detectMarkdownImage(List<Document> documents) {
+        for (Document doc : documents) {
+            if (doc == null || !doc.isText()) continue;
+            String text = doc.getText();
+            if (text != null && IMAGE_REF.matcher(text).find()) return true;
+        }
+        return false;
+    }
+
+    double computeTableRatio(List<Document> documents) {
+        int tableLines = 0;
+        int totalLines = 0;
+        for (Document doc : documents) {
+            if (doc == null || !doc.isText()) continue;
+            String text = doc.getText();
+            if (text == null) continue;
+            for (String line : text.lines().map(String::trim).filter(StringUtils::hasText).toList()) {
+                totalLines++;
+                if (PIPE_TABLE_ROW.matcher(line).matches()) tableLines++;
+            }
+        }
+        return totalLines == 0 ? 0.0 : (double) tableLines / totalLines;
+    }
+
+    double computeImageRatio(List<Document> documents) {
+        int imageChars = 0;
+        int totalChars = 0;
+        for (Document doc : documents) {
+            if (doc == null || !doc.isText()) continue;
+            String text = doc.getText();
+            if (text == null) continue;
+            totalChars += text.length();
+            var matcher = IMAGE_REF.matcher(text);
+            while (matcher.find()) {
+                imageChars += matcher.group().length();
+            }
+        }
+        return totalChars == 0 ? 0.0 : (double) imageChars / totalChars;
     }
 }

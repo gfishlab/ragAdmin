@@ -60,6 +60,7 @@ public class DocumentParseProcessor {
     private final ChunkSearchSyncService chunkSearchSyncService;
     private final ElasticsearchClient elasticsearchClient;
     private final DocumentVectorizationStrategyResolver strategyResolver;
+    private final ChunkProperties chunkProperties;
     private final DocumentChunkStrategyResolver chunkStrategyResolver;
     private final DocumentSignalAnalyzer signalAnalyzer;
     private final TaskRealtimeEventService taskRealtimeEventService;
@@ -82,6 +83,7 @@ public class DocumentParseProcessor {
             ChunkSearchSyncService chunkSearchSyncService,
             ElasticsearchClient elasticsearchClient,
             DocumentVectorizationStrategyResolver strategyResolver,
+            ChunkProperties chunkProperties,
             DocumentChunkStrategyResolver chunkStrategyResolver,
             DocumentSignalAnalyzer signalAnalyzer,
             TaskRealtimeEventService taskRealtimeEventService,
@@ -101,6 +103,7 @@ public class DocumentParseProcessor {
         this.chunkSearchSyncService = chunkSearchSyncService;
         this.elasticsearchClient = elasticsearchClient;
         this.strategyResolver = strategyResolver;
+        this.chunkProperties = chunkProperties;
         this.chunkStrategyResolver = chunkStrategyResolver;
         this.signalAnalyzer = signalAnalyzer;
         this.taskRealtimeEventService = taskRealtimeEventService;
@@ -407,9 +410,10 @@ public class DocumentParseProcessor {
         List<Document> cleanedDocuments = documentCleaner.clean(rawDocuments, cleanContext);
 
         DocumentSignals signals = signalAnalyzer.analyze(cleanedDocuments, cleanContext);
-        ChunkStrategyProperties chunkProps = new ChunkStrategyProperties(
-                strategy.getMaxChunkChars(), strategy.getChunkOverlapChars(), strategy.getMinChunkChars());
-        ChunkContext chunkContext = new ChunkContext(document, signals, chunkProps, extractParseMode(cleanedDocuments));
+        String contentType = signals.inferContentType();
+        ChunkStrategyProperties chunkProps = chunkProperties.resolve(contentType);
+        String parseMode = extractParseMode(cleanedDocuments);
+        ChunkContext chunkContext = new ChunkContext(document, signals, chunkProps, parseMode, contentType);
 
         DocumentChunkStrategy chunkStrategy = chunkStrategyResolver.resolve(chunkContext);
         List<ChunkDraft> chunks = chunkStrategy.chunk(cleanedDocuments, chunkContext);

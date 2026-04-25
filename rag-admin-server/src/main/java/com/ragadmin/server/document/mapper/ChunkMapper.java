@@ -17,7 +17,9 @@ public interface ChunkMapper extends BaseMapper<ChunkEntity> {
                 token_count,
                 char_count,
                 metadata_json,
-                enabled
+                enabled,
+                parent_chunk_id,
+                chunk_strategy
             ) VALUES (
                 #{kbId},
                 #{documentId},
@@ -27,7 +29,9 @@ public interface ChunkMapper extends BaseMapper<ChunkEntity> {
                 #{tokenCount},
                 #{charCount},
                 CAST(#{metadataJson} AS jsonb),
-                #{enabled}
+                #{enabled},
+                #{parentChunkId},
+                #{chunkStrategy}
             )
             """)
     @Options(useGeneratedKeys = true, keyProperty = "id")

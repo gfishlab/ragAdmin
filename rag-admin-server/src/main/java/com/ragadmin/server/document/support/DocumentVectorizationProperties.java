@@ -29,13 +29,16 @@ public class DocumentVectorizationProperties {
         /** 每次向量化请求发送的切片数量。 */
         private int embeddingBatchSize = 10;
 
-        /** 单个切片的目标最大字符数。 */
+        /** 单个切片的目标最大字符数。@deprecated 使用 {@link com.ragadmin.server.document.parser.ChunkProperties} 替代 */
+        @Deprecated
         private int maxChunkChars = 800;
 
-        /** 切片间重叠字符数，用于降低上下文断裂。 */
+        /** 切片间重叠字符数，用于降低上下文断裂。@deprecated 使用 ChunkProperties 替代 */
+        @Deprecated
         private int chunkOverlapChars = 120;
 
-        /** 切片最小字符数，低于此值的切片会被合并。 */
+        /** 切片最小字符数，低于此值的切片会被合并。@deprecated 使用 ChunkProperties 替代 */
+        @Deprecated
         private int minChunkChars = 50;
 
         public StrategyProperties() {

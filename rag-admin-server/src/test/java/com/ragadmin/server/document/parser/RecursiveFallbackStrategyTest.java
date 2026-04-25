@@ -13,7 +13,7 @@ class RecursiveFallbackStrategyTest {
     private final RecursiveFallbackStrategy strategy = new RecursiveFallbackStrategy();
 
     private ChunkContext context(int maxChunkChars, int overlapChars) {
-        return new ChunkContext(null, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
+        return ChunkContext.of(null, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
     }
 
     @Test

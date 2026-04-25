@@ -17,19 +17,19 @@ class PdfTextChunkStrategyTest {
     private ChunkContext pdfTextContext(int maxChunkChars, int overlapChars) {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
-        return new ChunkContext(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
+        return ChunkContext.of(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
     }
 
     private ChunkContext pdfOcrContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
-        return new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "OCR");
+        return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "OCR");
     }
 
     private ChunkContext nonPdfContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("MD");
-        return new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
+        return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
     }
 
     @Nested

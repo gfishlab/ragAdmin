@@ -17,13 +17,13 @@ class HtmlChunkStrategyTest {
     private ChunkContext htmlContext(int maxChunkChars, int overlapChars) {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("HTML");
-        return new ChunkContext(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
+        return ChunkContext.of(doc, DocumentSignals.empty(), new ChunkStrategyProperties(maxChunkChars, overlapChars, 50), "TEXT");
     }
 
     private ChunkContext nonHtmlContext() {
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
-        return new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
+        return ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
     }
 
     @Nested
@@ -38,7 +38,7 @@ class HtmlChunkStrategyTest {
         void shouldMatchHtmDocType() {
             DocumentEntity doc = new DocumentEntity();
             doc.setDocType("HTM");
-            ChunkContext ctx = new ChunkContext(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
+            ChunkContext ctx = ChunkContext.of(doc, DocumentSignals.empty(), ChunkStrategyProperties.defaults(), "TEXT");
             assertTrue(strategy.supports(ctx));
         }
 

@@ -41,7 +41,9 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
     public boolean supports(ChunkContext context) {
         return context.properties() != null
                 && context.document() != null
-                && context.document().getKbId() != null;
+                && context.document().getKbId() != null
+                && !context.contentContainsTable()
+                && !context.contentContainsImage();
     }
 
     @Override

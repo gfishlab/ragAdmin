@@ -143,6 +143,19 @@ rag:
       enabled: true
       libre-office-path: libreoffice
       timeout-seconds: 60
+    chunk:
+      default-max-chunk-chars: 800
+      default-overlap-chars: 120
+      default-min-chunk-chars: 50
+      table:
+        max-chunk-chars: 1600
+        overlap-chars: 100
+      image:
+        max-chunk-chars: 600
+        overlap-chars: 80
+      mixed:
+        max-chunk-chars: 1200
+        overlap-chars: 100
     vectorize:
       defaults:
         embedding-batch-size: 10
