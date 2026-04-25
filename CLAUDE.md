@@ -30,7 +30,7 @@
 ## Agent 工程运行约定
 
 - `.claude/rules`：任务分类、记忆写入、子代理路由、验证清单等执行细则
-- `.claude/memory`：会话启动摘要、项目进度快照、纠正记录、阶段观察、已学规则、反模式、演化日志等工程记忆
+- `.claude/memory`：会话启动摘要、项目进度快照、纠正记录（含反模式）、阶段观察（含演化记录）、已学规则等工程记忆
 - `.claude/agents`：`planner`、`executor`、`verifier` 等子代理职责说明
 - `.claude/settings.json`：项目级 Hook 配置（SessionStart 自动加载会话启动摘要，随仓库提交共享）
 

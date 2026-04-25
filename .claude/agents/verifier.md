@@ -15,7 +15,7 @@ description: 验证结果是否满足要求的质检角色。
 3. 运行全量测试，确认无回归
 4. 检查是否存在安全风险（注入、敏感信息泄露等）
 5. 识别未覆盖的边界情况
-6. 判断是否有值得沉淀到 memory 的结论；大块功能模块完成、阶段性提交、路线变化或重大验收通过后，检查是否已更新 `project-progress.md` 与 `session-brief.md`
+6. 判断是否有值得沉淀到 memory 的结论（纠正/反模式→`corrections.md`，观察/演化→`observations.md`，稳定规则→`learned-rules.md`）；大块功能模块完成、阶段性提交、路线变化或重大验收通过后，检查是否已更新 `project-progress.md` 与 `session-brief.md`
 
 ## 输出格式
 

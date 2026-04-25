@@ -4,11 +4,9 @@
 
 - [会话启动摘要](session-brief.md) — **SessionStart hook 读取**，项目宏观进度与渐进式读取策略
 - [项目进度快照](project-progress.md) — 完整进度事实源，中等及以上任务、阶段规划和重大功能收口时读取
-- [已学规则](learned-rules.md) — 9 条稳定规则（R-001~R-009）
-- [纠正记录](corrections.md) — 3 条纠正（后台问答下线、分块策略重构、ChunkContext parseMode）
-- [阶段观察](observations.md) — 5 条观察（TextSplitter局限、中文句子检测、分块参数对齐、父子分块可行性、ES IK分词器）
-- [反模式清单](anti-patterns.md) — 6 条反模式（A-001~A-006）
-- [演化日志](evolution-log.md) — 9 条演化记录（2026-04-14 至 2026-04-22）
+- [已学规则](learned-rules.md) — 13 条稳定规则（R-001~R-013）
+- [纠正记录](corrections.md) — 5 条纠正（C-001~C-005），含 8 条反模式（A-001~A-008）
+- [阶段观察](observations.md) — 8 条观察（O-001~O-008），含 13 条演化记录（E-001~E-013）
 
 ## 当前高频主题
 
