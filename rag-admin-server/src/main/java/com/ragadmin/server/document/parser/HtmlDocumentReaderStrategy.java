@@ -7,7 +7,10 @@ import org.springframework.core.annotation.Order;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @Order(30)
@@ -16,9 +19,12 @@ public class HtmlDocumentReaderStrategy implements DocumentReaderStrategy {
     private static final List<String> SUPPORTED_TYPES = List.of("HTML", "HTM");
 
     private final DocumentMetadataFactory documentMetadataFactory;
+    private final ImageReferenceResolver imageReferenceResolver;
 
-    public HtmlDocumentReaderStrategy(DocumentMetadataFactory documentMetadataFactory) {
+    public HtmlDocumentReaderStrategy(DocumentMetadataFactory documentMetadataFactory,
+                                      ImageReferenceResolver imageReferenceResolver) {
         this.documentMetadataFactory = documentMetadataFactory;
+        this.imageReferenceResolver = imageReferenceResolver;
     }
 
     @Override
@@ -32,6 +38,25 @@ public class HtmlDocumentReaderStrategy implements DocumentReaderStrategy {
                 new ByteArrayResource(request.content(), request.document().getDocName()),
                 JsoupDocumentReaderConfig.defaultConfig()
         );
-        return documentMetadataFactory.enrichDocuments(reader.get(), request, "HTML_READER", "TEXT");
+        List<Document> documents = reader.get();
+        documents = resolveImageReferences(documents, request);
+        return documentMetadataFactory.enrichDocuments(documents, request, "HTML_READER", "TEXT");
+    }
+
+    private List<Document> resolveImageReferences(List<Document> documents, DocumentParseRequest request) {
+        String bucket = request.document().getStorageBucket();
+        Long kbId = request.document().getKbId();
+        Long documentId = request.document().getId();
+        if (bucket == null || kbId == null || documentId == null) {
+            return documents;
+        }
+        List<Document> resolved = new ArrayList<>();
+        for (Document doc : documents) {
+            ImageResolutionResult result = imageReferenceResolver.resolveImages(doc.getText(), bucket, kbId, documentId);
+            Map<String, Object> metadata = new LinkedHashMap<>(doc.getMetadata());
+            metadata.put("imageReport", result.report());
+            resolved.add(new Document(doc.getId(), result.markdown(), metadata));
+        }
+        return resolved;
     }
 }

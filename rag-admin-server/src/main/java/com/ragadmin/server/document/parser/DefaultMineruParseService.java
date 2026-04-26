@@ -14,6 +14,8 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
 
+import com.ragadmin.server.infra.storage.MinioProperties;
+
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.net.URI;
@@ -33,13 +35,25 @@ public class DefaultMineruParseService implements MineruParseService {
 
     private final MineruProperties mineruProperties;
     private final MineruSourceResolver mineruSourceResolver;
+    private final ImageReferenceResolver imageReferenceResolver;
+    private final MineruImageProcessor mineruImageProcessor;
+    private final MinioProperties minioProperties;
     private final RestClient restClient;
     private final RestClient downloadClient;
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    public DefaultMineruParseService(MineruProperties mineruProperties, MineruSourceResolver mineruSourceResolver) {
+    public DefaultMineruParseService(
+            MineruProperties mineruProperties,
+            MineruSourceResolver mineruSourceResolver,
+            ImageReferenceResolver imageReferenceResolver,
+            MineruImageProcessor mineruImageProcessor,
+            MinioProperties minioProperties
+    ) {
         this.mineruProperties = mineruProperties;
         this.mineruSourceResolver = mineruSourceResolver;
+        this.imageReferenceResolver = imageReferenceResolver;
+        this.mineruImageProcessor = mineruImageProcessor;
+        this.minioProperties = minioProperties;
         SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
         requestFactory.setConnectTimeout(Duration.ofSeconds(Math.max(5, mineruProperties.getTimeoutSeconds())));
         requestFactory.setReadTimeout(Duration.ofSeconds(Math.max(5, mineruProperties.getTimeoutSeconds())));
@@ -96,6 +110,89 @@ public class DefaultMineruParseService implements MineruParseService {
             return new OcrCapability(true, false, "MinerU API 未完成配置", mineruProperties.getLanguage(), mineruProperties.getMaxPdfPages());
         }
         return new OcrCapability(true, true, "MinerU API 可用", mineruProperties.getLanguage(), mineruProperties.getMaxPdfPages());
+    }
+
+    @Override
+    public List<Document> parseWithImages(DocumentParseRequest request) throws Exception {
+        if (!mineruProperties.isConfigured()) {
+            throw new BusinessException("MINERU_NOT_CONFIGURED", "MinerU API 未完成配置", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        String sourceUrl = mineruSourceResolver.resolve(request);
+        return parseByUrlWithImages(
+                sourceUrl, request.document().getDocName(),
+                minioProperties.getBucketName(), request.document().getKbId(), request.document().getId()
+        );
+    }
+
+    @Override
+    public List<Document> parseByUrlWithImages(String presignedUrl, String fileName,
+                                                String bucket, Long kbId, Long documentId) throws Exception {
+        if (!mineruProperties.isConfigured()) {
+            throw new BusinessException("MINERU_NOT_CONFIGURED", "MinerU API 未完成配置", HttpStatus.SERVICE_UNAVAILABLE);
+        }
+        MineruTaskModels.CreateTaskResponse createTaskResponse = submitTask(presignedUrl, fileName);
+        MineruTaskModels.TaskResultResponse taskResultResponse = pollUntilFinished(createTaskResponse.data().taskId());
+        if (!"done".equalsIgnoreCase(taskResultResponse.data().state())) {
+            log.warn("MinerU 解析失败，taskId={}, fileName={}, errMsg={}",
+                    createTaskResponse.data().taskId(), fileName, nullSafe(taskResultResponse.data().errMsg()));
+            throw new BusinessException(
+                    "MINERU_TASK_FAILED",
+                    "MinerU 解析失败: " + nullSafe(taskResultResponse.data().errMsg()),
+                    HttpStatus.BAD_GATEWAY
+            );
+        }
+        ImageResolutionResult result = resolveMarkdownWithImages(
+                taskResultResponse.data(), bucket, kbId, documentId
+        );
+        Map<String, Object> metadata = new LinkedHashMap<>();
+        metadata.put("mineruTaskId", createTaskResponse.data().taskId());
+        metadata.put("mineruState", taskResultResponse.data().state());
+        metadata.put("mineruResultSource", "WITH_IMAGES");
+        metadata.put("imageReport", result.report());
+        return List.of(new Document(result.markdown(), metadata));
+    }
+
+    protected ImageResolutionResult resolveMarkdownWithImages(
+            MineruTaskModels.TaskResultData taskResultData, String bucket, Long kbId, Long documentId
+    ) throws Exception {
+        if (StringUtils.hasText(taskResultData.fullZipUrl())) {
+            byte[] zipBytes = downloadZipBytes(taskResultData.fullZipUrl());
+            String markdown = downloadMarkdownFromZip(taskResultData.fullZipUrl());
+            return mineruImageProcessor.processImagesFromZip(zipBytes, markdown, bucket, kbId, documentId);
+        }
+        String markdown;
+        String source;
+        if (StringUtils.hasText(taskResultData.fullMdUrl())) {
+            markdown = downloadPlainText(taskResultData.fullMdUrl());
+            source = "FULL_MD_URL";
+        } else if (StringUtils.hasText(taskResultData.mdUrl())) {
+            markdown = downloadPlainText(taskResultData.mdUrl());
+            source = "MD_URL";
+        } else {
+            throw new BusinessException("MINERU_RESULT_MISSING", "MinerU 未返回可用的 Markdown 结果地址", HttpStatus.BAD_GATEWAY);
+        }
+        ImageResolutionResult result = imageReferenceResolver.resolveImages(markdown, bucket, kbId, documentId);
+        log.info("图片引用解析完成，source={}, report={}", source, result.report());
+        return result;
+    }
+
+    private byte[] downloadZipBytes(String fullZipUrl) {
+        try {
+            byte[] bytes = downloadClient
+                    .get()
+                    .uri(URI.create(fullZipUrl))
+                    .retrieve()
+                    .body(byte[].class);
+            if (bytes == null || bytes.length == 0) {
+                throw new BusinessException("MINERU_RESULT_EMPTY", "MinerU 结果压缩包为空", HttpStatus.BAD_GATEWAY);
+            }
+            return bytes;
+        } catch (BusinessException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            log.warn("MinerU 结果压缩包下载失败，url={}, reason={}", fullZipUrl, ex.getMessage());
+            throw new BusinessException("MINERU_RESULT_DOWNLOAD_FAILED", "MinerU 结果压缩包下载失败", HttpStatus.BAD_GATEWAY);
+        }
     }
 
     protected MineruTaskModels.CreateTaskResponse submitTask(String sourceUrl, String fileName) {

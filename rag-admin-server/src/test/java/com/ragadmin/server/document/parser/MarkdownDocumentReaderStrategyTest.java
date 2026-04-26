@@ -9,10 +9,12 @@ import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
 
 class MarkdownDocumentReaderStrategyTest {
 
-    private final MarkdownDocumentReaderStrategy strategy = new MarkdownDocumentReaderStrategy(new DocumentMetadataFactory());
+    private final ImageReferenceResolver imageReferenceResolver = mock(ImageReferenceResolver.class);
+    private final MarkdownDocumentReaderStrategy strategy = new MarkdownDocumentReaderStrategy(new DocumentMetadataFactory(), imageReferenceResolver);
 
     @Test
     void shouldReadMarkdownAndPreserveHeaderMetadata() throws Exception {

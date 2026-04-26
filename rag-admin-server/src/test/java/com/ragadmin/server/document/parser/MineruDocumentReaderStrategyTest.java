@@ -18,7 +18,7 @@ class MineruDocumentReaderStrategyTest {
     @Test
     void shouldUseMineruForImageDocument() throws Exception {
         MineruParseService mineruParseService = mock(MineruParseService.class);
-        when(mineruParseService.parse(any())).thenReturn(List.of(new Document("MinerU 图片文本")));
+        when(mineruParseService.parseWithImages(any())).thenReturn(List.of(new Document("MinerU 图片文本")));
         MineruDocumentReaderStrategy strategy = new MineruDocumentReaderStrategy(mineruParseService, new DocumentMetadataFactory());
 
         List<Document> documents = strategy.read(request("PNG"));
@@ -32,7 +32,7 @@ class MineruDocumentReaderStrategyTest {
     @Test
     void shouldUseMineruForPdf() throws Exception {
         MineruParseService mineruParseService = mock(MineruParseService.class);
-        when(mineruParseService.parse(any())).thenReturn(List.of(new Document("MinerU PDF 文本")));
+        when(mineruParseService.parseWithImages(any())).thenReturn(List.of(new Document("MinerU PDF 文本")));
         MineruDocumentReaderStrategy strategy = new MineruDocumentReaderStrategy(mineruParseService, new DocumentMetadataFactory());
 
         assertTrue(strategy.supports(request("PDF")));

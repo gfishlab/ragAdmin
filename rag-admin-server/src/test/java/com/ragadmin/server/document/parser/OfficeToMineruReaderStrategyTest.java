@@ -74,7 +74,7 @@ class OfficeToMineruReaderStrategyTest {
         MineruParseService mineruParseService = mock(MineruParseService.class);
         when(mineruParseService.describeCapability())
                 .thenReturn(new OcrCapability(true, true, "MinerU 可用", "ch", 600));
-        when(mineruParseService.parseByUrl(anyString(), anyString()))
+        when(mineruParseService.parseByUrlWithImages(anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of(new Document("MinerU 解析结果")));
 
         DocumentConversionService conversionService = mock(DocumentConversionService.class);
@@ -105,7 +105,7 @@ class OfficeToMineruReaderStrategyTest {
         assertEquals("OFFICE_TO_MINERU", documents.getFirst().getMetadata().get("readerType"));
         assertEquals("CONVERT_THEN_OCR", documents.getFirst().getMetadata().get("parseMode"));
         assertEquals("DOCX", documents.getFirst().getMetadata().get("originalDocType"));
-        verify(mineruParseService).parseByUrl("https://minio.example.com/converted.pdf", "测试文档.docx");
+        verify(mineruParseService).parseByUrlWithImages("https://minio.example.com/converted.pdf", "测试文档.docx", "test-bucket", null, null);
     }
 
     private OfficeToMineruReaderStrategy createStrategy(boolean mineruAvailable, boolean libreOfficeAvailable) {

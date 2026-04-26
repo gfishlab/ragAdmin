@@ -51,7 +51,7 @@ public class SafeNormalizationCleaner implements DocumentCleanerStep {
             normalizedLines.add(line.strip());
         }
         return String.join("\n", normalizedLines)
-                .replaceAll("\n{3,}", "\n\n")
+                .replaceAll("\n{3,}", "\n")
                 .trim();
     }
 }

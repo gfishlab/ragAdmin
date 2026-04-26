@@ -86,7 +86,10 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
                             .build()
             );
 
-            List<Document> documents = mineruParseService.parseByUrl(presignedUrl, fileName);
+            List<Document> documents = mineruParseService.parseByUrlWithImages(
+                    presignedUrl, fileName,
+                    minioProperties.getBucketName(), request.document().getKbId(), request.document().getId()
+            );
 
             documents.forEach(doc -> doc.getMetadata().put("originalDocType", docType));
 

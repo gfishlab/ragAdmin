@@ -31,7 +31,7 @@ class DefaultDocumentCleanerTest {
         )), new DocumentCleanContext(document("TXT"), new DocumentCleanPolicy(true, false, true, false, false, false)));
 
         assertEquals(1, cleaned.size());
-        assertEquals("第一段\n\n第二段", cleaned.getFirst().getText());
+        assertEquals("第一段\n第二段", cleaned.getFirst().getText());
         assertEquals("TIKA", cleaned.getFirst().getMetadata().get("readerType"));
         assertEquals(Boolean.TRUE, cleaned.getFirst().getMetadata().get("cleaned"));
         assertEquals("v1", cleaned.getFirst().getMetadata().get("cleanVersion"));

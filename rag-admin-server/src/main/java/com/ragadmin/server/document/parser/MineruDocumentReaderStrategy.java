@@ -34,7 +34,7 @@ public class MineruDocumentReaderStrategy implements DocumentReaderStrategy {
     @Override
     public List<Document> read(DocumentParseRequest request) throws Exception {
         return documentMetadataFactory.enrichDocuments(
-                mineruParseService.parse(request),
+                mineruParseService.parseWithImages(request),
                 request,
                 "MINERU_API",
                 "OCR"
