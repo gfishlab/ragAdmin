@@ -1,6 +1,6 @@
 # ragAdmin 项目进度快照
 
-> 最后更新：2026-04-25
+> 最后更新：2026-04-26
 >
 > 本文件是项目完整进度的单一事实源。每次完成重大功能或阶段后更新；新会话默认先读取 `session-brief.md`，中等及以上任务再读取本文件。
 
@@ -28,9 +28,11 @@
 - [x] 文档上传（MinIO 预签名 URL）
 - [x] 文档注册、启用/禁用
 - [x] 文档加载架构（MinerU 统一 PDF/Office、XLSX 表格感知、Tika 兜底）
-- [x] 文档清洗（页眉页脚、噪声去除、归一化）
+- [x] 文档清洗（页眉页脚、噪声去除、归一化、HTML 残留清理）
 - [x] 文档分块（5 种策略：Markdown、HTML、PdfOcr、PdfText、RecursiveFallback）
 - [x] 三端数据同步（PG + Milvus + ES）
+- [x] 图片处理管线（CDN 图片下载转存 MinIO、MinerU ZIP 图片提取上传、URL 重写）
+- [x] 内容感知清洗策略（DocumentSignalAnalyzer 12 种信号驱动清洗策略选择）
 
 ### 检索与 RAG
 - [x] 混合检索：语义（Milvus）+ 关键词（ES BM25）+ 混合（RRF 融合）
@@ -61,7 +63,7 @@
 
 | 功能 | 完成度 | 说明 |
 |------|--------|------|
-| 聊天记忆 — Redis 短期记忆层 | 30% | DB summary 表就绪（V8），Redis 热记忆 + 摘要压缩触发机制未实现 |
+| 聊天记忆 — Redis 短期记忆层 | 85% | 三层存储全部实现（PG长期+Redis短期+摘要表），8轮端到端验证通过，服务重启记忆恢复正常，会话隔离正常。待完善：摘要触发阈值生效、刷新日志提升、HikariPool keepalive 配置 |
 | 查询改写接入检索管线 | 40% | DB 字段（V15）+ Prompt 模板已有，实际检索管线集成未完成 |
 | 语义分块 + 父子分块 | 20% | DB 列就绪（V16），SemanticChunkStrategy 和 ParentChunkExpansionService 未实现 |
 | Cross-Encoder 重排序 | 10% | LLM 重排序已完成，Cross-Encoder 策略 + Ollama 部署方案未开始 |
