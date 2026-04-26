@@ -72,6 +72,7 @@ class SpringAiConversationMemoryManagerTest {
     @BeforeEach
     void setUp() {
         chatMemoryProperties.setShortTermRounds(2);
+        chatMemoryProperties.setSummaryTriggerRounds(1);
         chatMemoryProperties.setSummaryMaxLength(120);
     }
 

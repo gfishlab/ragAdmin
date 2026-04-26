@@ -80,7 +80,7 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         try {
             lockToken = conversationSummaryLockManager.tryLock(conversationId);
             if (lockToken.isEmpty()) {
-                log.debug("会话摘要刷新跳过，未获取到锁，conversationId={}", conversationId);
+                log.info("会话摘要刷新跳过，未获取到锁，conversationId={}", conversationId);
                 return;
             }
             doRefresh(conversationId, sessionId);
@@ -111,14 +111,17 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         List<ChatMessageEntity> incrementalExchanges = buildIncrementalCompressibleExchanges(exchanges, existing);
         String summaryText = existing == null ? null : existing.getSummaryText();
 
-        if (!incrementalExchanges.isEmpty()) {
+        if (!incrementalExchanges.isEmpty() && shouldTriggerSummary(incrementalExchanges)) {
+            log.info("触发会话摘要压缩，conversationId={}, sessionId={}, 增量轮数={}", conversationId, sessionId, incrementalExchanges.size());
             String refreshedSummaryText = buildSummaryText(conversationId, sessionId, summaryText, incrementalExchanges);
             if (StringUtils.hasText(refreshedSummaryText)) {
                 summaryText = refreshedSummaryText;
                 upsertSummary(sessionId, conversationId, existing, summaryText, incrementalExchanges);
             } else {
-                log.debug("会话摘要刷新未生成有效摘要，沿用已有摘要，conversationId={}, sessionId={}", conversationId, sessionId);
+                log.info("会话摘要刷新未生成有效摘要，沿用已有摘要，conversationId={}, sessionId={}", conversationId, sessionId);
             }
+        } else if (!incrementalExchanges.isEmpty()) {
+            log.info("会话摘要跳过压缩（未达阈值），conversationId={}, sessionId={}, 增量轮数={}", conversationId, sessionId, incrementalExchanges.size());
         }
 
         redisShortTermChatMemoryStore.save(
@@ -229,6 +232,33 @@ public class SpringAiConversationMemoryManager implements ConversationMemoryMana
         return compressibleExchanges.stream()
                 .filter(exchange -> exchange.getId() != null && exchange.getId() > compressedUntilMessageId)
                 .toList();
+    }
+
+    private boolean shouldTriggerSummary(List<ChatMessageEntity> incrementalExchanges) {
+        int triggerRounds = chatMemoryProperties.getSummaryTriggerRounds();
+        if (triggerRounds > 0 && incrementalExchanges.size() >= triggerRounds) {
+            return true;
+        }
+        int tokenThreshold = chatMemoryProperties.getSummaryTriggerTokenThreshold();
+        if (tokenThreshold > 0) {
+            int estimatedTokens = estimateTokens(incrementalExchanges);
+            return estimatedTokens >= tokenThreshold;
+        }
+        return true;
+    }
+
+    private int estimateTokens(List<ChatMessageEntity> exchanges) {
+        int charCount = 0;
+        for (ChatMessageEntity exchange : exchanges) {
+            if (exchange.getQuestionText() != null) {
+                charCount += exchange.getQuestionText().length();
+            }
+            if (exchange.getAnswerText() != null) {
+                charCount += exchange.getAnswerText().length();
+            }
+        }
+        // 粗略估算：中英混合文本约 1.5 字符/token
+        return (int) (charCount / 1.5);
     }
 
     private List<ChatMessageEntity> buildCompressibleExchanges(List<ChatMessageEntity> exchanges) {
