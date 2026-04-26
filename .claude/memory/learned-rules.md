@@ -99,4 +99,12 @@
 - 规则：当前使用 GLM-5.1 模型而非 Claude，superpowers skill 不会被自动触发。必须在每次会话的首条消息处理前，主动通过 Skill 工具调用 `using-superpowers`
 - 来源：用户明确要求
 - 适用范围：所有会话的首条消息处理
+
+## [R-015] 实施任务前必须完成 architectures → plans 文档链路
+
+- 日期：2026-04-26
+- 规则：任何非简单实施任务（涉及多文件、多步骤），必须先完成文档链路：`docs/architectures`（架构设计）→ `docs/plans`（实施计划）→ 用户确认后再编码。不能跳过 plans 直接动手，也不能把计划写到 `~/.claude/plans/` 等项目外位置
+- 来源：图片处理管线实施时跳过 plans 文档直接编码的纠正
+- 适用范围：所有涉及多文件、多步骤的实施任务
+- 备注：详细反模式见 corrections.md A-009
 - 备注：已在 CLAUDE.md 第一性原则中注册

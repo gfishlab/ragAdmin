@@ -318,6 +318,8 @@ public class DocumentParseProcessor {
                 entity.setTokenCount(estimateTokenCount(chunk.text()));
                 entity.setCharCount(chunk.text().length());
                 entity.setMetadataJson(toMetadataJson(chunk.metadata()));
+                entity.setParentChunkId(chunk.parentChunkId());
+                entity.setChunkStrategy(extractChunkStrategy(chunk.metadata()));
                 entity.setEnabled(Boolean.TRUE);
                 chunkMapper.insertWithJsonb(entity);
                 persistedChunks.add(entity);
@@ -483,6 +485,12 @@ public class DocumentParseProcessor {
             return "解析失败";
         }
         return message.length() > 500 ? message.substring(0, 500) : message;
+    }
+
+    private String extractChunkStrategy(Map<String, Object> metadata) {
+        if (metadata == null) return null;
+        Object strategy = metadata.get("chunkStrategy");
+        return strategy != null ? String.valueOf(strategy) : null;
     }
 
     private record ProcessingContext(

@@ -279,7 +279,45 @@ MD/HTML 文件
 - `full_zip_url` 返回 → 始终走 ZIP 解压路径（包含图片处理步骤）
 - MD/HTML 内容中无图片引用 → 跳过 ImageReferenceResolver
 
-### 4.5 需要新增的代码
+### 4.5 并发与性能优化（JDK 21 虚拟线程）
+
+图片处理管线中大量操作是 IO 密集型（网络下载、MinIO 上传），应利用 JDK 21 虚拟线程并行化。
+
+**当前虚拟线程使用情况**：
+- `DocumentParseProcessor` 的任务分发已使用 `IO_VIRTUAL_TASK_EXECUTOR`（每个文档解析任务跑在独立虚拟线程上）
+
+**图片处理需要的并发优化**：
+
+```
+单文档内的图片处理并发模型：
+
+阶段 1：图片下载 + MinIO 上传（并行）
+  ┌─ image_1: download() → minioUpload() ─┐
+  ├─ image_2: download() → minioUpload() ─┤
+  ├─ image_3: download() → minioUpload() ─┤→ CompletableFuture.allOf()
+  ├─ ...                                   │
+  └─ image_N: download() → minioUpload() ─┘
+                                            ↓
+阶段 2：URL 重写（串行，依赖阶段 1 结果）
+  扫描 Markdown → 替换所有图片引用为 MinIO URL
+```
+
+**关键约束**：
+- 阶段 2（URL 重写）必须等阶段 1 全部完成 — 每张图片的 MinIO 路径是重写的输入
+- 单张图片的下载+上传是原子操作，不需要和其他图片协调
+- 并发度上限控制：单文档内最多 `maxImageConcurrency`（默认 10）个图片同时处理，避免大量图片时 MinIO 压力过大
+
+**实现方式**：
+- 使用 `CompletableFuture` + `Executors.newVirtualThreadPerTaskExecutor()` 或直接 `Thread.ofVirtual().start()`
+- 不引入额外线程池，虚拟线程由 JVM 调度，不需要池化
+- 并发度通过 `Semaphore` 控制
+
+**适用范围**：
+- MinerU ZIP 内图片批量上传 MinIO
+- MD/HTML 中 CDN 图片批量下载 + 上传
+- 文档删除时图片批量清理
+
+### 4.6 需要新增的代码
 
 | 组件 | 说明 |
 |------|------|
@@ -357,7 +395,7 @@ MD/HTML 文件
 
 ## 6. 内容驱动分块策略选择
 
-### 5.1 策略选择完全基于内容特征
+### 6.1 策略选择完全基于内容特征
 
 分块策略选择不基于文档类型，只基于提取后的内容特征：
 
@@ -376,7 +414,7 @@ MD/HTML 文件
        └─ 按 maxChunkChars 固定切分（仅安全网）
 ```
 
-### 5.2 各文档类型端到端流程
+### 6.2 各文档类型端到端流程
 
 #### PDF（含嵌入图片、表格、图表）
 ```
@@ -417,7 +455,7 @@ TXT → 直接读取 → SemanticChunkStrategy
 XLSX → Apache POI → Markdown Table → ContentAwareChunkStrategy
 ```
 
-### 5.3 分块配置参数（已实现：ChunkProperties）
+### 6.3 分块配置参数（已实现：ChunkProperties）
 
 | 内容类型 | 默认 maxChunkChars | 理由 |
 |----------|-------------------|------|
@@ -426,7 +464,7 @@ XLSX → Apache POI → Markdown Table → ContentAwareChunkStrategy
 | IMAGE | 600 | 图片上下文紧凑 |
 | MIXED | 1200 | 综合折中 |
 
-## 6. 实施步骤
+## 7. 实施步骤
 
 ### Phase A：图片处理管线（最大缺口）
 
