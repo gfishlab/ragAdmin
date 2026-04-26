@@ -92,3 +92,11 @@
 - 规则：向量存储使用 Milvus 引用模型，PostgreSQL 不存向量本体。分块参数（maxChunkChars / overlapChars / minChunkChars）按 embedding provider 区分配置
 - 来源：项目实施过程
 - 适用范围：向量存储、检索、分块配置相关改动
+
+## [R-014] 每次会话必须主动触发 using-superpowers skill
+
+- 日期：2026-04-25
+- 规则：当前使用 GLM-5.1 模型而非 Claude，superpowers skill 不会被自动触发。必须在每次会话的首条消息处理前，主动通过 Skill 工具调用 `using-superpowers`
+- 来源：用户明确要求
+- 适用范围：所有会话的首条消息处理
+- 备注：已在 CLAUDE.md 第一性原则中注册
