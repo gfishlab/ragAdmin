@@ -29,6 +29,7 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
     private final MinioClientFactory minioClientFactory;
     private final MinioProperties minioProperties;
     private final DocumentMetadataFactory documentMetadataFactory;
+    private final ImagePipelineProperties imagePipelineProperties;
     private final Tika tika = new Tika();
 
     public OfficeToMineruReaderStrategy(
@@ -36,12 +37,14 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
             MineruParseService mineruParseService,
             MinioClientFactory minioClientFactory,
             MinioProperties minioProperties,
-            DocumentMetadataFactory documentMetadataFactory) {
+            DocumentMetadataFactory documentMetadataFactory,
+            ImagePipelineProperties imagePipelineProperties) {
         this.conversionService = conversionService;
         this.mineruParseService = mineruParseService;
         this.minioClientFactory = minioClientFactory;
         this.minioProperties = minioProperties;
         this.documentMetadataFactory = documentMetadataFactory;
+        this.imagePipelineProperties = imagePipelineProperties;
     }
 
     @Override
@@ -82,7 +85,7 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
                             .method(Method.GET)
                             .bucket(minioProperties.getBucketName())
                             .object(convertedObjectKey)
-                            .expiry(30 * 60)
+                            .expiry(imagePipelineProperties.getPresignedUrlExpirySeconds())
                             .build()
             );
 

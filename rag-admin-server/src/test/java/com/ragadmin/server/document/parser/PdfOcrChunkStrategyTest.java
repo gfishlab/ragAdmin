@@ -77,7 +77,7 @@ class PdfOcrChunkStrategyTest {
 
         @Test
         void shouldChunkOcrTextWithWeakParagraphs() {
-            DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false, false, false, 0.0, 0.0);
+            DocumentSignals signals = new DocumentSignals(false, false, false, true, false, false, false, false, false, 0.0, 0.0, 0.1, 0.05);
             DocumentEntity doc = new DocumentEntity();
             doc.setDocType("PDF");
             ChunkContext ctx = ChunkContext.of(doc, signals, new ChunkStrategyProperties(200, 40, 50), "OCR");

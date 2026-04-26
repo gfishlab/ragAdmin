@@ -14,7 +14,7 @@ import static org.mockito.Mockito.when;
 class DefaultDocumentCleanerTest {
 
     private final CleanerPolicyResolver cleanerPolicyResolver = mock(CleanerPolicyResolver.class);
-    private final DocumentSignalAnalyzer signalAnalyzer = new DefaultDocumentSignalAnalyzer();
+    private final DocumentSignalAnalyzer signalAnalyzer = new DefaultDocumentSignalAnalyzer(new SignalAnalysisProperties());
     private final DefaultDocumentCleaner cleaner = new DefaultDocumentCleaner(
             signalAnalyzer,
             cleanerPolicyResolver,

@@ -18,7 +18,7 @@ class DefaultDocumentSignalAnalyzerTest {
 
     @BeforeEach
     void setUp() {
-        analyzer = new DefaultDocumentSignalAnalyzer();
+        analyzer = new DefaultDocumentSignalAnalyzer(new SignalAnalysisProperties());
         DocumentEntity doc = new DocumentEntity();
         doc.setDocType("PDF");
         context = new DocumentCleanContext(doc, DocumentCleanPolicy.defaultPolicy());

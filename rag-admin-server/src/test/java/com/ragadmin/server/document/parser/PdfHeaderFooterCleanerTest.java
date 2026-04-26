@@ -10,7 +10,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 
 class PdfHeaderFooterCleanerTest {
 
-    private final PdfHeaderFooterCleaner cleaner = new PdfHeaderFooterCleaner();
+    private final PdfHeaderFooterCleaner cleaner = new PdfHeaderFooterCleaner(new SignalAnalysisProperties());
 
     @Test
     void shouldRemoveRepeatedHeaderAndFooterAcrossPages() {

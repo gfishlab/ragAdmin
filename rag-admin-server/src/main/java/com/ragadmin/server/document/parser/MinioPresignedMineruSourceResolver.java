@@ -15,9 +15,11 @@ public class MinioPresignedMineruSourceResolver implements MineruSourceResolver 
     private static final Logger log = LoggerFactory.getLogger(MinioPresignedMineruSourceResolver.class);
 
     private final MinioClientFactory minioClientFactory;
+    private final ImagePipelineProperties imagePipelineProperties;
 
-    public MinioPresignedMineruSourceResolver(MinioClientFactory minioClientFactory) {
+    public MinioPresignedMineruSourceResolver(MinioClientFactory minioClientFactory, ImagePipelineProperties imagePipelineProperties) {
         this.minioClientFactory = minioClientFactory;
+        this.imagePipelineProperties = imagePipelineProperties;
     }
 
     @Override
@@ -28,7 +30,7 @@ public class MinioPresignedMineruSourceResolver implements MineruSourceResolver 
                             .method(Method.GET)
                             .bucket(request.version().getStorageBucket())
                             .object(request.version().getStorageObjectKey())
-                            .expiry(30 * 60)
+                            .expiry(imagePipelineProperties.getPresignedUrlExpirySeconds())
                             .build()
             );
         } catch (Exception ex) {

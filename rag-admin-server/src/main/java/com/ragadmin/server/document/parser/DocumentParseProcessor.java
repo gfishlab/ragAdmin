@@ -29,7 +29,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -45,7 +44,6 @@ import static com.ragadmin.server.common.config.AsyncExecutionConfiguration.IO_V
 public class DocumentParseProcessor {
 
     private static final Logger log = LoggerFactory.getLogger(DocumentParseProcessor.class);
-    private static final Duration STALE_RUNNING_TIMEOUT = Duration.ofMinutes(5);
     private static final String STALE_TASK_MESSAGE = "任务执行中断，系统已自动标记失败，请重试";
 
     private final DocumentParseTaskMapper documentParseTaskMapper;
@@ -149,12 +147,12 @@ public class DocumentParseProcessor {
     }
 
     public void recoverStaleRunningTasks() {
-        LocalDateTime staleBefore = LocalDateTime.now().minus(STALE_RUNNING_TIMEOUT);
+        LocalDateTime staleBefore = LocalDateTime.now().minusMinutes(documentParseProperties.getStaleRunningTimeoutMinutes());
         List<DocumentParseTaskEntity> staleTasks = documentParseTaskMapper.selectList(new LambdaQueryWrapper<DocumentParseTaskEntity>()
                 .eq(DocumentParseTaskEntity::getTaskStatus, "RUNNING")
                 .lt(DocumentParseTaskEntity::getStartedAt, staleBefore)
                 .orderByAsc(DocumentParseTaskEntity::getId)
-                .last("LIMIT 20"));
+                .last("LIMIT " + documentParseProperties.getStaleRecoveryBatchSize()));
         for (DocumentParseTaskEntity staleTask : staleTasks) {
             markFailed(staleTask.getId(), new IllegalStateException(STALE_TASK_MESSAGE));
             log.warn("检测到超时未完成的解析任务，已自动标记失败，taskId={}, startedAt={}",
@@ -468,7 +466,7 @@ public class DocumentParseProcessor {
     }
 
     private int estimateTokenCount(String text) {
-        return Math.max(1, text.length() / 4);
+        return Math.max(1, text.length() / documentParseProperties.getTokenEstimationDivisor());
     }
 
     private String extractParseMode(List<Document> documents) {
@@ -484,7 +482,8 @@ public class DocumentParseProcessor {
         if (message == null || message.isBlank()) {
             return "解析失败";
         }
-        return message.length() > 500 ? message.substring(0, 500) : message;
+        int maxLen = documentParseProperties.getErrorMessageMaxLength();
+        return message.length() > maxLen ? message.substring(0, maxLen) : message;
     }
 
     private String extractChunkStrategy(Map<String, Object> metadata) {

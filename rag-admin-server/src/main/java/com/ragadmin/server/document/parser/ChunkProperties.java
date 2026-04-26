@@ -16,11 +16,20 @@ public class ChunkProperties {
     private ContentTypeOverrides image = new ContentTypeOverrides();
     private ContentTypeOverrides mixed = new ContentTypeOverrides();
 
+    private SemanticOverrides semantic = new SemanticOverrides();
+
     @Data
     public static class ContentTypeOverrides {
         private Integer maxChunkChars;
         private Integer overlapChars;
         private Integer minChunkChars;
+    }
+
+    @Data
+    public static class SemanticOverrides {
+        private int childMaxChars = 400;
+        private int parentMaxChars = 2400;
+        private double similarityThreshold = 0.5;
     }
 
     public ChunkStrategyProperties resolve(String contentType) {

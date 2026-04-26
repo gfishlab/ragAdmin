@@ -13,7 +13,12 @@ import java.util.Map;
 @Order(22)
 public class PdfTextChunkStrategy implements DocumentChunkStrategy {
 
+    private final TableDetectionProperties tableDetectionProperties;
     private final RecursiveFallbackStrategy fallback = new RecursiveFallbackStrategy();
+
+    public PdfTextChunkStrategy(TableDetectionProperties tableDetectionProperties) {
+        this.tableDetectionProperties = tableDetectionProperties;
+    }
 
     @Override
     public boolean supports(ChunkContext context) {
@@ -71,12 +76,13 @@ public class PdfTextChunkStrategy implements DocumentChunkStrategy {
                 tableRows++;
             }
         }
-        return tableRows >= 2 && tableRows >= lines.length * 0.5;
+        return tableRows >= tableDetectionProperties.getMinTableRows()
+                && tableRows >= lines.length * tableDetectionProperties.getTableRowRatio();
     }
 
     private boolean isTabSeparatedRow(String line) {
         long tabCount = line.chars().filter(c -> c == '\t').count();
-        return tabCount >= 2;
+        return tabCount >= tableDetectionProperties.getMinTabCount();
     }
 
     private boolean isPipeSeparatedRow(String line) {
@@ -84,7 +90,7 @@ public class PdfTextChunkStrategy implements DocumentChunkStrategy {
             return false;
         }
         long pipeCount = line.chars().filter(c -> c == '|').count();
-        return pipeCount >= 3;
+        return pipeCount >= tableDetectionProperties.getMinPipeCount();
     }
 
     private List<String> aggregateParagraphs(List<String> paragraphs, ChunkStrategyProperties props) {

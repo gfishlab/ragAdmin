@@ -132,6 +132,10 @@ rag:
     parse:
       max-concurrency: 4
       dispatch-batch-size: 4
+      stale-running-timeout-minutes: 5
+      stale-recovery-batch-size: 20
+      token-estimation-divisor: 4
+      error-message-max-length: 500
     mineru:
       enabled: false
       base-url: https://mineru.net
@@ -146,6 +150,24 @@ rag:
       enabled: true
       libre-office-path: libreoffice
       timeout-seconds: 60
+    signal:
+      header-footer-threshold: 0.6
+      blank-line-ratio-threshold: 0.4
+      symbol-density-threshold: 0.15
+      weak-paragraph-avg-lines: 2.0
+      table-ratio-threshold: 0.1
+      image-ratio-threshold: 0.05
+    image-pipeline:
+      concurrency: 10
+      max-image-size: 10485760
+      presigned-url-expiry-seconds: 1800
+    table-detection:
+      min-table-rows: 2
+      table-row-ratio: 0.5
+      min-tab-count: 2
+      min-pipe-count: 3
+      overlap-tail-ratio: 0.3
+      overlap-tail-min-chars: 10
     chunk:
       default-max-chunk-chars: 800
       default-overlap-chars: 120
@@ -159,6 +181,10 @@ rag:
       mixed:
         max-chunk-chars: 1200
         overlap-chars: 100
+      semantic:
+        child-max-chars: 400
+        parent-max-chars: 2400
+        similarity-threshold: 0.5
     vectorize:
       defaults:
         embedding-batch-size: 10

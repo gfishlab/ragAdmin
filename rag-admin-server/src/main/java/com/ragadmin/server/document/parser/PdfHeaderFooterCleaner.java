@@ -16,6 +16,12 @@ import java.util.regex.Pattern;
 @Order(20)
 public class PdfHeaderFooterCleaner implements DocumentCleanerStep {
 
+    private final SignalAnalysisProperties signalProperties;
+
+    public PdfHeaderFooterCleaner(SignalAnalysisProperties signalProperties) {
+        this.signalProperties = signalProperties;
+    }
+
     private static final Pattern DATETIME_HEADER_PATTERN = Pattern.compile(
             "^\\d{4}[-/]\\d{1,2}[-/]\\d{1,2}(\\s+\\d{1,2}:\\d{2})?.*"
     );
@@ -48,7 +54,7 @@ public class PdfHeaderFooterCleaner implements DocumentCleanerStep {
             increment(lastLineCount, lines.getLast());
         }
 
-        int threshold = Math.max(2, (int) Math.ceil(documents.size() * 0.6));
+        int threshold = Math.max(2, (int) Math.ceil(documents.size() * signalProperties.getHeaderFooterThreshold()));
         List<Document> cleaned = new ArrayList<>();
         for (Document document : documents) {
             List<String> lines = new ArrayList<>(normalizedLines(document.getText()));

@@ -36,21 +36,23 @@ public class ImageReferenceResolver {
             "!\\[(?<alt>[^\\]]*)\\]\\((?<url>[^)]+)\\)"
     );
 
-    private static final long MAX_IMAGE_SIZE = 10 * 1024 * 1024;
-
     private final MinioClientFactory minioClientFactory;
     private final MinioProperties minioProperties;
+    private final ImagePipelineProperties imagePipelineProperties;
     private final ExecutorService ioExecutor;
-    private final Semaphore concurrencyLimiter = new Semaphore(10);
+    private final Semaphore concurrencyLimiter;
 
     public ImageReferenceResolver(
             MinioClientFactory minioClientFactory,
             MinioProperties minioProperties,
+            ImagePipelineProperties imagePipelineProperties,
             @Qualifier("ioVirtualTaskExecutor") ExecutorService ioExecutor
     ) {
         this.minioClientFactory = minioClientFactory;
         this.minioProperties = minioProperties;
+        this.imagePipelineProperties = imagePipelineProperties;
         this.ioExecutor = ioExecutor;
+        this.concurrencyLimiter = new Semaphore(imagePipelineProperties.getConcurrency());
     }
 
     public ImageResolutionResult resolveImages(
@@ -169,7 +171,7 @@ public class ImageReferenceResolver {
     private byte[] downloadImage(String imageUrl) {
         try (var stream = URI.create(imageUrl).toURL().openStream()) {
             byte[] bytes = stream.readAllBytes();
-            if (bytes.length > MAX_IMAGE_SIZE) {
+            if (bytes.length > imagePipelineProperties.getMaxImageSize()) {
                 throw new RuntimeException("图片超过 10MB 限制: " + imageUrl);
             }
             return bytes;
@@ -184,7 +186,7 @@ public class ImageReferenceResolver {
                         .method(Method.GET)
                         .bucket(bucket)
                         .object(objectKey)
-                        .expiry(30 * 60)
+                        .expiry(imagePipelineProperties.getPresignedUrlExpirySeconds())
                         .build()
         );
     }

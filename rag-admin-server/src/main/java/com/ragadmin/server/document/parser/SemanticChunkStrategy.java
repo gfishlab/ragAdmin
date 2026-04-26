@@ -24,9 +24,8 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(SemanticChunkStrategy.class);
 
-    private static final int CHILD_MAX_CHARS = 400;
-    private static final int PARENT_MAX_CHARS = 2400;
-    private static final double DEFAULT_SIMILARITY_THRESHOLD = 0.5;
+    @Autowired
+    private ChunkProperties chunkProperties;
 
     @Autowired
     private ModelService modelService;
@@ -57,7 +56,7 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
             return List.of();
         }
 
-        List<String> childTexts = splitIntoChildUnits(fullText, CHILD_MAX_CHARS);
+        List<String> childTexts = splitIntoChildUnits(fullText, chunkProperties.getSemantic().getChildMaxChars());
         if (childTexts.size() <= 1) {
             return childTexts.stream()
                     .map(t -> new ChunkDraft(t, new HashMap<>()))
@@ -84,9 +83,9 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
         }
 
         List<Double> similarities = computeAdjacentSimilarities(embeddings);
-        List<Integer> breakpoints = findBreakpoints(similarities, DEFAULT_SIMILARITY_THRESHOLD);
+        List<Integer> breakpoints = findBreakpoints(similarities, chunkProperties.getSemantic().getSimilarityThreshold());
 
-        return buildParentChildDrafts(childTexts, breakpoints, PARENT_MAX_CHARS);
+        return buildParentChildDrafts(childTexts, breakpoints, chunkProperties.getSemantic().getParentMaxChars());
     }
 
     List<Integer> findBreakpoints(List<Double> similarities, double threshold) {

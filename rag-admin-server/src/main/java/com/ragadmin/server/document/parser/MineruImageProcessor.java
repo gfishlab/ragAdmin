@@ -37,17 +37,21 @@ public class MineruImageProcessor {
 
     private final MinioClientFactory minioClientFactory;
     private final MinioProperties minioProperties;
+    private final ImagePipelineProperties imagePipelineProperties;
     private final ExecutorService ioExecutor;
-    private final Semaphore concurrencyLimiter = new Semaphore(10);
+    private final Semaphore concurrencyLimiter;
 
     public MineruImageProcessor(
             MinioClientFactory minioClientFactory,
             MinioProperties minioProperties,
+            ImagePipelineProperties imagePipelineProperties,
             @Qualifier("ioVirtualTaskExecutor") ExecutorService ioExecutor
     ) {
         this.minioClientFactory = minioClientFactory;
         this.minioProperties = minioProperties;
+        this.imagePipelineProperties = imagePipelineProperties;
         this.ioExecutor = ioExecutor;
+        this.concurrencyLimiter = new Semaphore(imagePipelineProperties.getConcurrency());
     }
 
     public ImageResolutionResult processImagesFromZip(
@@ -85,7 +89,7 @@ public class MineruImageProcessor {
                                         .method(Method.GET)
                                         .bucket(bucket)
                                         .object(objectKey)
-                                        .expiry(30 * 60)
+                                        .expiry(imagePipelineProperties.getPresignedUrlExpirySeconds())
                                         .build()
                         );
                         synchronized (fileNameToUrl) {

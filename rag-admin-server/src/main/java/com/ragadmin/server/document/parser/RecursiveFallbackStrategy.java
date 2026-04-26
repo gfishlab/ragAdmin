@@ -12,6 +12,16 @@ import java.util.List;
 @Order(50)
 public class RecursiveFallbackStrategy implements DocumentChunkStrategy {
 
+    private final TableDetectionProperties tableDetectionProperties;
+
+    public RecursiveFallbackStrategy() {
+        this.tableDetectionProperties = new TableDetectionProperties();
+    }
+
+    public RecursiveFallbackStrategy(TableDetectionProperties tableDetectionProperties) {
+        this.tableDetectionProperties = tableDetectionProperties;
+    }
+
     @Override
     public boolean supports(ChunkContext context) {
         return true;
@@ -74,7 +84,7 @@ public class RecursiveFallbackStrategy implements DocumentChunkStrategy {
             return source;
         }
         int rawStart = source.length() - tailLength;
-        int tolerance = Math.max(10, (int) (tailLength * 0.3));
+        int tolerance = Math.max(tableDetectionProperties.getOverlapTailMinChars(), (int) (tailLength * tableDetectionProperties.getOverlapTailRatio()));
         int searchFrom = Math.max(0, rawStart - tolerance);
 
         for (int i = rawStart; i > searchFrom; i--) {

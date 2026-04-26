@@ -12,7 +12,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class PdfTextChunkStrategyTest {
 
-    private final PdfTextChunkStrategy strategy = new PdfTextChunkStrategy();
+    private final PdfTextChunkStrategy strategy = new PdfTextChunkStrategy(new TableDetectionProperties());
 
     private ChunkContext pdfTextContext(int maxChunkChars, int overlapChars) {
         DocumentEntity doc = new DocumentEntity();

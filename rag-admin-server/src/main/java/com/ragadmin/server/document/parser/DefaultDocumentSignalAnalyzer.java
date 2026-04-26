@@ -10,10 +10,11 @@ import java.util.regex.Pattern;
 @Component
 public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
 
-    private static final double HEADER_FOOTER_THRESHOLD = 0.6;
-    private static final double BLANK_LINE_RATIO_THRESHOLD = 0.4;
-    private static final double SYMBOL_DENSITY_THRESHOLD = 0.15;
-    private static final double WEAK_PARAGRAPH_AVG_LINES = 2.0;
+    private final SignalAnalysisProperties properties;
+
+    public DefaultDocumentSignalAnalyzer(SignalAnalysisProperties properties) {
+        this.properties = properties;
+    }
 
     private static final Pattern OCR_NOISE_PATTERN = Pattern.compile(
             "[" +
@@ -58,7 +59,9 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
                 detectMarkdownTable(documents),
                 detectMarkdownImage(documents),
                 computeTableRatio(documents),
-                computeImageRatio(documents)
+                computeImageRatio(documents),
+                properties.getTableRatioThreshold(),
+                properties.getImageRatioThreshold()
         );
     }
 
@@ -68,7 +71,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
         }
         if (documents.size() >= 3) {
             Map<String, Integer> firstLineCount = countFirstOrLastLines(documents, true);
-            int threshold = Math.max(2, (int) Math.ceil(documents.size() * HEADER_FOOTER_THRESHOLD));
+            int threshold = Math.max(2, (int) Math.ceil(documents.size() * properties.getHeaderFooterThreshold()));
             if (firstLineCount.values().stream().anyMatch(count -> count >= threshold)) {
                 return true;
             }
@@ -82,7 +85,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
         }
         if (documents.size() >= 3) {
             Map<String, Integer> lastLineCount = countFirstOrLastLines(documents, false);
-            int threshold = Math.max(2, (int) Math.ceil(documents.size() * HEADER_FOOTER_THRESHOLD));
+            int threshold = Math.max(2, (int) Math.ceil(documents.size() * properties.getHeaderFooterThreshold()));
             if (lastLineCount.values().stream().anyMatch(count -> count >= threshold)) {
                 return true;
             }
@@ -152,7 +155,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
         if (totalLines == 0) {
             return false;
         }
-        return (double) blankLines / totalLines > BLANK_LINE_RATIO_THRESHOLD;
+        return (double) blankLines / totalLines > properties.getBlankLineRatioThreshold();
     }
 
     boolean detectWeakParagraphStructure(List<Document> documents) {
@@ -179,7 +182,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
         if (totalParagraphs == 0) {
             return false;
         }
-        return (double) totalParagraphLines / totalParagraphs < WEAK_PARAGRAPH_AVG_LINES;
+        return (double) totalParagraphLines / totalParagraphs < properties.getWeakParagraphAvgLines();
     }
 
     boolean detectOcrNoise(List<Document> documents) {
@@ -228,7 +231,7 @@ public class DefaultDocumentSignalAnalyzer implements DocumentSignalAnalyzer {
         if (totalNonWhitespace == 0) {
             return false;
         }
-        return (double) symbolCount / totalNonWhitespace > SYMBOL_DENSITY_THRESHOLD;
+        return (double) symbolCount / totalNonWhitespace > properties.getSymbolDensityThreshold();
     }
 
     boolean detectTocOutlineMissing(List<Document> documents) {

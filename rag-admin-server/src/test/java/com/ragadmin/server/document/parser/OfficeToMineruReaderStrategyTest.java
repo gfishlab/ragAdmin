@@ -37,7 +37,8 @@ class OfficeToMineruReaderStrategyTest {
                 mineruParseService,
                 mock(MinioClientFactory.class),
                 mock(MinioProperties.class),
-                new DocumentMetadataFactory()
+                new DocumentMetadataFactory(),
+                new ImagePipelineProperties()
         );
 
         List<Document> documents = strategy.read(request("DOCX"));
@@ -60,7 +61,8 @@ class OfficeToMineruReaderStrategyTest {
                 mineruParseService,
                 mock(MinioClientFactory.class),
                 mock(MinioProperties.class),
-                new DocumentMetadataFactory()
+                new DocumentMetadataFactory(),
+                new ImagePipelineProperties()
         );
 
         List<Document> documents = strategy.read(request("DOCX"));
@@ -96,7 +98,8 @@ class OfficeToMineruReaderStrategyTest {
                 mineruParseService,
                 minioClientFactory,
                 minioProperties,
-                new DocumentMetadataFactory()
+                new DocumentMetadataFactory(),
+                new ImagePipelineProperties()
         );
 
         List<Document> documents = strategy.read(request("DOCX"));
@@ -121,7 +124,8 @@ class OfficeToMineruReaderStrategyTest {
                 mineruParseService,
                 mock(MinioClientFactory.class),
                 mock(MinioProperties.class),
-                new DocumentMetadataFactory()
+                new DocumentMetadataFactory(),
+                new ImagePipelineProperties()
         );
     }
 

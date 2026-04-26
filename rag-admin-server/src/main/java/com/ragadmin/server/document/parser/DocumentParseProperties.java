@@ -9,4 +9,8 @@ public class DocumentParseProperties {
 
     private int maxConcurrency = 4;
     private int dispatchBatchSize = 4;
+    private int staleRunningTimeoutMinutes = 5;
+    private int staleRecoveryBatchSize = 20;
+    private int tokenEstimationDivisor = 4;
+    private int errorMessageMaxLength = 500;
 }

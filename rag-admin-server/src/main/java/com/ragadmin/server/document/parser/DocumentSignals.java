@@ -11,20 +11,22 @@ public record DocumentSignals(
         boolean markdownTableDetected,
         boolean markdownImageDetected,
         double tableRatio,
-        double imageRatio
+        double imageRatio,
+        double tableRatioThreshold,
+        double imageRatioThreshold
 ) {
 
     public static DocumentSignals empty() {
         return new DocumentSignals(false, false, false, false, false, false, false,
-                false, false, 0.0, 0.0);
+                false, false, 0.0, 0.0, 0.1, 0.05);
     }
 
     public boolean containsTable() {
-        return markdownTableDetected || tableRatio > 0.1;
+        return markdownTableDetected || tableRatio > tableRatioThreshold;
     }
 
     public boolean containsImage() {
-        return markdownImageDetected || imageRatio > 0.05;
+        return markdownImageDetected || imageRatio > imageRatioThreshold;
     }
 
     public String inferContentType() {
