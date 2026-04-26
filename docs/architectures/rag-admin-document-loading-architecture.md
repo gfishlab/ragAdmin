@@ -11,6 +11,7 @@
 - 清洗：`rag-admin-document-cleaning-architecture.md`
 - 分块：`rag-admin-document-chunking-architecture.md`
 - 语义分块：`rag-admin-semantic-chunking-architecture.md`
+- 图片处理 + 内容感知分块：`document-loading-chunking-design.md`
 - 入口编排：`rag-admin-document-ingestion-architecture.md`
 
 ## 2. 设计边界

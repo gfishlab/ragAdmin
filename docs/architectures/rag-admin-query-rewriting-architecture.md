@@ -38,11 +38,12 @@
 
 ### 全局配置
 
+知识库级 `retrievalQueryRewritingMode` 是唯一控制点，不再使用全局开关。以下配置仅用于调参：
+
 | 配置项 | 默认值 | 说明 |
 |--------|--------|------|
-| `rag.retrieval.query-rewriting.multi-query-enabled` | false | Multi-Query 全局开关 |
 | `rag.retrieval.query-rewriting.multi-query-count` | 3 | 生成的替代查询数量 |
-| `rag.retrieval.query-rewriting.hyde-enabled` | false | HyDE 全局开关 |
+| `rag.retrieval.query-rewriting.log-max-query-length` | 120 | 日志中查询文本截断长度 |
 
 ## 4. 处理流程
 
@@ -83,7 +84,7 @@ QueryRewritingService.rewrite(query, mode)
 |------|------|
 | `QueryRewritingService` | 查询改写入口，调度 Multi-Query 和 HyDE |
 | `QueryRewritingMode` | 改写模式枚举 |
-| `QueryRewritingProperties` | 全局配置 |
+| `QueryRewritingProperties` | 调参配置（multiQueryCount、logMaxQueryLength） |
 | `RetrievalService` | 在 retrieve() 中集成改写，多查询结果合并 |
 
 ## 7. Prompt 模板

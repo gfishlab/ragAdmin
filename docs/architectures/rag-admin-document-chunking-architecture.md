@@ -12,6 +12,8 @@
 - 分块与清洗的职责边界如何划分
 - 各框架（Spring AI / LangChain4j / LlamaIndex）分块能力对比与选型决策
 
+相关文档：`document-loading-chunking-design.md`（图片处理管线 + 内容感知分块详细设计）
+
 当前阶段如果局部实现与本文档冲突，应优先更新本文档，再调整实现。
 
 ## 2. 设计边界
@@ -281,7 +283,7 @@ rag:
 2. ~~**引入 ChunkContext**：封装 `DocumentEntity` + `DocumentSignals` + `ChunkStrategyProperties`~~ ✅ 已完成
 3. ~~**逐个实现策略**：Markdown → HTML → PdfOcr → PdfText~~ ✅ 已完成
 4. ~~**验证**：每种策略补充单元测试，用真实文档验证切片质量~~ ✅ 已完成
-5. **接入配置**：支持按策略覆盖分块参数（待实施）
+5. **接入配置**：支持按策略覆盖分块参数（全局 YAML 已支持按内容类型覆写；按知识库覆写待实施）
 6. **父子分块**：实现 `ParentChildChunkStrategy` 分层包装器（远期）
 
 ## 10. 框架分块能力对比与选型决策

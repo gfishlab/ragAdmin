@@ -42,9 +42,9 @@
 
 | 模式 | 标识 | 召回源 | 适用场景 |
 |------|------|--------|----------|
-| 语义检索 | `SEMANTIC_ONLY` | Milvus | 语义理解类查询（默认） |
+| 语义检索 | `SEMANTIC_ONLY` | Milvus | 语义理解类查询 |
 | 全文检索 | `KEYWORD_ONLY` | ES | 精确匹配类查询 |
-| 混合检索 | `HYBRID` | Milvus + ES | 通用场景，综合最优 |
+| 混合检索 | `HYBRID` | Milvus + ES | 通用场景，综合最优（默认） |
 
 分发逻辑位于 `RetrievalService.retrieve()`，根据 `RetrievalMode.resolve(kb.getRetrievalMode())` 决定路径。
 
@@ -85,10 +85,10 @@ score = Σ 1 / (k + rank_i)
 - 可选集成 Cross-Encoder 或 LLM-based Reranker
 - `kb_knowledge_base.rerank_enabled` 字段已预留
 
-### 6.2 查询改写增强
+### 6.2 查询改写
 
-- Multi-Query 分解：将复杂查询拆分为多个子查询并行检索
-- HyDE：生成假设文档用于检索，提升语义匹配质量
+- 已实现 Multi-Query 分解和 HyDE，详见 `rag-admin-query-rewriting-architecture.md`
+- 由知识库级 `retrievalQueryRewritingMode` 字段控制
 
 ## 7. 检索架构依赖图
 
@@ -99,7 +99,9 @@ DocumentParseProcessor
   └── syncChunks(ES)             ── ES 写入全文索引
 
 RetrievalService.retrieve()
-  ├── retrieveSemantic()   ────── SEMANTIC_ONLY（默认）
+  ├── retrieveSemantic()   ────── SEMANTIC_ONLY
+  ├── KeywordRetrievalStrategy   KEYWORD_ONLY
+  └── HYBRID 分发（默认）
   ├── KeywordRetrievalStrategy   KEYWORD_ONLY
   └── HYBRID 分发
         ├── retrieveSemantic()
