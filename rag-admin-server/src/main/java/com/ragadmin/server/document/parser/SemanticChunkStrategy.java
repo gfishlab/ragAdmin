@@ -147,13 +147,14 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
         long parentIdCounter = -1; // negative IDs as placeholders
         for (List<String> group : groups) {
             String parentText = String.join("\n\n", group);
+            long parentId = parentIdCounter--;
             Map<String, Object> parentMeta = new HashMap<>();
             parentMeta.put("isParent", true);
             parentMeta.put("chunkStrategy", "SEMANTIC");
             parentMeta.put("childCount", group.size());
+            parentMeta.put("parentPlaceholderId", parentId);
             drafts.add(new ChunkDraft(parentText, parentMeta, null));
 
-            long parentId = parentIdCounter--;
             for (String childText : group) {
                 Map<String, Object> childMeta = new HashMap<>();
                 childMeta.put("isChild", true);

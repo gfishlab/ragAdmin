@@ -31,6 +31,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -192,13 +193,14 @@ public class DocumentParseProcessor {
 
             TaskStepRecordEntity embeddingStep = startStep(context.task().getId(), "GENERATE_EMBEDDING", "生成向量");
             taskRealtimeEventService.publishStepStarted(context.task(), context.document(), embeddingStep.getStepCode(), embeddingStep.getStepName());
-            chunkVectorizationService.vectorize(knowledgeBase, chunks);
+            List<ChunkEntity> childChunks = chunks.stream().filter(c -> c.getParentChunkId() == null || c.getParentChunkId() > 0).toList();
+            chunkVectorizationService.vectorize(knowledgeBase, childChunks);
             completeStep(embeddingStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), embeddingStep.getStepCode(), embeddingStep.getStepName());
 
             TaskStepRecordEntity searchSyncStep = startStep(context.task().getId(), "SYNC_SEARCH_ENGINE", "同步检索引擎");
             taskRealtimeEventService.publishStepStarted(context.task(), context.document(), searchSyncStep.getStepCode(), searchSyncStep.getStepName());
-            chunkSearchSyncService.syncChunks(context.document().getKbId(), chunks);
+            chunkSearchSyncService.syncChunks(context.document().getKbId(), childChunks);
             completeStep(searchSyncStep);
             taskRealtimeEventService.publishStepCompleted(context.task(), context.document(), searchSyncStep.getStepCode(), searchSyncStep.getStepName());
 
@@ -304,6 +306,7 @@ public class DocumentParseProcessor {
             chunkMapper.delete(new LambdaQueryWrapper<ChunkEntity>()
                     .eq(ChunkEntity::getDocumentVersionId, context.version().getId()));
 
+            Map<Long, Long> placeholderToRealId = new HashMap<>();
             int chunkNo = 1;
             List<ChunkEntity> persistedChunks = new ArrayList<>();
             for (ChunkDraft chunk : chunks) {
@@ -316,10 +319,24 @@ public class DocumentParseProcessor {
                 entity.setTokenCount(estimateTokenCount(chunk.text()));
                 entity.setCharCount(chunk.text().length());
                 entity.setMetadataJson(toMetadataJson(chunk.metadata()));
-                entity.setParentChunkId(chunk.parentChunkId());
+
+                // Resolve parent placeholder to real DB ID
+                Long parentId = chunk.parentChunkId();
+                if (parentId != null && parentId < 0) {
+                    parentId = placeholderToRealId.get(parentId);
+                }
+                entity.setParentChunkId(parentId);
+
                 entity.setChunkStrategy(extractChunkStrategy(chunk.metadata()));
                 entity.setEnabled(Boolean.TRUE);
                 chunkMapper.insertWithJsonb(entity);
+
+                // Record mapping from placeholder to real ID for parent chunks
+                Object placeholder = chunk.metadata().get("parentPlaceholderId");
+                if (placeholder instanceof Long placeholderId && Boolean.TRUE.equals(chunk.metadata().get("isParent"))) {
+                    placeholderToRealId.put(placeholderId, entity.getId());
+                }
+
                 persistedChunks.add(entity);
             }
             return persistedChunks;
