@@ -6,6 +6,8 @@ public record ChunkResponse(
         String chunkText,
         Integer tokenCount,
         Integer charCount,
+        Long parentChunkId,
+        String chunkStrategy,
         Boolean enabled
 ) {
 }

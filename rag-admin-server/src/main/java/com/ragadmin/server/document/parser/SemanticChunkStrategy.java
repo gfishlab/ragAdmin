@@ -67,11 +67,11 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
         try {
             embeddingDesc = resolveEmbeddingDescriptor(context);
             if (embeddingDesc == null) {
-                log.debug("无法解析 embedding 模型，回退到普通分块");
+                log.warn("无法解析 embedding 模型，回退到普通分块，kbId={}", context.document().getKbId());
                 return new RecursiveFallbackStrategy().chunk(documents, context);
             }
         } catch (Exception e) {
-            log.debug("Embedding 模型不可用，回退到普通分块: {}", e.getMessage());
+            log.info("Embedding 模型不可用，回退到普通分块: {}", e.getMessage());
             return new RecursiveFallbackStrategy().chunk(documents, context);
         }
 
@@ -84,6 +84,7 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
 
         List<Double> similarities = computeAdjacentSimilarities(embeddings);
         List<Integer> breakpoints = findBreakpoints(similarities, chunkProperties.getSemantic().getSimilarityThreshold());
+        log.info("语义分块完成，childUnits={} breakpoints={}", childTexts.size(), breakpoints.size());
 
         return buildParentChildDrafts(childTexts, breakpoints, chunkProperties.getSemantic().getParentMaxChars());
     }
@@ -225,7 +226,7 @@ public class SemanticChunkStrategy implements DocumentChunkStrategy {
             }
             return modelService.resolveKnowledgeBaseEmbeddingModelDescriptor(kb.getEmbeddingModelId());
         } catch (Exception e) {
-            log.debug("解析 embedding 模型描述符失败: {}", e.getMessage());
+            log.warn("解析 embedding 模型描述符失败: {}", e.getMessage());
             return null;
         }
     }

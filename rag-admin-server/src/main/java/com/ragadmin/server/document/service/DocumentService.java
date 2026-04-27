@@ -418,6 +418,8 @@ public class DocumentService {
                 chunk.getChunkText(),
                 chunk.getTokenCount(),
                 chunk.getCharCount(),
+                chunk.getParentChunkId(),
+                chunk.getChunkStrategy(),
                 chunk.getEnabled()
         );
     }
