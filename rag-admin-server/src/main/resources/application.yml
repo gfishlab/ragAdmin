@@ -107,6 +107,16 @@ rag:
     max-context-chunks: 5
     max-context-chars: 4000
     reference-snippet-chars: 200
+    conflict-detection:
+      enabled: false
+      method: PROMPT
+      llm-nli:
+        temperature: 0.0
+        top-p: 0.1
+        max-pairs: 20
+        confidence-threshold: 0.7
+      resolution:
+        enabled: true
     query-rewriting:
       multi-query-count: 3
       log-max-query-length: 120

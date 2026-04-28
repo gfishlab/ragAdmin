@@ -65,6 +65,9 @@ public class RetrievalService {
     @Autowired
     private ParentChunkExpansionService parentChunkExpansionService;
 
+    @Autowired
+    private ConflictDetectionService conflictDetectionService;
+
     public RetrievalResult retrieve(KnowledgeBaseEntity knowledgeBase, String question) {
         QueryRewritingService.RewrittenQueries rewritten = queryRewritingService.rewrite(
                 question, knowledgeBase.getRetrievalQueryRewritingMode());
@@ -108,6 +111,10 @@ public class RetrievalService {
                 chunks = retrieveSemantic(knowledgeBase, question, topK);
             }
         }
+
+        // 冲突检测：多路召回之后、reranking 之前
+        var conflictResult = conflictDetectionService.detect(question, chunks);
+        chunks = conflictResult.getResolvedChunks();
 
         if (Boolean.TRUE.equals(knowledgeBase.getRerankEnabled()) && rerankingProperties.isEnabled()) {
             chunks = rerankingService.rerank(question, chunks);
@@ -275,6 +282,9 @@ public class RetrievalService {
     public record RetrievalResult(List<RetrievedChunk> chunks, String context) {
     }
 
-    public record RetrievedChunk(ChunkEntity chunk, double score) {
+    public record RetrievedChunk(ChunkEntity chunk, double score, List<String> conflictGroupIds) {
+        public RetrievedChunk(ChunkEntity chunk, double score) {
+            this(chunk, score, List.of());
+        }
     }
 }
