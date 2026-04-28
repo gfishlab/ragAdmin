@@ -12,8 +12,13 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
 
     private static final String TABLE = "TABLE";
     private static final String IMAGE = "IMAGE";
-    private static final String HEADING = "HEADING";
     private static final String TEXT = "TEXT";
+
+    private final TableDetectionProperties tableDetectionProperties;
+
+    public ContentAwareChunkStrategy(TableDetectionProperties tableDetectionProperties) {
+        this.tableDetectionProperties = tableDetectionProperties;
+    }
 
     @Override
     public boolean supports(ChunkContext context) {
@@ -31,22 +36,65 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
 
         if (fullText.isBlank()) return List.of();
 
-        List<ContentBlock> blocks = identifyBlocks(fullText);
-        List<ChunkDraft> chunks = aggregateBlocks(blocks, props, context.contentType());
+        // Phase 1: split by headings into sections
+        List<String> sections = splitByHeadings(fullText);
 
-        for (int i = 0; i < chunks.size(); i++) {
-            Map<String, Object> meta = new HashMap<>(chunks.get(i).metadata());
-            meta.put("chunkIndex", i);
-            meta.put("totalChunks", chunks.size());
-            chunks.set(i, new ChunkDraft(chunks.get(i).text(), meta, chunks.get(i).parentChunkId()));
+        // Phase 2: within each section, identify blocks and aggregate
+        List<ChunkDraft> allDrafts = new ArrayList<>();
+        for (String section : sections) {
+            if (section.isBlank()) continue;
+            List<ContentBlock> blocks = identifyBlocks(section);
+            allDrafts.addAll(aggregateBlocks(blocks, props, context.contentType()));
         }
-        return chunks;
+
+        // Finalize metadata
+        for (int i = 0; i < allDrafts.size(); i++) {
+            Map<String, Object> meta = new HashMap<>(allDrafts.get(i).metadata());
+            meta.put("chunkIndex", i);
+            meta.put("totalChunks", allDrafts.size());
+            allDrafts.set(i, new ChunkDraft(allDrafts.get(i).text(), meta, allDrafts.get(i).parentChunkId()));
+        }
+        return allDrafts;
+    }
+
+    List<String> splitByHeadings(String text) {
+        List<String> sections = new ArrayList<>();
+        String[] lines = text.split("\n");
+        StringBuilder current = new StringBuilder();
+        boolean inCodeBlock = false;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+
+            if (trimmed.startsWith("```")) {
+                inCodeBlock = !inCodeBlock;
+                current.append(line).append("\n");
+                continue;
+            }
+
+            if (!inCodeBlock && trimmed.matches("^#{1,6}\\s+.+") && current.length() > 0) {
+                String section = current.toString().trim();
+                if (!section.isEmpty()) {
+                    sections.add(section);
+                }
+                current = new StringBuilder();
+            }
+            current.append(line).append("\n");
+        }
+
+        String last = current.toString().trim();
+        if (!last.isEmpty()) {
+            sections.add(last);
+        }
+        return sections;
     }
 
     List<ContentBlock> identifyBlocks(String markdown) {
         List<ContentBlock> blocks = new ArrayList<>();
         String[] lines = markdown.split("\n");
         int i = 0;
+        boolean inCodeBlock = false;
+
         while (i < lines.length) {
             String line = lines[i];
             String trimmed = line.trim();
@@ -56,15 +104,42 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
                 continue;
             }
 
+            // Track code block state
+            if (trimmed.startsWith("```")) {
+                inCodeBlock = !inCodeBlock;
+                int start = i;
+                i++;
+                // Accumulate the entire code block as a single TEXT block
+                while (i < lines.length) {
+                    if (lines[i].trim().startsWith("```")) {
+                        i++;
+                        inCodeBlock = !inCodeBlock;
+                        break;
+                    }
+                    i++;
+                }
+                blocks.add(new ContentBlock(TEXT, lines, start, i));
+                continue;
+            }
+
+            // Inside code block, treat as TEXT
+            if (inCodeBlock) {
+                int start = i;
+                while (i < lines.length && !lines[i].trim().startsWith("```")) {
+                    i++;
+                }
+                if (i > start) {
+                    blocks.add(new ContentBlock(TEXT, lines, start, i));
+                }
+                continue;
+            }
+
             if (isPipeTableRow(trimmed)) {
                 int start = i;
                 while (i < lines.length && isPipeTableRow(lines[i].trim())) {
                     i++;
                 }
                 blocks.add(new ContentBlock(TABLE, lines, start, i));
-            } else if (trimmed.startsWith("#") && trimmed.matches("^#{1,6}\\s+.+")) {
-                blocks.add(new ContentBlock(HEADING, lines, i, i + 1));
-                i++;
             } else if (trimmed.matches("!\\[[^\\]]*\\]\\([^)]+\\).*")) {
                 blocks.add(new ContentBlock(IMAGE, lines, i, i + 1));
                 i++;
@@ -72,7 +147,7 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
                 int start = i;
                 while (i < lines.length && !lines[i].trim().isEmpty()
                         && !isPipeTableRow(lines[i].trim())
-                        && !lines[i].trim().startsWith("#")
+                        && !lines[i].trim().startsWith("```")
                         && !lines[i].trim().matches("!\\[[^\\]]*\\]\\([^)]+\\).*")) {
                     i++;
                 }
@@ -102,20 +177,17 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
 
             if (!current.isEmpty() && current.length() + blockText.length() + 2 > maxChars) {
                 if (isTable && !currentHasTable && !currentHasImage) {
-                    // Table coming up, finalize current chunk and handle table separately
                     chunks.add(buildDraft(current.toString(), currentHasTable, currentHasImage, contentType));
                     current = new StringBuilder(overlapTail(current.toString(), overlapChars));
                     currentHasTable = false;
                     currentHasImage = false;
                 } else if (isImage) {
-                    // Image block: finalize current and start fresh with image context
                     chunks.add(buildDraft(current.toString(), currentHasTable, currentHasImage, contentType));
-                    current = new StringBuilder(overlapTail(current.toString(), overlapChars));
+                    current = new StringBuilder();
                     currentHasTable = false;
                     currentHasImage = false;
                 } else if (isTable && currentHasTable) {
-                    // Consecutive tables: split the large table
-                    chunks.addAll(splitLargeTable(blockText, maxChars, overlapChars, contentType));
+                    chunks.addAll(splitLargeTable(blockText, maxChars, contentType));
                     continue;
                 } else {
                     chunks.add(buildDraft(current.toString(), currentHasTable, currentHasImage, contentType));
@@ -125,9 +197,8 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
                 }
             }
 
-            // Handle oversized single table
             if (isTable && blockText.length() > maxChars && current.isEmpty()) {
-                chunks.addAll(splitLargeTable(blockText, maxChars, overlapChars, contentType));
+                chunks.addAll(splitLargeTable(blockText, maxChars, contentType));
                 continue;
             }
 
@@ -144,12 +215,11 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
         return chunks;
     }
 
-    private List<ChunkDraft> splitLargeTable(String tableText, int maxChars, int overlapChars, String contentType) {
+    private List<ChunkDraft> splitLargeTable(String tableText, int maxChars, String contentType) {
         List<ChunkDraft> result = new ArrayList<>();
         String[] rows = tableText.split("\n");
 
         if (rows.length < 3) {
-            // Header + separator + at most 1 data row, can't split further
             result.add(buildDraft(tableText, true, false, contentType));
             return result;
         }
@@ -174,30 +244,42 @@ public class ContentAwareChunkStrategy implements DocumentChunkStrategy {
 
     private ChunkDraft buildDraft(String text, boolean hasTable, boolean hasImage, String contentType) {
         Map<String, Object> meta = new HashMap<>();
+        meta.put("chunkStrategy", "CONTENT_AWARE");
         meta.put("containsTable", hasTable);
         meta.put("containsImage", hasImage);
         meta.put("contentType", contentType != null ? contentType : "TEXT");
         return new ChunkDraft(text.trim(), meta);
     }
 
-    private String overlapTail(String text, int overlapChars) {
-        if (text.length() <= overlapChars) return text;
-        String tail = text.substring(text.length() - overlapChars);
-        int paraBreak = tail.indexOf("\n\n");
-        if (paraBreak >= 0) return tail.substring(paraBreak + 2);
-        int lineBreak = tail.indexOf('\n');
-        if (lineBreak >= 0) return tail.substring(lineBreak + 1);
-        int space = tail.indexOf(' ');
-        if (space >= 0) return tail.substring(space + 1);
-        return tail;
+    String overlapTail(String source, int tailLength) {
+        if (source.length() <= tailLength) return source;
+        int rawStart = source.length() - tailLength;
+        int tolerance = Math.max(tableDetectionProperties.getOverlapTailMinChars(),
+                (int) (tailLength * tableDetectionProperties.getOverlapTailRatio()));
+        int searchFrom = Math.max(0, rawStart - tolerance);
+
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (source.charAt(i) == '\n' && i > 0 && source.charAt(i - 1) == '\n') {
+                return source.substring(i + 1);
+            }
+        }
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (source.charAt(i) == '\n') {
+                return source.substring(i + 1);
+            }
+        }
+        for (int i = rawStart; i > searchFrom; i--) {
+            if (Character.isWhitespace(source.charAt(i))) {
+                return source.substring(i + 1);
+            }
+        }
+        return source.substring(rawStart);
     }
 
-    private boolean isPipeTableRow(String line) {
+    boolean isPipeTableRow(String line) {
         String trimmed = line.trim();
         if (!trimmed.startsWith("|") || !trimmed.endsWith("|")) return false;
-        // Separator row: |---|---|
         if (trimmed.matches("^\\|[-:]+[-| :]*\\|$")) return true;
-        // Data row: | cell | cell |
         if (trimmed.length() >= 3) {
             long pipeCount = trimmed.chars().filter(c -> c == '|').count();
             return pipeCount >= 2;
