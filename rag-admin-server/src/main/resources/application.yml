@@ -164,10 +164,6 @@ rag:
       poll-interval-millis: 2000
       max-poll-attempts: 30
       max-pdf-pages: 600
-    conversion:
-      enabled: true
-      libre-office-path: libreoffice
-      timeout-seconds: 60
     signal:
       header-footer-threshold: 0.6
       blank-line-ratio-threshold: 0.4

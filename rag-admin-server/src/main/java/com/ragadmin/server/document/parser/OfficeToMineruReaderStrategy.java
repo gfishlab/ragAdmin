@@ -24,7 +24,6 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
     private static final Logger log = LoggerFactory.getLogger(OfficeToMineruReaderStrategy.class);
     private static final Set<String> SUPPORTED_TYPES = Set.of("DOCX", "PPTX");
 
-    private final DocumentConversionService conversionService;
     private final MineruParseService mineruParseService;
     private final MinioClientFactory minioClientFactory;
     private final MinioProperties minioProperties;
@@ -33,13 +32,11 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
     private final Tika tika = new Tika();
 
     public OfficeToMineruReaderStrategy(
-            DocumentConversionService conversionService,
             MineruParseService mineruParseService,
             MinioClientFactory minioClientFactory,
             MinioProperties minioProperties,
             DocumentMetadataFactory documentMetadataFactory,
             ImagePipelineProperties imagePipelineProperties) {
-        this.conversionService = conversionService;
         this.mineruParseService = mineruParseService;
         this.minioClientFactory = minioClientFactory;
         this.minioProperties = minioProperties;
@@ -62,21 +59,19 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
             return readWithTika(request);
         }
 
-        if (!conversionService.isAvailable()) {
-            log.info("LibreOffice 不可用，降级到 Tika 解析，docType={}, fileName={}", docType, fileName);
-            return readWithTika(request);
-        }
-
         try {
-            byte[] pdfBytes = conversionService.convertToPdf(request.content(), fileName);
-            String convertedObjectKey = request.version().getStorageObjectKey() + ".converted.pdf";
+            // 直接上传原始 DOCX/PPTX 到 MinIO，MinerU 原生支持 Office 格式
+            String objectKey = request.version().getStorageObjectKey();
+            String contentType = "DOCX".equals(docType)
+                    ? "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                    : "application/vnd.openxmlformats-officedocument.presentationml.presentation";
 
             minioClientFactory.createClient().putObject(
                     PutObjectArgs.builder()
                             .bucket(minioProperties.getBucketName())
-                            .object(convertedObjectKey)
-                            .stream(new ByteArrayInputStream(pdfBytes), pdfBytes.length, -1)
-                            .contentType("application/pdf")
+                            .object(objectKey)
+                            .stream(new ByteArrayInputStream(request.content()), request.content().length, -1)
+                            .contentType(contentType)
                             .build()
             );
 
@@ -84,7 +79,7 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(minioProperties.getBucketName())
-                            .object(convertedObjectKey)
+                            .object(objectKey)
                             .expiry(imagePipelineProperties.getPresignedUrlExpirySeconds())
                             .build()
             );
@@ -96,9 +91,9 @@ public class OfficeToMineruReaderStrategy implements DocumentReaderStrategy {
 
             documents.forEach(doc -> doc.getMetadata().put("originalDocType", docType));
 
-            return documentMetadataFactory.enrichDocuments(documents, request, "OFFICE_TO_MINERU", "CONVERT_THEN_OCR");
+            return documentMetadataFactory.enrichDocuments(documents, request, "OFFICE_MINERU", "OCR");
         } catch (Exception e) {
-            log.warn("Office 文档转 MinerU 解析失败，降级到 Tika，docType={}, fileName={}, reason={}",
+            log.warn("Office 文档 MinerU 解析失败，降级到 Tika，docType={}, fileName={}, reason={}",
                     docType, fileName, e.getMessage());
             return readWithTika(request);
         }

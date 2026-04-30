@@ -18,7 +18,7 @@ class OfficeToMineruReaderStrategyTest {
 
     @Test
     void shouldSupportDocxAndPptx() {
-        OfficeToMineruReaderStrategy strategy = createStrategy(false, false);
+        OfficeToMineruReaderStrategy strategy = createStrategy(false);
 
         assertTrue(strategy.supports(request("DOCX")));
         assertTrue(strategy.supports(request("PPTX")));
@@ -33,7 +33,6 @@ class OfficeToMineruReaderStrategyTest {
                 .thenReturn(new OcrCapability(true, false, "MinerU 不可用", "ch", 600));
 
         OfficeToMineruReaderStrategy strategy = new OfficeToMineruReaderStrategy(
-                mock(DocumentConversionService.class),
                 mineruParseService,
                 mock(MinioClientFactory.class),
                 mock(MinioProperties.class),
@@ -48,53 +47,23 @@ class OfficeToMineruReaderStrategyTest {
     }
 
     @Test
-    void shouldFallbackToTikaWhenLibreOfficeUnavailable() throws Exception {
-        MineruParseService mineruParseService = mock(MineruParseService.class);
-        when(mineruParseService.describeCapability())
-                .thenReturn(new OcrCapability(true, true, "MinerU 可用", "ch", 600));
-
-        DocumentConversionService conversionService = mock(DocumentConversionService.class);
-        when(conversionService.isAvailable()).thenReturn(false);
-
-        OfficeToMineruReaderStrategy strategy = new OfficeToMineruReaderStrategy(
-                conversionService,
-                mineruParseService,
-                mock(MinioClientFactory.class),
-                mock(MinioProperties.class),
-                new DocumentMetadataFactory(),
-                new ImagePipelineProperties()
-        );
-
-        List<Document> documents = strategy.read(request("DOCX"));
-
-        assertEquals(1, documents.size());
-        assertEquals("TIKA", documents.getFirst().getMetadata().get("readerType"));
-    }
-
-    @Test
-    void shouldCallMineruWhenBothAvailable() throws Exception {
+    void shouldCallMineruWhenAvailable() throws Exception {
         MineruParseService mineruParseService = mock(MineruParseService.class);
         when(mineruParseService.describeCapability())
                 .thenReturn(new OcrCapability(true, true, "MinerU 可用", "ch", 600));
         when(mineruParseService.parseByUrlWithImages(anyString(), anyString(), anyString(), any(), any()))
                 .thenReturn(List.of(new Document("MinerU 解析结果")));
 
-        DocumentConversionService conversionService = mock(DocumentConversionService.class);
-        when(conversionService.isAvailable()).thenReturn(true);
-        when(conversionService.convertToPdf(any(byte[].class), anyString()))
-                .thenReturn("fake-pdf".getBytes());
-
         MinioClientFactory minioClientFactory = mock(MinioClientFactory.class);
         io.minio.MinioClient minioClient = mock(io.minio.MinioClient.class);
         when(minioClientFactory.createClient()).thenReturn(minioClient);
         when(minioClient.getPresignedObjectUrl(any(io.minio.GetPresignedObjectUrlArgs.class)))
-                .thenReturn("https://minio.example.com/converted.pdf");
+                .thenReturn("https://minio.example.com/document.docx");
 
         MinioProperties minioProperties = mock(MinioProperties.class);
         when(minioProperties.getBucketName()).thenReturn("test-bucket");
 
         OfficeToMineruReaderStrategy strategy = new OfficeToMineruReaderStrategy(
-                conversionService,
                 mineruParseService,
                 minioClientFactory,
                 minioProperties,
@@ -105,22 +74,50 @@ class OfficeToMineruReaderStrategyTest {
         List<Document> documents = strategy.read(request("DOCX"));
 
         assertEquals(1, documents.size());
-        assertEquals("OFFICE_TO_MINERU", documents.getFirst().getMetadata().get("readerType"));
-        assertEquals("CONVERT_THEN_OCR", documents.getFirst().getMetadata().get("parseMode"));
+        assertEquals("OFFICE_MINERU", documents.getFirst().getMetadata().get("readerType"));
+        assertEquals("OCR", documents.getFirst().getMetadata().get("parseMode"));
         assertEquals("DOCX", documents.getFirst().getMetadata().get("originalDocType"));
-        verify(mineruParseService).parseByUrlWithImages("https://minio.example.com/converted.pdf", "测试文档.docx", "test-bucket", null, null);
+        verify(mineruParseService).parseByUrlWithImages("https://minio.example.com/document.docx", "测试文档.docx", "test-bucket", null, null);
     }
 
-    private OfficeToMineruReaderStrategy createStrategy(boolean mineruAvailable, boolean libreOfficeAvailable) {
+    @Test
+    void shouldFallbackToTikaWhenMineruParseFails() throws Exception {
+        MineruParseService mineruParseService = mock(MineruParseService.class);
+        when(mineruParseService.describeCapability())
+                .thenReturn(new OcrCapability(true, true, "MinerU 可用", "ch", 600));
+        when(mineruParseService.parseByUrlWithImages(anyString(), anyString(), anyString(), any(), any()))
+                .thenThrow(new RuntimeException("MinerU 解析异常"));
+
+        MinioClientFactory minioClientFactory = mock(MinioClientFactory.class);
+        io.minio.MinioClient minioClient = mock(io.minio.MinioClient.class);
+        when(minioClientFactory.createClient()).thenReturn(minioClient);
+        when(minioClient.getPresignedObjectUrl(any(io.minio.GetPresignedObjectUrlArgs.class)))
+                .thenReturn("https://minio.example.com/document.docx");
+        when(minioClient.putObject(any())).thenReturn(null);
+
+        MinioProperties minioProperties = mock(MinioProperties.class);
+        when(minioProperties.getBucketName()).thenReturn("test-bucket");
+
+        OfficeToMineruReaderStrategy strategy = new OfficeToMineruReaderStrategy(
+                mineruParseService,
+                minioClientFactory,
+                minioProperties,
+                new DocumentMetadataFactory(),
+                new ImagePipelineProperties()
+        );
+
+        List<Document> documents = strategy.read(request("DOCX"));
+
+        assertEquals(1, documents.size());
+        assertEquals("TIKA", documents.getFirst().getMetadata().get("readerType"));
+    }
+
+    private OfficeToMineruReaderStrategy createStrategy(boolean mineruAvailable) {
         MineruParseService mineruParseService = mock(MineruParseService.class);
         when(mineruParseService.describeCapability())
                 .thenReturn(new OcrCapability(true, mineruAvailable, "test", "ch", 600));
 
-        DocumentConversionService conversionService = mock(DocumentConversionService.class);
-        when(conversionService.isAvailable()).thenReturn(libreOfficeAvailable);
-
         return new OfficeToMineruReaderStrategy(
-                conversionService,
                 mineruParseService,
                 mock(MinioClientFactory.class),
                 mock(MinioProperties.class),

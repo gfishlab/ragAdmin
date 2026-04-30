@@ -147,8 +147,8 @@ resolveMarkdown() 优先级：
 | 文档类型 | 加载工具 | 提取方式 | 输出格式 | 选择理由 |
 |----------|----------|----------|----------|----------|
 | PDF | MinerU VLM | 视觉理解 | Markdown + 图片 | 版面理解能力强，能处理扫描件 |
-| DOCX | LibreOffice → PDF → MinerU VLM | 格式转换 + 视觉理解 | Markdown + 图片 | 嵌入图片、表格需要视觉提取 |
-| PPT/PPTX | LibreOffice → PDF → MinerU VLM | 格式转换 + 视觉理解 | Markdown + 图片 | 幻灯片版面复杂，需视觉理解 |
+| DOCX | MinerU VLM | 视觉理解 | Markdown + 图片 | MinerU 原生支持 Office 格式 |
+| PPT/PPTX | MinerU VLM | 视觉理解 | Markdown + 图片 | MinerU 原生支持 Office 格式 |
 | PNG/JPG/JPEG/WEBP | MinerU VLM | 视觉理解 | Markdown（图片描述） | 直接视觉识别 |
 | MD/MARKDOWN | Spring AI MarkdownReader | 结构化解析 | 原始 Markdown | 已是结构化文本，无需 VLM |
 | HTML/HTM | Jsoup | DOM 解析 | 纯文本 + 表格标记 | 已是结构化标记 |
@@ -424,7 +424,7 @@ PDF → MinerU VLM → ZIP(md + images/) → 图片存 MinIO → URL 重写
 
 #### DOCX/PPT（含嵌入图片）
 ```
-DOCX/PPT → LibreOffice 转 PDF → PDF 存 MinIO → MinerU VLM → 同 PDF 路径
+DOCX/PPTX → 原始文件存 MinIO → MinerU VLM（原生支持 Office 格式） → 同 PDF 路径
 ```
 
 #### 图片（PNG/JPG）
